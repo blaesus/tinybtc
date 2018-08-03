@@ -1,14 +1,22 @@
 #include <stdint.h>
 #include "parameters.h"
 
-const uint32_t MAGIC_NUMBER = 0x20180427;
+#define MAIN_NET_MAGIC 0xD9B4BEF9;
+#define DIY_NET_MAGIC 0x20180427;
+
+const uint32_t MAGIC_NUMBER = MAIN_NET_MAGIC;
 
 const struct Parameters parameters = {
+
+    // see Satoshi's version.h
+    .protocolVersion = 70015,
+
+    .remotePort = 8333,
 
     // For node Discovery
     // See https://en.bitcoin.it/wiki/Satoshi_Client_Node_Discovery
 
-    .dns_seeds = {
+    .dnsSeeds = {
         "seed.bitcoin.sipa.be",
         "dnsseed.bluematt.me",
         "dnsseed.bitcoin.dashjr.org",

@@ -7,6 +7,10 @@
 #include "globalstate.h"
 #include "inet.h"
 
+#include <unistd.h>
+#include <fcntl.h>
+
+
 uint32_t getV4BinaryIp(IP ip) {
     return (ip[15] << 3 * BYTE)
            + (ip[14] << 2 * BYTE)
@@ -72,17 +76,18 @@ int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]) {
 
 uint8_t dns_bootstrap() {
     puts("Bootstrapping peers via DNS");
-    const uint16_t seedCount = sizeof(parameters.dns_seeds) / sizeof(DomainName);
+    const uint16_t seedCount = sizeof(parameters.dnsSeeds) / sizeof(DomainName);
     for (int seedIndex = 0; seedIndex < seedCount; seedIndex++) {
         DomainName seed;
-        memcpy(seed, parameters.dns_seeds[seedIndex], sizeof(seed));
+        memcpy(seed, parameters.dnsSeeds[seedIndex], sizeof(seed));
         IP ips[MAX_IP_PER_DNS] = { };
         printf("Looking up %s\n", seed);
         lookup_host(seed, ips);
 
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
-            globalState.peerIpCount += 1;
-            memcpy(globalState.peerIps[globalState.peerIpCount], ips[ipIndex], sizeof(IP));
+            if (!isIPEmpty(ips[ipIndex])) {
+                add_peer(ips[ipIndex]);
+            }
         }
     }
     return 0;
@@ -97,3 +102,45 @@ int isIPEmpty(const IP ip) {
     return 1;
 }
 
+int establish_tcp_connections() {
+
+    for (uint32_t peerIndex = 0; peerIndex < globalState.peerCount; peerIndex++) {
+        struct Peer *peer = &globalState.peers[peerIndex];
+        if (peer->active) {
+            struct sockaddr_in serverAddress = {0};
+            peer->socket = socket(AF_INET, SOCK_STREAM, 0);
+            if (peer->socket < 0) {
+                printf("\n Socket creation error \n");
+                return -1;
+            }
+
+            long socketArgs = fcntl(peer->socket, F_GETFL, NULL);
+            socketArgs |= O_NONBLOCK;
+            fcntl(peer->socket, F_SETFL, socketArgs);
+
+            serverAddress.sin_family = AF_INET;
+            serverAddress.sin_port = htons(parameters.remotePort);
+            serverAddress.sin_addr.s_addr = getV4BinaryIp(peer->ip);
+
+            char *ipString = convert_ipv4_readable(peer->ip);
+            printf("Establishing socket for %s\n", ipString);
+            const int response = connect(peer->socket, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
+            if (response < 0) {
+                printf("\nConnection failed for %s\n", ipString);
+            }
+            printf("Connected to %s\n", ipString);
+        }
+    }
+    return 0;
+}
+
+
+int close_tcp_connections() {
+    for (uint32_t peerIndex = 0; peerIndex < globalState.peerCount; peerIndex++) {
+        struct Peer *peer = &globalState.peers[peerIndex];
+        if (peer->socket) {
+            printf("Closing connection to %s\n", convert_ipv4_readable(peer->ip));
+            close(peer->socket);
+        }
+    }
+}
