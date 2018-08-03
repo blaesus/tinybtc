@@ -3,8 +3,8 @@
 #include "parameters.h"
 
 struct GlobalState {
-    IPAddressString peerIps[10000];
-    uint32_t peerIpIndex;
+    IP peerIps[10000];
+    uint32_t peerIpCount;
 };
 
 typedef struct GlobalState GlobalState;

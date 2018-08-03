@@ -2,5 +2,5 @@
 
 GlobalState globalState = {
     .peerIps = {},
-    .peerIpIndex = 0,
+    .peerIpCount = 0,
 };

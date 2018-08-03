@@ -1,8 +1,7 @@
 #pragma once
 
-typedef char IP[16];
-typedef char IPAddressString[100];
-typedef char DomainName[50];
+#include <stdint.h>
+#include "inet.h"
 
 struct Parameters {
     DomainName dns_seeds[6];

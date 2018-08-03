@@ -11,5 +11,5 @@ set(SOURCE_FILES
         src/parameters.h
         src/globalstate.h
         src/globalstate.c
-)
+        src/inet.c src/inet.h)
 add_executable(diy-bitcoin ${SOURCE_FILES})
