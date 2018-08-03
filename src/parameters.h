@@ -1,10 +1,11 @@
-//
-// Created by Andy Shu on 2/8/2018.
-//
+#pragma once
 
-#ifndef DIY_BITCOIN_PARAMETERS_H
-#define DIY_BITCOIN_PARAMETERS_H
+typedef char IP[16];
+typedef char IPAddressString[100];
+typedef char DomainName[50];
 
-const char *dns_seeds[6];
+struct Parameters {
+    DomainName dns_seeds[6];
+};
 
-#endif //DIY_BITCOIN_PARAMETERS_H
+const struct Parameters parameters;

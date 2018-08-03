@@ -12,9 +12,9 @@
 
 #include "Block.h"
 #include "parameters.h"
-#include "global_state.h"
+#include "globalstate.h"
 
-int lookup_host(const char *host, char *ips[100]) {
+int lookup_host(const char *host, IPAddressString ips[100]) {
     struct addrinfo hints, *response;
     int errcode;
 
@@ -31,9 +31,9 @@ int lookup_host(const char *host, char *ips[100]) {
 
     int ip_index = 0;
     while (response) {
-        char addrstr[100];
+        IPAddressString ipAddressString;
         void *ptr;
-        inet_ntop(response->ai_family, response->ai_addr->sa_data, addrstr, 100);
+        inet_ntop(response->ai_family, response->ai_addr->sa_data, ipAddressString, 100);
 
         if (response->ai_family == AF_INET6) {
             ptr = &((struct sockaddr_in6 *) response->ai_addr)->sin6_addr;
@@ -41,9 +41,8 @@ int lookup_host(const char *host, char *ips[100]) {
         else {
             ptr = &((struct sockaddr_in *) response->ai_addr)->sin_addr;
         }
-        inet_ntop(response->ai_family, ptr, addrstr, 100);
-        ips[ip_index] = calloc(50, sizeof(char));
-        strcpy(ips[ip_index], addrstr);
+        inet_ntop(response->ai_family, ptr, ipAddressString, 100);
+        strcpy(ips[ip_index], ipAddressString);
         ip_index += 1;
         response = response->ai_next;
     }
@@ -51,25 +50,36 @@ int lookup_host(const char *host, char *ips[100]) {
     return 0;
 }
 
-int dns_bootstrap() {
-    const uint16_t array_length = sizeof(dns_seeds) / sizeof(char*);
-    for (int i = 0; i < array_length; i++) {
-        const char *seed = dns_seeds[i];
-        char *ips[100] = { NULL };
+uint8_t dns_bootstrap() {
+    const uint16_t seed_array_length = sizeof(parameters.dns_seeds) / sizeof(DomainName);
+    for (int i = 0; i < seed_array_length; i++) {
+        DomainName seed;
+        strcpy(seed, parameters.dns_seeds[i]);
+        IPAddressString ipStrings[100] = { };
         printf("Looking up %s\n", seed);
-        lookup_host(seed, ips);
+        lookup_host(seed, ipStrings);
 
-        for (int j = 0; j < sizeof(ips) / sizeof(char*); j++) {
-            if (ips[j]) {
-                printf("IP %i: %s\n", j, ips[j]);
-                free(ips[j]);
+        for (int j = 0; j < sizeof(ipStrings) / sizeof(IPAddressString); j++) {
+            if (ipStrings[j][0] != '\0') {
+                globalState.peerIpIndex += 1;
+                strcpy(globalState.peerIps[globalState.peerIpIndex], ipStrings[j]);
+                printf("IP %i: %s\n", j, ipStrings[j]);
             }
         }
     }
     return 0;
 }
 
+int checkGlobalState() {
+    for (int i = 0; i < sizeof(globalState.peerIps) / sizeof(IPAddressString); i++) {
+        if (globalState.peerIps[i][0] != '\0') {
+            printf("%s\n", globalState.peerIps[i]);
+        }
+    }
+}
+
 int main() {
     dns_bootstrap();
+    checkGlobalState();
     return 0;
 }
