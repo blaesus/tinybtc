@@ -236,28 +236,25 @@ int monitor_incoming_messages() {
     struct sockaddr_in remoteAddress;
     socklen_t sin_size = sizeof remoteAddress;
     while(1) {  // main accept() loop
-        sleep(1);
-        puts("Accepting");
-        printf("DEBUG %u, %u", globalState.listenSocket, sin_size);
+        puts("\nAccepting");
         incomingSocket = accept(globalState.listenSocket, (struct sockaddr *)&remoteAddress, &sin_size);
         if (incomingSocket < 0) {
             perror("accept");
             continue;
         }
-        puts("C");
-        printf("server: got connection from \n");
+        printf("server: got connection from %s \n", inet_ntoa(remoteAddress.sin_addr));
         int childProcessId = fork();
         if (!childProcessId) { // child
-            ssize_t sendError = send(incomingSocket, "Hello, world!", 13, 0);
-            if (sendError < 0) {
-                perror("send");
-            }
+            close(globalState.listenSocket);
+//            ssize_t sendError = send(incomingSocket, "Hello, world!", 13, 0);
+//            if (sendError < 0) {
+//                perror("send");
+//            }
             close(incomingSocket);
             return 0;
         }
         else { // parent
-            printf("Process: I created child process %i\n", childProcessId);
-            close(incomingSocket);  // parent doesn't need this
+            close(incomingSocket);
         }
     }
 }
