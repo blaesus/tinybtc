@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/socket.h>
 #include "parameters.h"
 
 #define MAX_PEERS 10000
@@ -15,6 +14,7 @@ struct Peer {
 struct GlobalState {
     struct Peer peers[MAX_PEERS];
     uint32_t peerCount;
+    int listenSocket;
 };
 
 typedef struct GlobalState GlobalState;

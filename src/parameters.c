@@ -11,7 +11,7 @@ const struct Parameters parameters = {
     // see Satoshi's version.h
     .protocolVersion = 70015,
 
-    .remotePort = 8333,
+    .port = 8333,
 
     // For node Discovery
     // See https://en.bitcoin.it/wiki/Satoshi_Client_Node_Discovery

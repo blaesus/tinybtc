@@ -6,7 +6,7 @@
 struct Parameters {
     int32_t protocolVersion;
     DomainName dnsSeeds[6];
-    uint16_t remotePort;
+    uint16_t port;
 };
 
 const struct Parameters parameters;

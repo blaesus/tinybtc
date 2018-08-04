@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "Block.h"
 #include "message.h"
@@ -7,30 +8,22 @@
 #include "globalstate.h"
 #include "inet.h"
 
-int inspect_global_state() {
-    puts("Global state inspection");
-    for (int i = 0; i < globalState.peerCount; i++) {
-        if (globalState.peers[i].active) {
-            char *ipString = convert_ipv4_readable(globalState.peers[i].ip);
-            printf("%s, ", ipString);
-        }
-    }
-    return 0;
+void cleanup() {
+    printf("Cleaning up\n");
+    close_tcp_connections();
 }
-
-int find_more_addr() {
-    const uint32_t initialIpCount = globalState.peerCount;
-    for (int peerIndex = 0; peerIndex < globalState.peerCount; peerIndex++) {
-        globalState.peers[peerIndex];
-    }
-    return 0;
-}
-
 
 int main() {
-    dns_bootstrap();
-    establish_tcp_connections();
-    inspect_global_state();
-    close_tcp_connections();
+    int error;
+    error = setup_listen_socket();
+    if (error) {
+        printf("Cannot setup listen socket");
+        return -1;
+    }
+    monitor_incoming_messages();
+//    dns_bootstrap();
+    add_loopback_peer();
+//    establish_tcp_connections();
+    atexit(&cleanup);
     return 0;
 }

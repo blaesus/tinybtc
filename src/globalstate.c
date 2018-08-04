@@ -8,7 +8,11 @@ GlobalState globalState = {
 };
 
 void add_peer(IP ip) {
+    const uint32_t index = globalState.peerCount;
     globalState.peerCount += 1;
-    globalState.peers[globalState.peerCount].active = 1;
-    memcpy(globalState.peers[globalState.peerCount].ip, ip, sizeof(IP));
+
+    memset(&globalState.peers[index], 0, sizeof(struct Peer));
+
+    globalState.peers[index].active = 1;
+    memcpy(globalState.peers[index].ip, ip, sizeof(IP));
 }
