@@ -20,3 +20,4 @@ int setup_listen_socket(void);
 int establish_tcp_connections(void);
 int close_tcp_connections(void);
 int monitor_incoming_messages(void);
+uint32_t get_v4_binary_representation(const IP ip);
