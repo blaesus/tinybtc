@@ -1,4 +1,5 @@
 .idea
-cmake-build-debug
+.DS_store
+cmake-build-*
 CMakeFiles
 data
