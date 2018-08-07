@@ -16,10 +16,11 @@
 #include "util.h"
 
 
+
 uint32_t get_v4_binary_representation(const IP ip) {
-    const uint32_t number = (ip[15] << 3 * BYTE)
-                            + (ip[14] << 2 * BYTE)
-                            + (ip[13] << 1 * BYTE)
+    const uint32_t number = (ip[15] << 3 * BITS_IN_BYTE)
+                            + (ip[14] << 2 * BITS_IN_BYTE)
+                            + (ip[13] << 1 * BITS_IN_BYTE)
                             + (ip[12]);
     return htonl(number);
 }
@@ -41,13 +42,15 @@ int print_ip(IP ip) {
 }
 
 int convert_ipv4_address_to_ip_array(uint32_t address, IP ip) {
-    const uint32_t addressHostEndian = ntohl(address);
+    if (!address) {
+        return 0;
+    }
     ip[10] = (uint8_t)0xFF;
     ip[11] = (uint8_t)0xFF;
-    ip[12] = (uint8_t)(addressHostEndian & 0xFF);
-    ip[13] = (uint8_t)((addressHostEndian >> 1 * BYTE) & 0xFF);
-    ip[14] = (uint8_t)((addressHostEndian >> 2 * BYTE) & 0xFF);
-    ip[15] = (uint8_t)((addressHostEndian >> 3 * BYTE) & 0xFF);
+    ip[12] = (uint8_t)(address & 0xFF);
+    ip[13] = (uint8_t)((address >> 1 * BITS_IN_BYTE) & 0xFF);
+    ip[14] = (uint8_t)((address >> 2 * BITS_IN_BYTE) & 0xFF);
+    ip[15] = (uint8_t)((address >> 3 * BITS_IN_BYTE) & 0xFF);
     return 0;
 }
 
@@ -75,6 +78,8 @@ int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]) {
         }
         else {
             uint32_t address = (((struct sockaddr_in *) response->ai_addr)->sin_addr).s_addr;
+
+            ntohl(address);
             convert_ipv4_address_to_ip_array(address, ip);
         }
         memcpy(ips[ipIndex], ip, sizeof(IP));
@@ -97,7 +102,7 @@ int dns_bootstrap() {
 
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
-                add_peer(ips[ipIndex]);
+                add_peer(ips[ipIndex], false);
             }
         }
     }

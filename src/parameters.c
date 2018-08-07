@@ -1,15 +1,6 @@
 #include <stdint.h>
 #include "parameters.h"
 
-#define MAIN_NET_MAGIC 0xD9B4BEF9
-#define DIY_NET_MAGIC 0x20180427
-
-#define SERVICE_NODE_NETWORK 1
-#define SERVICE_NODE_GETUTXO 2
-#define SERVICE_NODE_BLOOM 4
-#define SERVICE_NODE_WITNESS 8
-#define SERVICE_NODE_NETWORK_LIMITED 1024
-
 const struct Parameters parameters = {
 
     .magic = MAIN_NET_MAGIC,
@@ -17,13 +8,12 @@ const struct Parameters parameters = {
     // see Satoshi's version.h
     .protocolVersion = 70015,
 
-    .port = 8333,
+    .port = TEST_NET_PORT,
 
-    .services = SERVICE_NODE_NETWORK,
+    .services = SERVICE_NODE_NETWORK & SERVICE_NODE_WITNESS,
 
     // For node Discovery
     // See https://en.bitcoin.it/wiki/Satoshi_Client_Node_Discovery
-
     .dnsSeeds = {
         "seed.bitcoin.sipa.be",
         "dnsseed.bluematt.me",
@@ -32,6 +22,12 @@ const struct Parameters parameters = {
         "seed.bitcoin.jonasschnelli.ch",
         "seed.btc.petertodd.org",
     },
+
+    .userAgent = "/Satoshi:0.16.2/",
+
+    .maxIncoming = 125,
+
+    .maxOutgoing = 8,
 
     .backlog = 32
 };

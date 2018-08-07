@@ -34,7 +34,7 @@ struct ContextData {
 
 void on_peer_connect(uv_connect_t* req, int32_t status) {
     struct ContextData *data = (struct ContextData *)req->data;
-    char *ipString = convert_ipv4_readable(data->peer->ip);
+    char *ipString = convert_ipv4_readable(data->peer->address.ip);
     if (status) {
         fprintf(stderr, " [ERR] connection failed with peer %s: %s \n", ipString, uv_strerror(status));
     }
@@ -45,7 +45,7 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
 
 
 int32_t connect_to_peer(struct Peer *peer) {
-    char *ipString = convert_ipv4_readable(peer->ip);
+    char *ipString = convert_ipv4_readable(peer->address.ip);
     printf(" > connecting with peer %s\n", ipString);
     struct sockaddr_in remoteAddress = {0};
     peer->socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
@@ -74,12 +74,12 @@ void on_echo_write_finish(uv_write_t *req, int status) {
 void on_incoming_message(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
     if (nread < 0) {
         if (nread != UV_EOF) {
-            fprintf(stderr, "Read error %s\n", uv_err_name(nread));
+            fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
             uv_close((uv_handle_t*) client, NULL);
         }
     } else if (nread > 0) {
         uv_write_t *req = (uv_write_t *) malloc(sizeof(uv_write_t));
-        uv_buf_t wrbuf = uv_buf_init(buf->base, nread);
+        uv_buf_t wrbuf = uv_buf_init(buf->base, (unsigned int)nread);
         uv_write(req, client, &wrbuf, 1, on_echo_write_finish);
     }
 

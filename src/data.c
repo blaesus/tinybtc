@@ -17,7 +17,7 @@ int save_peers() {
     fwrite(peerCountBytes, 1, 4, file);
 
     for (uint8_t index = 0; index < global.peerCount; index++) {
-        fwrite(global.peers[index].ip, 1, 16, file);
+        fwrite(global.peers[index].address.ip, 1, 16, file);
     }
 
     fclose(file);
@@ -31,12 +31,12 @@ int load_peers() {
     uint8_t buffer[16] = {0};
 
     fread(&buffer, 1, 4, file);
-    global.peerCount = combine_int32(buffer);
+    global.peerCount = combine_uint32(buffer);
     printf("(%u peers to recover)...", global.peerCount);
     for (uint32_t index = 0; index < global.peerCount; index++) {
         fread(&buffer, 1, 16, file);
         memset(&global.peers[index], 0, sizeof(struct Peer));
-        memcpy(global.peers[index].ip, buffer, sizeof(IP));
+        memcpy(global.peers[index].address.ip, buffer, sizeof(IP));
         global.peers[index].valid = true;
     }
     printf("Done\n");

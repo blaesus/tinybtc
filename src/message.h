@@ -3,26 +3,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "parameters.h"
+#include "datatypes.h"
+
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#version
-// @see https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
-
-typedef uint8_t VariableLengthInteger[64];
-
-// @see https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
-
-struct VariableLengthString {
-    uint8_t string[9];
-    VariableLengthInteger length;
-};
-
-// @see https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
-
-struct NetworkAddress {
-    uint32_t time;
-    uint64_t services;
-    uint8_t ip[16];
-    uint16_t port;
-};
 
 struct VersionPayload {
     int32_t version;
@@ -46,12 +29,42 @@ union Payload {
 
 typedef union Payload Payload;
 
+// @see https://en.bitcoin.it/wiki/Protocol_documentation#Message_structure
+
+#define CHECKSUM_SIZE 4
+typedef uint8_t PayloadChecksum[CHECKSUM_SIZE];
+
 struct Message {
     uint32_t magic;
     uint8_t command[12];
-    uint32_t length;
-    uint32_t checksum;
+    uint32_t length; // of payload
+    PayloadChecksum checksum;
     Payload *payload;
 };
 
-int serialize_version_message(struct Message *message, uint8_t *data);
+uint64_t serialize_version_message(
+        struct Message *ptrMessage,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
+);
+void makeVerackMessage(struct Message *ptrMessage);
+uint8_t serializeVarInt(uint64_t data, uint8_t *ptrBuffer);
+uint64_t serialize_varstr(
+        struct VariableLengthString *ptrVarStr,
+        uint8_t *ptrBuffer
+);
+uint64_t serializeVersionPayload(
+        struct VersionPayload *ptrPayload,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
+);
+void printObjectWithLength(uint8_t *ptrData, uint64_t length);
+uint64_t make_version_payload_to_peer(
+        struct Peer *ptrPeer,
+        struct VersionPayload *ptrPayload
+);
+void make_version_message(
+        struct Message *ptrMessage,
+        struct VersionPayload *ptrPayload,
+        uint32_t payloadLength
+);
