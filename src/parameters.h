@@ -4,10 +4,12 @@
 #include "inet.h"
 
 struct Parameters {
-    int32_t magic[4];
+    uint32_t magic;
+    uint64_t services;
     int32_t protocolVersion;
     DomainName dnsSeeds[6];
     uint16_t port;
+    uint8_t backlog;
 };
 
-const struct Parameters parameters;
+extern const struct Parameters parameters;

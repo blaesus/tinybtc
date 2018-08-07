@@ -4,12 +4,16 @@
 #include <errno.h>
 #include <stdbool.h>
 
+#include <sys/socket.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include <pthread.h>
+
 #include "globalstate.h"
 #include "inet.h"
+#include "util.h"
 
 
 uint32_t get_v4_binary_representation(const IP ip) {
@@ -21,7 +25,6 @@ uint32_t get_v4_binary_representation(const IP ip) {
 }
 
 char *convert_ipv4_readable(IP ip) {
-    // TODO: Handle ipv6
     struct in_addr addr = {
         .s_addr = get_v4_binary_representation(ip)
     };
@@ -29,7 +32,7 @@ char *convert_ipv4_readable(IP ip) {
 }
 
 int print_ip(IP ip) {
-    for (int i = 0; i < sizeof(IP) / sizeof(char); i++) {
+    for (size_t i = 0; i < sizeof(IP) / sizeof(char); i++) {
         printf("%u", ip[i]);
         printf("-");
     }
@@ -101,65 +104,23 @@ int dns_bootstrap() {
     return 0;
 }
 
-int add_loopback_peer() {
-    puts("Adding loopback as peer");
-    IP ip = {0};
-    convert_ipv4_address_to_ip_array(inet_addr("127.0.0.1"), ip);
-    add_peer(ip);
-    return 0;
-}
-
-int setup_listen_socket() {
-    struct addrinfo hints, *localAddress, *addr;
-    int addrInfoError;
-    int yes=1;
+int32_t get_local_listen_address(struct sockaddr_in *addr) {
+    struct addrinfo hints, *localAddress;
+    int32_t addrInfoError;
+    char port[5] = {0};
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; // use my IP
+    hints.ai_flags = AI_PASSIVE; // Use my IP
 
-    if ((addrInfoError = getaddrinfo(NULL, "8333", &hints, &localAddress)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addrInfoError));
+    uint_to_str(parameters.port, port);
+
+    if ((addrInfoError = getaddrinfo(NULL, port, &hints, &localAddress)) != 0) {
+        printf("getaddrinfo: %s\n", gai_strerror(addrInfoError));
         return 1;
     }
-
-    for(addr = localAddress; addr != NULL; addr = addr->ai_next) {
-        globalState.listenSocket = socket(addr->ai_family, addr->ai_socktype,addr->ai_protocol);
-        if (globalState.listenSocket < 0) {
-            perror("server: socket");
-            continue;
-        }
-
-        if (setsockopt(globalState.listenSocket, SOL_SOCKET, SO_REUSEADDR, &yes,
-                       sizeof(int)) == -1) {
-            perror("setsockopt");
-            return 1;
-        }
-
-        int bindError = bind(globalState.listenSocket, addr->ai_addr, addr->ai_addrlen);
-        if (bindError < 0) {
-            fprintf(stderr, "Local binding failed with error code %u \n", errno);
-            close(globalState.listenSocket);
-            continue;
-        }
-        printf("Binding succeeded \n");
-
-        break;
-    }
-
-    freeaddrinfo(localAddress); // all done with this structure
-    if (addr == NULL)  {
-        fprintf(stderr, "server: failed to bind\n");
-        return 1;
-    }
-
-    const int listenError = listen(globalState.listenSocket, 10);
-    if (listenError) {
-        printf("Listening failed with error code %u \n", errno);
-        return -1;
-    }
-    printf("Listening started\n");
+    memcpy(addr, (struct sockaddr_in *)localAddress->ai_addr, sizeof(struct sockaddr_in *));
     return 0;
 }
 
@@ -171,91 +132,3 @@ bool isIPEmpty(const IP ip) {
     }
     return true;
 }
-
-int connect_to_peer(struct Peer *peer) {
-    struct sockaddr_in remoteAddress = {0};
-    peer->socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (peer->socket < 0) {
-        printf("Cannot create socket");
-        return -1;
-    }
-
-    remoteAddress.sin_family = AF_INET;
-    remoteAddress.sin_port = htons(parameters.port);
-    remoteAddress.sin_addr.s_addr = get_v4_binary_representation(peer->ip);
-
-//    long socketArgs = fcntl(peer->socket, F_GETFL, NULL);
-//    socketArgs |= O_NONBLOCK;
-//    fcntl(peer->socket, F_SETFL, socketArgs);
-
-    char *ipString = convert_ipv4_readable(peer->ip);
-    printf("Connecting socket to %s\n", ipString);
-    const int connectError = connect(peer->socket, (struct sockaddr *)&remoteAddress, sizeof(remoteAddress));
-    if (connectError < 0) {
-        printf("Failed to connect to %s (%u) \n", ipString, errno);
-        return -1;
-    }
-    printf("Connected to %s\n", ipString);
-
-    return 0;
-}
-
-int establish_tcp_connections() {
-    for (uint32_t peerIndex = 0; peerIndex < globalState.peerCount; peerIndex++) {
-        struct Peer *peer = &globalState.peers[peerIndex];
-        if (peer->active) {
-            connect_to_peer(peer);
-        }
-    }
-    return 0;
-}
-
-
-int close_tcp_connections() {
-    printf("Closing connections");
-    close(globalState.listenSocket);
-    for (uint32_t peerIndex = 0; peerIndex < globalState.peerCount; peerIndex++) {
-        struct Peer *peer = &globalState.peers[peerIndex];
-        if (peer->socket) {
-            close(peer->socket);
-        }
-    }
-    return 0;
-}
-
-void *get_in_addr(struct sockaddr *sa) {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
-
-int monitor_incoming_messages() {
-    puts("Setting up monitoring");
-    int incomingSocket;
-    struct sockaddr_in remoteAddress;
-    socklen_t sin_size = sizeof remoteAddress;
-    while(1) {  // main accept() loop
-        puts("\nAccepting");
-        incomingSocket = accept(globalState.listenSocket, (struct sockaddr *)&remoteAddress, &sin_size);
-        if (incomingSocket < 0) {
-            perror("accept");
-            continue;
-        }
-        printf("server: got connection from %s \n", inet_ntoa(remoteAddress.sin_addr));
-        int childProcessId = fork();
-        if (!childProcessId) { // child
-            close(globalState.listenSocket);
-//            ssize_t sendError = send(incomingSocket, "Hello, world!", 13, 0);
-//            if (sendError < 0) {
-//                perror("send");
-//            }
-            close(incomingSocket);
-            return 0;
-        }
-        else { // parent
-            close(incomingSocket);
-        }
-    }
-}
-

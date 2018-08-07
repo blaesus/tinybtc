@@ -2,14 +2,11 @@ cmake_minimum_required(VERSION 3.5)
 project(diy-bitcoin)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 
 include_directories(src)
-set(SOURCE_FILES
-        src/main.c
-        src/parameters.c
-        src/Block.h
-        src/parameters.h
-        src/globalstate.h
-        src/globalstate.c
-        src/inet.c src/inet.h src/message.h src/data.h src/data.c)
-add_executable(diy-bitcoin ${SOURCE_FILES})
+include_directories(deps/libuv)
+file(GLOB SOURCES "src/*.c")
+
+add_executable(diy-bitcoin ${SOURCES} src/comm.c src/comm.h)
+target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv/libuv_a.a)

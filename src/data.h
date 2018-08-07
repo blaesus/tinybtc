@@ -1,4 +1,4 @@
 #pragma once
 
-int saveGlobalState();
-int loadGlobalState();
+int save_peers();
+int load_peers();

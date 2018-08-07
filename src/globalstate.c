@@ -2,17 +2,19 @@
 #include <stdbool.h>
 #include "globalstate.h"
 
-GlobalState globalState = {
+GlobalState global = {
+    .listenSocket = -1,
     .peers = {},
     .peerCount = 0,
+    .eventCounter = 0,
 };
 
 void add_peer(IP ip) {
-    const uint32_t index = globalState.peerCount;
-    globalState.peerCount += 1;
+    const uint32_t index = global.peerCount;
+    global.peerCount += 1;
 
-    memset(&globalState.peers[index], 0, sizeof(struct Peer));
+    memset(&global.peers[index], 0, sizeof(struct Peer));
 
-    globalState.peers[index].active = 1;
-    memcpy(globalState.peers[index].ip, ip, sizeof(IP));
+    global.peers[index].valid = 1;
+    memcpy(global.peers[index].ip, ip, sizeof(IP));
 }
