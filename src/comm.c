@@ -42,6 +42,7 @@ void on_incoming_message(
         ssize_t nread,
         const uv_buf_t *buf
 ) {
+    printf("\n>----------------------------------------------------------");
     printf("\nIncoming message");
     if (nread < 0) {
         if (nread != UV_EOF) {
@@ -49,7 +50,20 @@ void on_incoming_message(
             uv_close((uv_handle_t*) client, NULL);
         }
     } else if (nread > 0) {
-        printObjectWithLength(buf->base, nread);
+        struct Message incomingMessage = {0};
+        parseMessageHeader(buf->base, &incomingMessage);
+        if (incomingMessage.magic == parameters.magic) {
+            printObjectWithLength(buf->base, nread);
+            printf("Message parsed: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
+                   incomingMessage.magic,
+                   incomingMessage.command,
+                   incomingMessage.length
+            );
+        }
+        else {
+            printf("\nMAGIC mismatch: %x != %x\n", parameters.magic, incomingMessage.magic);
+        }
+        printf("----------------------------------------------------------<\n");
     }
 
     if (buf->base) {

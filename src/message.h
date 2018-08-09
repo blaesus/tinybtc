@@ -68,3 +68,8 @@ void make_version_message(
         struct VersionPayload *ptrPayload,
         uint32_t payloadLength
 );
+
+uint64_t parseMessageHeader(
+        uint8_t *buffer,
+        struct Message *ptrMessage
+);

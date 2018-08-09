@@ -211,3 +211,19 @@ uint64_t serialize_version_message(
     return messageHeaderSize + ptrMessage->length;
 }
 
+uint64_t parseMessageHeader(
+        uint8_t *buffer,
+        struct Message *ptrMessage
+) {
+    struct Message *p = ptrMessage;
+
+    uint32_t headerSize =
+            +sizeof(ptrMessage->magic)
+            +sizeof(ptrMessage->command)
+            +sizeof(ptrMessage->length)
+            +sizeof(ptrMessage->checksum);
+
+    memcpy(p, buffer, headerSize);
+
+    return headerSize;
+}
