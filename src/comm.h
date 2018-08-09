@@ -5,5 +5,5 @@
 
 uint32_t setup_main_event_loop(bool setupIdle);
 int setup_listen_socket(void);
-int setup_peer_connections(void);
+int connect_to_peers(void);
 int free_networking_resources(void);

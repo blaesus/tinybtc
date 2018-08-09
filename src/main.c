@@ -57,11 +57,9 @@ int32_t test_version_messages() {
     };
     memcpy(fixturePeer.address.ip, fixturePeerIp, sizeof(IP));
 
-    uint8_t messageBuffer[MESSAGE_BUFFER_SIZE] = {};
-    memset(messageBuffer, 0xFF, sizeof(messageBuffer));
+    uint8_t messageBuffer[MESSAGE_BUFFER_SIZE] = {0};
 
-    uint64_t userAgentLength = make_version_payload_to_peer(&fixturePeer, &payload);
-    uint64_t payloadLength = userAgentLength + 1 /* Length itself */ + 85; // TODO: calculate;
+    uint32_t payloadLength = make_version_payload_to_peer(&fixturePeer, &payload);
     make_version_message(&message, &payload, payloadLength);
 
     uint64_t dataSize = serialize_version_message(
@@ -70,7 +68,7 @@ int32_t test_version_messages() {
             MESSAGE_BUFFER_SIZE
     );
 
-    printObjectWithLength(&messageBuffer, dataSize);
+    printObjectWithLength(messageBuffer, dataSize);
 
     return 0;
 }
@@ -87,22 +85,25 @@ void testHash() {
     //Should be 95 95 c9 df ...
 }
 
-int32_t main() {
-    init();
-//    testHash();
-    test_version_messages();
-}
-
-int32_t mainX() {
-    init();
+int32_t network() {
     load_peers();
     if (!global.peerCount) {
         dns_bootstrap();
+        save_peers();
     }
-    setup_main_event_loop(false);
+    setup_main_event_loop(true);
     setup_listen_socket();
-    setup_peer_connections();
+    connect_to_peers();
     run_main_loop();
+    return 0;
+}
+
+int32_t main() {
+    init();
+//    testHash();
+//    test_version_messages();
+    network();
     atexit(&cleanup);
     return 0;
 }
+

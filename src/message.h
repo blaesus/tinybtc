@@ -47,8 +47,8 @@ uint64_t serialize_version_message(
         uint8_t *ptrBuffer,
         uint32_t bufferSize
 );
-void makeVerackMessage(struct Message *ptrMessage);
-uint8_t serializeVarInt(uint64_t data, uint8_t *ptrBuffer);
+void make_verack_message(struct Message *ptrMessage);
+uint8_t serialize_to_varint(uint64_t data, uint8_t *ptrBuffer);
 uint64_t serialize_varstr(
         struct VariableLengthString *ptrVarStr,
         uint8_t *ptrBuffer
@@ -59,7 +59,7 @@ uint64_t serializeVersionPayload(
         uint32_t bufferSize
 );
 void printObjectWithLength(uint8_t *ptrData, uint64_t length);
-uint64_t make_version_payload_to_peer(
+uint32_t make_version_payload_to_peer(
         struct Peer *ptrPeer,
         struct VersionPayload *ptrPayload
 );

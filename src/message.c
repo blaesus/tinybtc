@@ -8,52 +8,6 @@
 #include "globalstate.h"
 #include "util.h"
 
-
-void calculate_payload_checksum(void *ptrPayload, uint32_t length, uint8_t *ptrResult) {
-    SHA256_HASH hash = {0};
-    dsha256(ptrPayload, length, hash);
-    memcpy(ptrResult, hash, CHECKSUM_SIZE);
-}
-
-void makeVerackMessage(struct Message *ptrMessage) {
-    ptrMessage->magic = parameters.magic;
-    memcpy(ptrMessage->command, CMD_VERACK, sizeof(CMD_VERACK));
-    ptrMessage->length = 0;
-    calculate_payload_checksum(
-            ptrMessage->payload,
-            ptrMessage->length,
-            ptrMessage->checksum
-    );
-}
-
-uint64_t make_version_payload_to_peer(
-        struct Peer *ptrPeer,
-        struct VersionPayload *ptrPayload
-) {
-    struct NetworkAddress recipientAddress = ptrPeer->address;
-
-    const uint8_t NONCE_WIDTH = sizeof(uint64_t) / sizeof(uint8_t);
-//    uint8_t nonceBytes[NONCE_WIDTH] = {0};
-//    randomBytes(NONCE_WIDTH, nonceBytes);
-    uint8_t nonceBytes[NONCE_WIDTH] = { 0x5e, 0x5a, 0xdb, 0x60, 0x3e, 0x5e, 0x63, 0x8d };
-
-    uint64_t nonce = combine_uint64(nonceBytes);
-
-    size_t userAgentLength = strlen((char *)parameters.userAgent);
-
-    ptrPayload->version = parameters.protocolVersion;
-    ptrPayload->services = parameters.services;
-//    ptrPayload->timestamp = time(NULL);
-    ptrPayload->timestamp = 0x5b6550fa; //FIXME: Remove fixture
-    ptrPayload->addr_recv = recipientAddress;
-    ptrPayload->addr_from = global.myAddress;
-    ptrPayload->nonce = nonce;
-    ptrPayload->user_agent.length = userAgentLength;
-    memcpy(ptrPayload->user_agent.string, parameters.userAgent, userAgentLength);
-    ptrPayload->relay = true;
-    return userAgentLength;
-}
-
 #define VAR_INT_CHECKPOINT_8  0xFD
 #define VAR_INT_PREFIX_16  0xFD
 #define VAR_INT_CHECKPOINT_16  0xFFFF
@@ -61,8 +15,23 @@ uint64_t make_version_payload_to_peer(
 #define VAR_INT_CHECKPIONT_32  0xFFFFFFFF
 #define VAR_INT_PREFIX_64  0xFF
 
+uint8_t calc_number_varint_width(uint64_t number) {
+    if (number < VAR_INT_CHECKPOINT_8) {
+        return 1;
+    }
+    else if (number <= VAR_INT_CHECKPOINT_16) {
+        return 3;
+    }
+    else if (number <= VAR_INT_CHECKPIONT_32) {
+        return 5;
+    }
+    else {
+        return 9;
+    }
+}
 
-uint8_t serializeVarInt(
+
+uint8_t serialize_to_varint(
         uint64_t data,
         uint8_t *ptrBuffer
 ) {
@@ -87,19 +56,62 @@ uint8_t serializeVarInt(
     }
 }
 
+void calculate_payload_checksum(void *ptrPayload, uint32_t length, uint8_t *ptrResult) {
+    SHA256_HASH hash = {0};
+    dsha256(ptrPayload, length, hash);
+    memcpy(ptrResult, hash, CHECKSUM_SIZE);
+}
+
+void make_verack_message(struct Message *ptrMessage) {
+    ptrMessage->magic = parameters.magic;
+    memcpy(ptrMessage->command, CMD_VERACK, sizeof(CMD_VERACK));
+    ptrMessage->length = 0;
+    calculate_payload_checksum(
+            ptrMessage->payload,
+            ptrMessage->length,
+            ptrMessage->checksum
+    );
+}
+
+uint32_t make_version_payload_to_peer(
+        struct Peer *ptrPeer,
+        struct VersionPayload *ptrPayload
+) {
+    struct NetworkAddress recipientAddress = ptrPeer->address;
+    uint64_t nonce = random_uint64();
+
+    uint32_t userAgentDataLength = (uint32_t)strlen((char *)parameters.userAgent);
+
+    ptrPayload->version = parameters.protocolVersion;
+    ptrPayload->services = parameters.services;
+    ptrPayload->timestamp = time(NULL);
+    ptrPayload->addr_recv = recipientAddress;
+    ptrPayload->addr_from = global.myAddress;
+    ptrPayload->nonce = nonce;
+    ptrPayload->user_agent.length = userAgentDataLength;
+    memcpy(ptrPayload->user_agent.string, parameters.userAgent, userAgentDataLength);
+    ptrPayload->relay = true;
+
+    uint8_t userAgentLengthWidth = calc_number_varint_width(userAgentDataLength);
+
+    return userAgentDataLength + userAgentLengthWidth + 85;
+}
+
+
+
 uint64_t serialize_varstr(
         struct VariableLengthString *ptrVarStr,
         uint8_t *ptrBuffer
 ) {
-    uint8_t varintLength = serializeVarInt(ptrVarStr->length, ptrBuffer);
+    uint8_t varintLength = serialize_to_varint(ptrVarStr->length, ptrBuffer);
     memcpy(ptrBuffer+varintLength, ptrVarStr->string, ptrVarStr->length);
     return varintLength + ptrVarStr->length;
 }
 
 uint64_t serialize_network_address(
-    struct NetworkAddress *ptrAddress,
-    uint8_t *ptrBuffer,
-    uint32_t bufferSize
+        struct NetworkAddress *ptrAddress,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
 ) {
     //TODO: Cehck buffer overflow
     uint8_t *p = ptrBuffer;
@@ -116,9 +128,9 @@ uint64_t serialize_network_address(
 }
 
 uint64_t serialize_version_payload(
-    struct VersionPayload *ptrPayload,
-    uint8_t *ptrBuffer,
-    uint32_t bufferSize
+        struct VersionPayload *ptrPayload,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
 ) {
     if (bufferSize < 0) {
         // TODO: Check buffer overflow in the following procedures;

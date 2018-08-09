@@ -20,9 +20,11 @@ int save_peers() {
         fwrite(global.peers[index].address.ip, 1, 16, file);
     }
 
+    printf("Saved %u peers", global.peerCount);
+
     fclose(file);
     return 0;
-};
+}
 
 int load_peers() {
     printf("Loading global state ");

@@ -78,9 +78,7 @@ int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]) {
         }
         else {
             uint32_t address = (((struct sockaddr_in *) response->ai_addr)->sin_addr).s_addr;
-
-            ntohl(address);
-            convert_ipv4_address_to_ip_array(address, ip);
+            convert_ipv4_address_to_ip_array(ntohl(address), ip);
         }
         memcpy(ips[ipIndex], ip, sizeof(IP));
         ipIndex += 1;
@@ -96,13 +94,14 @@ int dns_bootstrap() {
     for (int seedIndex = 0; seedIndex < seedCount; seedIndex++) {
         DomainName seed;
         memcpy(seed, parameters.dnsSeeds[seedIndex], sizeof(seed));
-        IP ips[MAX_IP_PER_DNS] = { };
+        IP ips[MAX_IP_PER_DNS] = {{0}};
         printf("Looking up %s\n", seed);
         lookup_host(seed, ips);
 
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
                 add_peer(ips[ipIndex], false);
+                printf("%s\n", convert_ipv4_readable(ips[ipIndex]));
             }
         }
     }

@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "util.h"
 #include "datatypes.h"
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 
 int segment_int32(uint32_t number, uint8_t chars[4]) {
     chars[0] = (uint8_t)(number & 0xFF);
@@ -42,7 +42,7 @@ uint32_t count_string_length(char *s) {
     return i+1;
 }
 
-void swap(char *a, char *b) {
+void swap_char(char *a, char *b) {
     char temp = *b;
     *b = *a;
     *a = temp;
@@ -51,7 +51,7 @@ void swap(char *a, char *b) {
 void reverse_string(char *s) {
     uint32_t length = count_string_length(s);
     for (uint32_t i = 0; i < length / 2; i++) {
-        swap(&s[i], &s[length - i - 2]);
+        swap_char(&s[i], &s[length - i - 2]);
     }
 }
 
@@ -73,19 +73,33 @@ void randomBytes(uint32_t count, uint8_t *data) {
     }
 }
 
+uint64_t random_uint64() {
+    uint8_t nonceBytes[8] = {0};
+    randomBytes(8, nonceBytes);
+    return combine_uint64(nonceBytes);
+}
+
 void printUint64(uint64_t input) {
     printf("%"PRIu64"\n", input);
 }
 
 void printObjectWithLength(uint8_t *ptrData, uint64_t length) {
-    uint32_t index;
+    uint64_t index;
     uint8_t character = 0;
     for (index = 0; index < length; index++) {
         character = (uint8_t)(*ptrData & 0xFF);
         if (index % 16 == 0) {
-            printf("\n%03x0 - ", index / 16);
+            printf("\n%03"PRIx64"0 - ", index / 16);
         }
         printf("%02x ", character);
         ptrData++;
     }
+    printf("END \n");
+}
+
+uint32_t min(uint32_t a, uint32_t b) {
+    if (a <= b) {
+        return a;
+    }
+    return b;
 }

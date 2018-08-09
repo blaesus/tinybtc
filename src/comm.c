@@ -6,14 +6,19 @@
 
 #include "globalstate.h"
 #include "inet.h"
+#include "message.h"
 
 void on_idle(uv_idle_t *handle) {
     global.eventCounter++;
     if (global.eventCounter % 1000000 == 0) {
-        printf("Event count %u\n", global.eventCounter);
+        printf("Event count %llu\n", global.eventCounter);
     }
     if (global.eventCounter >= 1e7) {
+        printf("Stopping main loop...\n");
         uv_idle_stop(handle);
+        uv_loop_close(uv_default_loop());
+        uv_stop(uv_default_loop());
+        printf("Done.\n");
     }
 }
 
@@ -26,11 +31,76 @@ uint32_t setup_main_event_loop(bool setupIdle) {
     }
     printf("Done.\n");
     return 0;
-};
+}
 
 struct ContextData {
     struct Peer *peer;
 };
+
+void on_incoming_message(
+        uv_stream_t *client,
+        ssize_t nread,
+        const uv_buf_t *buf
+) {
+    printf("\nIncoming message");
+    if (nread < 0) {
+        if (nread != UV_EOF) {
+            fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
+            uv_close((uv_handle_t*) client, NULL);
+        }
+    } else if (nread > 0) {
+        printObjectWithLength(buf->base, nread);
+    }
+
+    if (buf->base) {
+        free(buf->base);
+    }
+}
+
+void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+    buf->base = (char*)malloc(suggested_size);
+    buf->len = suggested_size;
+}
+
+
+void on_version_sent(uv_write_t *req, int status) {
+    if (status) {
+        fprintf(stderr, " [ERR] failed to send version: %s \n", uv_strerror(status));
+        return;
+    }
+    else {
+        printf("\nversion sent\n");
+    }
+}
+
+void send_version(struct Peer *ptrPeer, uv_connect_t* req) {
+    struct VersionPayload payload = {0};
+    uint32_t payloadLength = make_version_payload_to_peer(ptrPeer, &payload);
+
+    struct Message message = {0};
+    make_version_message(&message, &payload, payloadLength);
+
+    uint8_t buffer[MESSAGE_BUFFER_SIZE] = {0};
+    uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
+
+    uint64_t dataSize = serialize_version_message(
+            &message,
+            buffer,
+            MESSAGE_BUFFER_SIZE
+    );
+
+    char *ipString = convert_ipv4_readable(ptrPeer->address.ip);
+    printf("\nSending version message to peer %s\n", ipString);
+    printObjectWithLength(buffer, dataSize);
+
+    uvBuffer.len = dataSize;
+    uvBuffer.base = (char *)buffer;
+
+    uv_stream_t* tcp = req->handle;
+    uv_write_t write_req;
+    uint8_t bufferCount = 1;
+    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_version_sent);
+}
 
 void on_peer_connect(uv_connect_t* req, int32_t status) {
     struct ContextData *data = (struct ContextData *)req->data;
@@ -40,28 +110,26 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     }
     else {
         printf(" [OK]  connected with peer %s \n", ipString);
+        struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
+        send_version(ptrPeer, req);
+        uv_read_start(req->handle, alloc_buffer, on_incoming_message);
     }
 }
 
 
-int32_t connect_to_peer(struct Peer *peer) {
-    char *ipString = convert_ipv4_readable(peer->address.ip);
+int32_t connect_to_peer(struct Peer *ptrPeer) {
+    char *ipString = convert_ipv4_readable(ptrPeer->address.ip);
     printf(" > connecting with peer %s\n", ipString);
     struct sockaddr_in remoteAddress = {0};
-    peer->socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    ptrPeer->socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
     uv_connect_t* connection = (uv_connect_t*)malloc(sizeof(uv_connect_t));
     struct ContextData *data = malloc(sizeof(struct ContextData)); //TODO: Free me somewhere
-    data->peer = peer;
+    data->peer = ptrPeer;
     connection->data = data;
-    uv_tcp_init(uv_default_loop(), peer->socket);
+    uv_tcp_init(uv_default_loop(), ptrPeer->socket);
     uv_ip4_addr(ipString, parameters.port, &remoteAddress);
-    uv_tcp_connect(connection, peer->socket, (const struct sockaddr*)&remoteAddress, &on_peer_connect);
+    uv_tcp_connect(connection, ptrPeer->socket, (const struct sockaddr*)&remoteAddress, &on_peer_connect);
     return 0;
-}
-
-void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    buf->base = (char*)malloc(suggested_size);
-    buf->len = suggested_size;
 }
 
 void on_echo_write_finish(uv_write_t *req, int status) {
@@ -69,23 +137,6 @@ void on_echo_write_finish(uv_write_t *req, int status) {
         fprintf(stderr, "Write error %s\n", uv_strerror(status));
     }
     free(req);
-}
-
-void on_incoming_message(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
-    if (nread < 0) {
-        if (nread != UV_EOF) {
-            fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
-            uv_close((uv_handle_t*) client, NULL);
-        }
-    } else if (nread > 0) {
-        uv_write_t *req = (uv_write_t *) malloc(sizeof(uv_write_t));
-        uv_buf_t wrbuf = uv_buf_init(buf->base, (unsigned int)nread);
-        uv_write(req, client, &wrbuf, 1, on_echo_write_finish);
-    }
-
-    if (buf->base) {
-        free(buf->base);
-    }
 }
 
 void on_incoming_connection(uv_stream_t *server, int status) {
@@ -125,9 +176,14 @@ int32_t setup_listen_socket() {
     return 0;
 }
 
-int32_t setup_peer_connections() {
-    printf("Setting up peers\n");
-    for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
+int32_t connect_to_peers() {
+
+    uint32_t maxConnection = min(parameters.maxOutgoing, global.peerCount);
+    // TODO: randomize properly
+    uint32_t OFFSET = (uint32_t)((random_uint64() % maxConnection) % 0xFFFFFFFF);
+
+    printf("Connecting to %u peers\n", maxConnection);
+    for (uint32_t peerIndex = OFFSET; peerIndex < maxConnection + OFFSET; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
         if (peer->valid) {
             connect_to_peer(peer);
@@ -137,7 +193,7 @@ int32_t setup_peer_connections() {
 }
 
 int32_t free_networking_resources() {
-    printf("Freeing networking resources");
+    printf("Freeing networking resources...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
         if (peer->socket) {
@@ -145,5 +201,6 @@ int32_t free_networking_resources() {
         }
     }
     uv_loop_close(uv_default_loop());
+    printf("Done.\n");
     return 0;
 }
