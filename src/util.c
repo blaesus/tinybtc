@@ -15,6 +15,12 @@ int segment_int32(uint32_t number, uint8_t chars[4]) {
     return 0;
 }
 
+uint16_t combine_uint16(const uint8_t *chars) {
+    uint16_t number = + (chars[1] << 1 * BITS_IN_BYTE)
+                      + (chars[0]);
+    return number;
+}
+
 uint32_t combine_uint32(const uint8_t *chars) {
     uint32_t number = (chars[3] << 3 * BITS_IN_BYTE)
                       + (chars[2] << 2 * BITS_IN_BYTE)

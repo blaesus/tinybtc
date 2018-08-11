@@ -49,6 +49,10 @@ uint64_t serialize_version_message(
 );
 void make_verack_message(struct Message *ptrMessage);
 uint8_t serialize_to_varint(uint64_t data, uint8_t *ptrBuffer);
+uint8_t parse_varint(
+        uint8_t *ptrBuffer,
+        uint64_t *result
+);
 uint64_t serialize_varstr(
         struct VariableLengthString *ptrVarStr,
         uint8_t *ptrBuffer
@@ -58,7 +62,6 @@ uint64_t serializeVersionPayload(
         uint8_t *ptrBuffer,
         uint32_t bufferSize
 );
-void printObjectWithLength(uint8_t *ptrData, uint64_t length);
 uint32_t make_version_payload_to_peer(
         struct Peer *ptrPeer,
         struct VersionPayload *ptrPayload
@@ -69,7 +72,14 @@ void make_version_message(
         uint32_t payloadLength
 );
 
-uint64_t parseMessageHeader(
+uint64_t parse_message_header(
         uint8_t *buffer,
         struct Message *ptrMessage
 );
+
+uint64_t parse_version_payload(
+        uint8_t *ptrBuffer,
+        struct VersionPayload *ptrPayload
+);
+
+bool is_message_header(void *p);

@@ -37,31 +37,47 @@ struct ContextData {
     struct Peer *peer;
 };
 
-void on_incoming_message(
+void on_incoming_data(
         uv_stream_t *client,
         ssize_t nread,
         const uv_buf_t *buf
 ) {
-    printf("\n>----------------------------------------------------------");
-    printf("\nIncoming message");
+    struct ContextData *data = (struct ContextData *)client->data;
+    char *ipString = convert_ipv4_readable(data->peer->address.ip);
+    printf("\n----> Incoming message from %s--------", ipString);
     if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
             uv_close((uv_handle_t*) client, NULL);
         }
     } else if (nread > 0) {
-        struct Message incomingMessage = {0};
-        parseMessageHeader(buf->base, &incomingMessage);
-        if (incomingMessage.magic == parameters.magic) {
-            printObjectWithLength(buf->base, nread);
-            printf("Message parsed: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
-                   incomingMessage.magic,
-                   incomingMessage.command,
-                   incomingMessage.length
+        if (is_message_header(buf->base)) {
+            printf("\nMatched a header\n");
+            struct Message header = {0};
+            parse_message_header(buf->base, &header);
+            printf("Message header parsed: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
+                   header.magic,
+                   header.command,
+                   header.length
             );
+            data->peer->partialMessage = malloc(sizeof(struct Message));
+            memcpy(data->peer->partialMessage, &header, nread);
+            printObjectWithLength(&header, nread);
         }
         else {
-            printf("\nMAGIC mismatch: %x != %x\n", parameters.magic, incomingMessage.magic);
+            if (strcmp((char *)data->peer->partialMessage->command, "version") == 0) {
+                printf("\nNon-header for command 'version'\n");
+
+                struct VersionPayload payload = {0};
+                const uint64_t payloadOffset = parse_version_payload(buf->base, &payload);
+                data->peer->partialMessage->payload = malloc(sizeof(struct VersionPayload)); //FIXME: Free
+                memcpy(data->peer->partialMessage->payload, &payload, sizeof(struct VersionPayload));
+
+                printObjectWithLength(buf->base, payloadOffset);
+                printf("payload parsed: user_agent=%s\n",
+                        payload.user_agent.string
+                );
+            }
         }
         printf("----------------------------------------------------------<\n");
     }
@@ -87,7 +103,8 @@ void on_version_sent(uv_write_t *req, int status) {
     }
 }
 
-void send_version(struct Peer *ptrPeer, uv_connect_t* req) {
+void send_version(uv_connect_t* req) {
+    struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
     struct VersionPayload payload = {0};
     uint32_t payloadLength = make_version_payload_to_peer(ptrPeer, &payload);
 
@@ -124,9 +141,9 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     }
     else {
         printf(" [OK]  connected with peer %s \n", ipString);
-        struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
-        send_version(ptrPeer, req);
-        uv_read_start(req->handle, alloc_buffer, on_incoming_message);
+        req->handle->data = req->data;
+        send_version(req);
+        uv_read_start(req->handle, alloc_buffer, on_incoming_data);
     }
 }
 
@@ -135,14 +152,16 @@ int32_t connect_to_peer(struct Peer *ptrPeer) {
     char *ipString = convert_ipv4_readable(ptrPeer->address.ip);
     printf(" > connecting with peer %s\n", ipString);
     struct sockaddr_in remoteAddress = {0};
-    ptrPeer->socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    ptrPeer->socket = malloc(sizeof(uv_tcp_t));
     uv_connect_t* connection = (uv_connect_t*)malloc(sizeof(uv_connect_t));
     struct ContextData *data = malloc(sizeof(struct ContextData)); //TODO: Free me somewhere
+    memset(data, 0, sizeof(struct ContextData));
     data->peer = ptrPeer;
     connection->data = data;
     uv_tcp_init(uv_default_loop(), ptrPeer->socket);
     uv_ip4_addr(ipString, parameters.port, &remoteAddress);
     uv_tcp_connect(connection, ptrPeer->socket, (const struct sockaddr*)&remoteAddress, &on_peer_connect);
+    ptrPeer->connection = connection;
     return 0;
 }
 
@@ -164,7 +183,7 @@ void on_incoming_connection(uv_stream_t *server, int status) {
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
-        uv_read_start((uv_stream_t *) client, alloc_buffer, on_incoming_message);
+        uv_read_start((uv_stream_t *) client, alloc_buffer, on_incoming_data);
     } else {
         printf("Cannot accept\n");
         uv_close((uv_handle_t*) client, NULL);
@@ -206,11 +225,16 @@ int32_t connect_to_peers() {
     return 0;
 }
 
+void on_close() {
+    printf("Closed!");
+}
+
 int32_t free_networking_resources() {
     printf("Freeing networking resources...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
         if (peer->socket) {
+            uv_close(peer->connection->handle, on_close);
             free(peer->socket);
         }
     }

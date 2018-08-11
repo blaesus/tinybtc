@@ -56,6 +56,31 @@ uint8_t serialize_to_varint(
     }
 }
 
+uint8_t parse_varint(
+        uint8_t *ptrBuffer,
+        uint64_t *result
+) {
+    uint8_t firstByte = ptrBuffer[0];
+    switch (firstByte) {
+        case VAR_INT_PREFIX_16: {
+            *result = combine_uint16(ptrBuffer+1);
+            return 3;
+        }
+        case VAR_INT_PREFIX_32: {
+            *result = combine_uint32(ptrBuffer+1);
+            return 5;
+        }
+        case VAR_INT_PREFIX_64: {
+            *result = combine_uint64(ptrBuffer+1);
+            return 9;
+        }
+        default: {
+            *result = firstByte;
+            return 1;
+        }
+    }
+}
+
 void calculate_payload_checksum(void *ptrPayload, uint32_t length, uint8_t *ptrResult) {
     SHA256_HASH hash = {0};
     dsha256(ptrPayload, length, hash);
@@ -98,7 +123,6 @@ uint32_t make_version_payload_to_peer(
 }
 
 
-
 uint64_t serialize_varstr(
         struct VariableLengthString *ptrVarStr,
         uint8_t *ptrBuffer
@@ -108,12 +132,24 @@ uint64_t serialize_varstr(
     return varintLength + ptrVarStr->length;
 }
 
+uint64_t parse_as_varstr(
+        uint8_t *ptrBuffer,
+        struct VariableLengthString *ptrResult
+) {
+    uint64_t strLength = 0;
+    uint8_t lengthWidth = parse_varint(ptrBuffer, &strLength);
+    ptrResult->length = strLength;
+    const uint8_t markerWidth = sizeof(uint8_t);
+    memcpy(ptrResult->string, ptrBuffer + markerWidth, strLength);
+    return lengthWidth + strLength;
+}
+
 uint64_t serialize_network_address(
         struct NetworkAddress *ptrAddress,
         uint8_t *ptrBuffer,
         uint32_t bufferSize
 ) {
-    //TODO: Cehck buffer overflow
+    //TODO: Check buffer overflow
     uint8_t *p = ptrBuffer;
     memcpy(p, &ptrAddress->services, sizeof(ptrAddress->services));
     p += sizeof(ptrAddress->services);
@@ -122,6 +158,23 @@ uint64_t serialize_network_address(
     p += sizeof(ptrAddress->ip);
 
     memcpy(p, &ptrAddress->port, sizeof(ptrAddress->port));
+    p += sizeof(ptrAddress->port);
+
+    return p - ptrBuffer;
+}
+
+uint64_t parse_network_address(
+        uint8_t *ptrBuffer,
+        struct NetworkAddress *ptrAddress
+) {
+    uint8_t *p = ptrBuffer;
+    memcpy(&ptrAddress->services, p, sizeof(ptrAddress->services));
+    p += sizeof(ptrAddress->services);
+
+    memcpy(&ptrAddress->ip, p, sizeof(ptrAddress->ip));
+    p += sizeof(ptrAddress->ip);
+
+    memcpy(&ptrAddress->port, p, sizeof(ptrAddress->port));
     p += sizeof(ptrAddress->port);
 
     return p - ptrBuffer;
@@ -211,7 +264,7 @@ uint64_t serialize_version_message(
     return messageHeaderSize + ptrMessage->length;
 }
 
-uint64_t parseMessageHeader(
+uint64_t parse_message_header(
         uint8_t *buffer,
         struct Message *ptrMessage
 ) {
@@ -227,3 +280,54 @@ uint64_t parseMessageHeader(
 
     return headerSize;
 }
+
+uint64_t parse_version_payload(
+    uint8_t *ptrBuffer,
+    struct VersionPayload *ptrPayload
+) {
+    uint8_t *p = ptrBuffer;
+
+    memcpy(&ptrPayload->version, p, sizeof(ptrPayload->version));
+    p += sizeof ptrPayload->version;
+
+    memcpy(&ptrPayload->services, p, sizeof(ptrPayload->services));
+    p += sizeof ptrPayload->services;
+
+    memcpy(&ptrPayload->timestamp, p, sizeof(ptrPayload->timestamp));
+    p += sizeof ptrPayload->timestamp;
+
+    struct NetworkAddress recipientAddress = {0};
+    uint64_t width = parse_network_address(p, &recipientAddress);
+    ptrPayload->addr_recv = recipientAddress;
+    p += width;
+
+    if (ptrPayload->version >= 106) {
+        struct NetworkAddress senderAddress = {0};
+        uint64_t width = parse_network_address(p, &senderAddress);
+        ptrPayload->addr_from = senderAddress;
+        p += width;
+
+        memcpy(&ptrPayload->nonce, p, sizeof(ptrPayload->nonce));
+        p += sizeof ptrPayload->nonce;
+
+        struct VariableLengthString userAgent = {.length = 0, .string={0}};
+        uint64_t userAgentOffset = parse_as_varstr(p, &userAgent);
+        ptrPayload->user_agent = userAgent;
+        p += userAgentOffset;
+
+        memcpy(&ptrPayload->start_height, p, sizeof(ptrPayload->start_height));
+        p += sizeof ptrPayload->start_height;
+    }
+
+    if (ptrPayload->version >= 70001) {
+        memcpy(&ptrPayload->relay, p, sizeof(ptrPayload->relay));
+        p += sizeof ptrPayload->relay;
+    }
+
+    return p - ptrBuffer;
+}
+
+bool is_message_header(void *p) {
+    return combine_uint32(p) == parameters.magic;
+}
+

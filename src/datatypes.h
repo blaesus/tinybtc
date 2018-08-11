@@ -7,7 +7,7 @@
 
 #define DOMAIN_NAME_LENGTH 50
 
-#define MAX_VARIABLE_LENGTH_STRING_LENGTH 256 // Technically it could be larger
+#define MAX_VARIABLE_LENGTH_STRING_LENGTH 2048
 
 typedef uint8_t IP[16];
 
@@ -44,6 +44,8 @@ struct NetworkAddressWithTime {
 struct Peer {
     bool valid;
     uv_tcp_t *socket;
+    uv_connect_t *connection;
     bool myClient;
     struct NetworkAddress address;
+    struct Message *partialMessage;
 };

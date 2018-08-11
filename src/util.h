@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 int segment_int32(uint32_t number, uint8_t chars[4]);
+uint16_t combine_uint16(const uint8_t *chars);
 uint32_t combine_uint32(const uint8_t *chars);
 uint64_t combine_uint64(const uint8_t *chars);
 int32_t uint_to_str(uint32_t data, char *output);
