@@ -29,5 +29,5 @@ const struct Parameters parameters = {
 
     .maxOutgoing = 8,
 
-    .backlog = 32
+    .backlog = 32,
 };

@@ -48,6 +48,23 @@ uint64_t load_version_payload(
     return payloadOffset;
 }
 
+uint64_t load_payload(
+        uint8_t *ptrBuffer,
+        uint8_t *command,
+        Message *ptrMessage
+) {
+    if (strcmp((char *)command, "version") == 0) {
+        return load_version_payload(ptrBuffer, ptrMessage);
+    }
+    if (strcmp((char *)command, "verack") == 0) {
+        return 0;
+    }
+    else {
+        fprintf(stderr, "Cannot load payload for COMMAND %s", command);
+        return 0;
+    }
+}
+
 void print_message_header(Message *ptrMessage) {
     printf("\nheader: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
            ptrMessage->magic,
@@ -102,28 +119,22 @@ void on_incoming_data(
             parse_message_header(buf->base, &message);
 
             data->peer->messageCache.message = malloc(sizeof(Message));
-            uint32_t headerWidth = sizeof(struct MessageHeader);
+            uint32_t headerWidth = sizeof(MessageHeader);
             memcpy(data->peer->messageCache.message, &message, headerWidth);
             data->peer->messageCache.headerLoaded = true;
             data->peer->messageCache.payloadLoaded = false;
-            if (data->peer->messageCache.message->length == 0) {
+            if ((uint32_t)nread >= headerWidth) {
+                load_payload(buf->base+headerWidth, message.command, data->peer->messageCache.message);
                 data->peer->messageCache.payloadLoaded = true;
-            }
-            if ((uint32_t)nread > headerWidth) {
-                load_version_payload(buf->base+headerWidth, data->peer->messageCache.message);
-                data->peer->messageCache.payloadLoaded = true;
-            }
-            else {
             }
         }
         else {
-            if (strcmp((char *)data->peer->messageCache.message->command, "version") == 0) {
-                printf("\nNon-header for command 'version'\n");
-                load_version_payload(
-                        buf->base,
-                        data->peer->messageCache.message
-                );
-            }
+            printf("\nNon-header for command 'version'\n");
+            load_payload(
+                    buf->base,
+                    data->peer->messageCache.message->command,
+                    data->peer->messageCache.message
+            );
         }
         print_message_cache(&data->peer->messageCache);
         printf("----------------------------------------------------------<\n");
