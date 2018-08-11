@@ -37,6 +37,52 @@ struct ContextData {
     struct Peer *peer;
 };
 
+uint64_t load_version_payload(
+    uint8_t *ptrBuffer,
+    Message *ptrMessage
+) {
+    VersionPayload payload = {0};
+    const uint64_t payloadOffset = parse_version_payload(ptrBuffer, &payload);
+    ptrMessage->payload = malloc(sizeof(VersionPayload)); //FIXME: Free
+    memcpy(ptrMessage->payload, &payload, sizeof(VersionPayload));
+    return payloadOffset;
+}
+
+void print_message_header(Message *ptrMessage) {
+    printf("\nheader: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
+           ptrMessage->magic,
+           ptrMessage->command,
+           ptrMessage->length
+    );
+}
+
+void print_message_payload(
+        uint8_t* command,
+        Payload *ptrPayload
+) {
+    if (strcmp((char *)command, "version") == 0) {
+        printf("payload: user_agent=%s\n",
+               ((struct VersionPayload *)ptrPayload)->user_agent.string
+        );
+    }
+}
+
+void print_message_cache(MessageCache *ptrCache) {
+    printf("\n=== Message parsing ===");
+    if (ptrCache->headerLoaded) {
+        print_message_header(ptrCache->message);
+    }
+    if (ptrCache->payloadLoaded) {
+        print_message_payload(
+                ptrCache->message->command,
+                ptrCache->message->payload
+        );
+    }
+    else {
+        puts("payload: [not ready]\n");
+    }
+}
+
 void on_incoming_data(
         uv_stream_t *client,
         ssize_t nread,
@@ -51,34 +97,35 @@ void on_incoming_data(
             uv_close((uv_handle_t*) client, NULL);
         }
     } else if (nread > 0) {
-        if (is_message_header(buf->base)) {
-            printf("\nMatched a header\n");
-            struct Message header = {0};
-            parse_message_header(buf->base, &header);
-            printf("Message header parsed: MAGIC=%x, COMMAND=%s, LENGTH=%u\n",
-                   header.magic,
-                   header.command,
-                   header.length
-            );
-            data->peer->partialMessage = malloc(sizeof(struct Message));
-            memcpy(data->peer->partialMessage, &header, nread);
-            printObjectWithLength(&header, nread);
+        if (begins_width_header(buf->base)) {
+            struct Message message = {0};
+            parse_message_header(buf->base, &message);
+
+            data->peer->messageCache.message = malloc(sizeof(Message));
+            uint32_t headerWidth = sizeof(struct MessageHeader);
+            memcpy(data->peer->messageCache.message, &message, headerWidth);
+            data->peer->messageCache.headerLoaded = true;
+            data->peer->messageCache.payloadLoaded = false;
+            if (data->peer->messageCache.message->length == 0) {
+                data->peer->messageCache.payloadLoaded = true;
+            }
+            if ((uint32_t)nread > headerWidth) {
+                load_version_payload(buf->base+headerWidth, data->peer->messageCache.message);
+                data->peer->messageCache.payloadLoaded = true;
+            }
+            else {
+            }
         }
         else {
-            if (strcmp((char *)data->peer->partialMessage->command, "version") == 0) {
+            if (strcmp((char *)data->peer->messageCache.message->command, "version") == 0) {
                 printf("\nNon-header for command 'version'\n");
-
-                struct VersionPayload payload = {0};
-                const uint64_t payloadOffset = parse_version_payload(buf->base, &payload);
-                data->peer->partialMessage->payload = malloc(sizeof(struct VersionPayload)); //FIXME: Free
-                memcpy(data->peer->partialMessage->payload, &payload, sizeof(struct VersionPayload));
-
-                printObjectWithLength(buf->base, payloadOffset);
-                printf("payload parsed: user_agent=%s\n",
-                        payload.user_agent.string
+                load_version_payload(
+                        buf->base,
+                        data->peer->messageCache.message
                 );
             }
         }
+        print_message_cache(&data->peer->messageCache);
         printf("----------------------------------------------------------<\n");
     }
 

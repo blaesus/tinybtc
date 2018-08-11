@@ -33,13 +33,21 @@ struct NetworkAddress {
     uint16_t port;
 };
 
+// version >= 31402; not for version
 struct NetworkAddressWithTime {
-    // version >= 31402
     uint32_t time;
     uint64_t services;
     uint8_t ip[16];
     uint16_t port;
 };
+
+struct MessageCache {
+    bool headerLoaded;
+    bool payloadLoaded;
+    struct Message *message;
+};
+
+typedef struct MessageCache MessageCache;
 
 struct Peer {
     bool valid;
@@ -47,5 +55,7 @@ struct Peer {
     uv_connect_t *connection;
     bool myClient;
     struct NetworkAddress address;
-    struct Message *partialMessage;
+    struct MessageCache messageCache;
 };
+
+typedef struct Peer Peer;

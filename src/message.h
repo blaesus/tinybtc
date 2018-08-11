@@ -23,6 +23,8 @@ struct VersionPayload {
     bool relay;
 };
 
+typedef struct VersionPayload VersionPayload;
+
 union Payload {
     struct VersionPayload version;
 };
@@ -34,20 +36,31 @@ typedef union Payload Payload;
 #define CHECKSUM_SIZE 4
 typedef uint8_t PayloadChecksum[CHECKSUM_SIZE];
 
+#define MESSAGE_HEADER_FIELDS \
+    uint32_t magic; \
+    uint8_t command[12]; \
+    uint32_t length; \
+    PayloadChecksum checksum; \
+
+struct MessageHeader {
+    MESSAGE_HEADER_FIELDS
+};
+
+typedef struct MessageHeader MessageHeader;
+
 struct Message {
-    uint32_t magic;
-    uint8_t command[12];
-    uint32_t length; // of payload
-    PayloadChecksum checksum;
+    MESSAGE_HEADER_FIELDS
     Payload *payload;
 };
+
+typedef struct Message Message;
 
 uint64_t serialize_version_message(
         struct Message *ptrMessage,
         uint8_t *ptrBuffer,
         uint32_t bufferSize
 );
-void make_verack_message(struct Message *ptrMessage);
+void make_verack_message(Message *ptrMessage);
 uint8_t serialize_to_varint(uint64_t data, uint8_t *ptrBuffer);
 uint8_t parse_varint(
         uint8_t *ptrBuffer,
@@ -82,4 +95,4 @@ uint64_t parse_version_payload(
         struct VersionPayload *ptrPayload
 );
 
-bool is_message_header(void *p);
+bool begins_width_header(void *p);

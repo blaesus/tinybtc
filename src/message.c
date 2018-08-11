@@ -268,17 +268,8 @@ uint64_t parse_message_header(
         uint8_t *buffer,
         struct Message *ptrMessage
 ) {
-    struct Message *p = ptrMessage;
-
-    uint32_t headerSize =
-            +sizeof(ptrMessage->magic)
-            +sizeof(ptrMessage->command)
-            +sizeof(ptrMessage->length)
-            +sizeof(ptrMessage->checksum);
-
-    memcpy(p, buffer, headerSize);
-
-    return headerSize;
+    memcpy(ptrMessage, buffer, sizeof(struct MessageHeader));
+    return sizeof(struct MessageHeader);
 }
 
 uint64_t parse_version_payload(
@@ -327,7 +318,7 @@ uint64_t parse_version_payload(
     return p - ptrBuffer;
 }
 
-bool is_message_header(void *p) {
+bool begins_width_header(void *p) {
     return combine_uint32(p) == parameters.magic;
 }
 
