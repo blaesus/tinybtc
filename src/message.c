@@ -241,6 +241,25 @@ void make_version_message(
             ptrMessage->checksum
     );
 }
+
+uint64_t serialize_verack_message(
+        struct Message *ptrMessage,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
+) {
+    if (bufferSize < 0) {
+        // TODO: Check buffer overflow
+        return 0;
+    }
+    const uint64_t messageHeaderSize =
+            sizeof(ptrMessage->magic)
+            + sizeof(ptrMessage->command)
+            + sizeof(ptrMessage->length)
+            + sizeof(ptrMessage->checksum);
+    memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
+    return messageHeaderSize + ptrMessage->length;
+}
+
 uint64_t serialize_version_message(
         struct Message *ptrMessage,
         uint8_t *ptrBuffer,

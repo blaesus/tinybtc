@@ -13,7 +13,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 2e7) {
+    if (global.eventCounter >= 1e8) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -97,6 +97,44 @@ void print_message_payload(
     }
 }
 
+void on_message_sent(uv_write_t *req, int status) {
+    char *ipString = get_peer_ip((uv_connect_t *)req);
+    if (status) {
+        fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
+        return;
+    }
+    else {
+        printf("message sent to %s\n", ipString);
+    }
+}
+
+void send_verack(uv_connect_t *req) {
+    struct Message message = {0};
+    make_verack_message(&message);
+
+    uint8_t buffer[MESSAGE_BUFFER_SIZE] = {0};
+    uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
+
+    uint64_t dataSize = serialize_verack_message(
+            &message,
+            buffer,
+            MESSAGE_BUFFER_SIZE
+    );
+
+    char *ipString = get_peer_ip(req);
+    printf("Sending verack message to peer %s\n", ipString);
+
+    uvBuffer.len = dataSize;
+    uvBuffer.base = (char *)buffer;
+
+    uv_stream_t* tcp = req->handle;
+    uv_write_t write_req;
+    uint8_t bufferCount = 1;
+    write_req.data = req->data;
+    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_message_sent);
+}
+
+
 void print_message_cache(MessageCache messageCache) {
     printf("\n>====== Incoming ========");
     print_message_header(messageCache.message);
@@ -120,6 +158,7 @@ void on_incoming_message(Peer *ptrPeer) {
     }
     else if (strcmp((char *)command, "verack") == 0) {
         ptrPeer->handshake.acceptUs = true;
+        send_verack(ptrPeer->connection);
     }
 
     ptrPeer->messageCache.headerLoaded = false;
@@ -185,17 +224,6 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     buf->len = suggested_size;
 }
 
-void on_version_sent(uv_write_t *req, int status) {
-    char *ipString = get_peer_ip((uv_connect_t *)req);
-    if (status) {
-        fprintf(stderr, "failed to send version to %s: %s \n", ipString, uv_strerror(status));
-        return;
-    }
-    else {
-        printf("version sent to %s\n", ipString);
-    }
-}
-
 void send_version(uv_connect_t *req) {
     struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
     struct VersionPayload payload = {0};
@@ -223,7 +251,7 @@ void send_version(uv_connect_t *req) {
     uv_write_t write_req;
     uint8_t bufferCount = 1;
     write_req.data = req->data;
-    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_version_sent);
+    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_message_sent);
 }
 
 void on_peer_connect(uv_connect_t* req, int32_t status) {

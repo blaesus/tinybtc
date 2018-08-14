@@ -60,6 +60,11 @@ uint64_t serialize_version_message(
         uint8_t *ptrBuffer,
         uint32_t bufferSize
 );
+uint64_t serialize_verack_message(
+        struct Message *ptrMessage,
+        uint8_t *ptrBuffer,
+        uint32_t bufferSize
+);
 void make_verack_message(Message *ptrMessage);
 uint8_t serialize_to_varint(uint64_t data, uint8_t *ptrBuffer);
 uint8_t parse_varint(
