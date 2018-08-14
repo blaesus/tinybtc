@@ -47,7 +47,7 @@ int32_t test_version_messages() {
             fixturePeerIp
     );
     struct Peer fixturePeer = {
-            .handshake = 0,
+            .handshake = {0},
             .socket = NULL,
             .myClient = false,
             .address = {
@@ -109,7 +109,7 @@ void testHash() {
     //Should be 95 95 c9 df ...
 }
 
-int32_t network() {
+int32_t setup_peers() {
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
@@ -124,7 +124,7 @@ int32_t main(int32_t argc, char **argv) {
     init();
 //    testHash();
 //    test_version_messages();
-//    network();
+    setup_peers();
     run_main_loop();
     atexit(&cleanup);
     return 0;

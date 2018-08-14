@@ -337,7 +337,6 @@ uint64_t parse_version_payload(
     return p - ptrBuffer;
 }
 
-
 uint64_t parse_inv_payload(
         Byte *ptrBuffer,
         InvPayload *ptrPayload

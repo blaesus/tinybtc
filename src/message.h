@@ -26,6 +26,12 @@ struct VersionPayload {
 
 typedef struct VersionPayload VersionPayload;
 
+#define IV_TYPE_ERROR 0
+#define IV_TYPE_MSG_TX 1
+#define IV_TYPE_MSG_BLOCK 2
+#define IV_TYPE_MSG_FILTERED_BLOCK 3
+#define IV_TYPE_MSG_CMPCT_BLOCK 4
+
 struct InventoryVector {
     uint32_t type : 4 * BITS_IN_BYTE;
     SHA256_HASH hash;
@@ -33,16 +39,21 @@ struct InventoryVector {
 
 typedef struct InventoryVector InventoryVector;
 
-struct InvPayload {
+struct GenericDataPayload {
     uint64_t count;
     struct InventoryVector inventory[MAX_INV_SIZE];
 };
 
-typedef struct InvPayload InvPayload;
+typedef struct GenericDataPayload GenericDataPayload;
+
+typedef GenericDataPayload InvPayload;
+
+typedef GenericDataPayload GetDataPayload;
 
 union Payload {
     VersionPayload version;
     InvPayload inv;
+    GetDataPayload getdata;
 };
 
 typedef union Payload Payload;

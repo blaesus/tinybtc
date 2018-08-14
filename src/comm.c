@@ -53,14 +53,14 @@ uint64_t load_version_payload(
     return payloadOffset;
 }
 
-uint64_t load_inv_payload(
+uint64_t load_generic_data_payload(
         uint8_t *ptrBuffer,
         Message *ptrMessage
 ) {
-    InvPayload payload = {0};
+    GenericDataPayload payload = {0};
     const uint64_t payloadOffset = parse_inv_payload(ptrBuffer, &payload);
-    ptrMessage->payload = malloc(sizeof(InvPayload)); //FIXME: Free
-    memcpy(ptrMessage->payload, &payload, sizeof(InvPayload));
+    ptrMessage->payload = malloc(sizeof(GenericDataPayload)); //FIXME: Free
+    memcpy(ptrMessage->payload, &payload, sizeof(GenericDataPayload));
     return payloadOffset;
 }
 
@@ -76,7 +76,7 @@ uint64_t load_payload(
         return 0;
     }
     else if (strcmp((char *)command, "inv") == 0) {
-        return load_inv_payload(ptrBuffer, ptrMessage);
+        return load_generic_data_payload(ptrBuffer, ptrMessage);
     }
     else {
         fprintf(stderr, "Cannot load payload for COMMAND %s\n", command);
@@ -90,6 +90,36 @@ void print_message_header(Message *ptrMessage) {
            ptrMessage->command,
            ptrMessage->length
     );
+}
+
+char *getIVType(uint32_t type) {
+    static char result[255] = {0};
+    switch (type) {
+        case IV_TYPE_ERROR: {
+            strcpy(result, "ERROR");
+            break;
+        }
+        case IV_TYPE_MSG_TX: {
+            strcpy(result, "MSG_TX");
+            break;
+        }
+        case IV_TYPE_MSG_BLOCK: {
+            strcpy(result, "MSG_BLOCK");
+            break;
+        }
+        case IV_TYPE_MSG_FILTERED_BLOCK: {
+            strcpy(result, "MSG_FILTERED_BLOCK");
+            break;
+        }
+        case IV_TYPE_MSG_CMPCT_BLOCK: {
+            strcpy(result, "MSG_CMPCT_BLOCK");
+            break;
+        }
+        default: {
+            strcpy(result, "Unknown");
+        }
+    }
+    return result;
 }
 
 void print_message_payload(
@@ -113,8 +143,8 @@ void print_message_payload(
         );
         for (uint8_t i = 0; i < ptrPayloadTyped->count; i++) {
             InventoryVector iv = ptrPayloadTyped->inventory[i];
-            printf("type %u", iv.type);
-            print_object(iv.hash, SHA256_LENGTH);
+            char *typeString = getIVType(iv.type);
+            printf("Inventory of type %s(%u)\n", typeString, iv.type);
         }
     }
     else {
@@ -133,30 +163,55 @@ void on_message_sent(uv_write_t *req, int status) {
     }
 }
 
-void send_verack(uv_connect_t *req) {
+void write_buffer(
+        uv_connect_t *req,
+        uv_buf_t *ptrUvBuffer
+) {
+    uv_stream_t* tcp = req->handle;
+    uv_write_t *ptrWriteReq = (uv_write_t*)malloc(sizeof(uv_write_t));
+    uint8_t bufferCount = 1;
+    ptrWriteReq->data = req->data;
+    uv_write(ptrWriteReq, tcp, ptrUvBuffer, bufferCount, &on_message_sent);
+}
+
+void send_message(
+        uv_connect_t *req,
+        char *command
+) {
     struct Message message = {0};
-    make_verack_message(&message);
-
     uint8_t buffer[MESSAGE_BUFFER_SIZE] = {0};
-    uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
-
-    uint64_t dataSize = serialize_verack_message(
-            &message,
-            buffer,
-            MESSAGE_BUFFER_SIZE
-    );
-
     char *ipString = get_peer_ip(req);
-    printf("Sending verack message to peer %s\n", ipString);
-
-    uvBuffer.len = dataSize;
+    printf("Sending message to peer %s\n", ipString);
+    uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
-    uv_stream_t* tcp = req->handle;
-    uv_write_t write_req;
-    uint8_t bufferCount = 1;
-    write_req.data = req->data;
-    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_message_sent);
+    if (strcmp(command, "version") == 0) {
+        struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
+        struct VersionPayload payload = {0};
+        uint32_t payloadLength = make_version_payload_to_peer(ptrPeer, &payload);
+        make_version_message(&message, &payload, payloadLength);
+        uint64_t dataSize = serialize_version_message(
+                &message,
+                buffer,
+                MESSAGE_BUFFER_SIZE
+        );
+        uvBuffer.len = dataSize;
+    }
+    else if (strcmp(command, "verack") == 0) {
+        make_verack_message(&message);
+        uint64_t dataSize = serialize_verack_message(
+                &message,
+                buffer,
+                MESSAGE_BUFFER_SIZE
+        );
+        uvBuffer.len = dataSize;
+        write_buffer(req, &uvBuffer);
+    }
+    else {
+        fprintf(stderr, "Cannot recognize command %s", command);
+        return;
+    }
+    write_buffer(req, &uvBuffer);
 }
 
 
@@ -183,7 +238,7 @@ void on_incoming_message(Peer *ptrPeer) {
     }
     else if (strcmp((char *)command, "verack") == 0) {
         ptrPeer->handshake.acceptUs = true;
-        send_verack(ptrPeer->connection);
+        send_message(ptrPeer->connection, "verack");
     }
 
     ptrPeer->messageCache.headerLoaded = false;
@@ -249,36 +304,6 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     buf->len = suggested_size;
 }
 
-void send_version(uv_connect_t *req) {
-    struct Peer *ptrPeer = ((struct ContextData *)(req->data))->peer;
-    struct VersionPayload payload = {0};
-    uint32_t payloadLength = make_version_payload_to_peer(ptrPeer, &payload);
-
-    struct Message message = {0};
-    make_version_message(&message, &payload, payloadLength);
-
-    uint8_t buffer[MESSAGE_BUFFER_SIZE] = {0};
-    uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
-
-    uint64_t dataSize = serialize_version_message(
-            &message,
-            buffer,
-            MESSAGE_BUFFER_SIZE
-    );
-
-    char *ipString = get_peer_ip(req);
-    printf("Sending version message to peer %s\n", ipString);
-
-    uvBuffer.len = dataSize;
-    uvBuffer.base = (char *)buffer;
-
-    uv_stream_t* tcp = req->handle;
-    uv_write_t write_req;
-    uint8_t bufferCount = 1;
-    write_req.data = req->data;
-    uv_write(&write_req, tcp, &uvBuffer, bufferCount, &on_message_sent);
-}
-
 void on_peer_connect(uv_connect_t* req, int32_t status) {
     struct ContextData *data = (struct ContextData *)req->data;
     char *ipString = convert_ipv4_readable(data->peer->address.ip);
@@ -288,7 +313,7 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     else {
         printf("connected with peer %s \n", ipString);
         req->handle->data = req->data;
-        send_version(req);
+        send_message(req, "version");
         uv_read_start(req->handle, alloc_buffer, on_incoming_data);
     }
 }
