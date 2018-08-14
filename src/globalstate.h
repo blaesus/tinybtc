@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uv/uv.h"
+#include "redis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
 

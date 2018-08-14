@@ -6,6 +6,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
 
 include_directories(src)
 include_directories(deps/)
+include_directories(deps/uv)
 file(GLOB SOURCES "src/*.c")
 
 add_executable(diy-bitcoin
@@ -13,3 +14,4 @@ add_executable(diy-bitcoin
         deps/sha256/sha256.c
 )
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/uv/libuv_a.a)
+target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/redis/libhiredis.a)
