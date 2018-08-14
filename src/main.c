@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "uv.h"
+#include "uv/uv.h"
 
 #include "comm.h"
 #include "data.h"

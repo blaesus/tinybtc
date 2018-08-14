@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "sha256.h"
+#include "sha256/sha256.h"
 
 #define SHA256_LENGTH 32
 

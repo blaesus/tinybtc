@@ -1,4 +1,4 @@
-#include "sha256.h"
+#include "sha256/sha256.h"
 #include "hash.h"
 
 void sha256(void *data, uint32_t length, SHA256_HASH result) {

@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#include "uv.h"
+#include "uv/uv.h"
 
 #include "globalstate.h"
 #include "inet.h"
