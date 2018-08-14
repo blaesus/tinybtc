@@ -337,6 +337,24 @@ uint64_t parse_version_payload(
     return p - ptrBuffer;
 }
 
+
+uint64_t parse_inv_payload(
+        Byte *ptrBuffer,
+        InvPayload *ptrPayload
+) {
+    uint64_t count = 0;
+    uint8_t countWidth = parse_varint(ptrBuffer, &count);
+    ptrPayload->count = count;
+    for (uint64_t index = 0; index < count; index++) {
+        memcpy(
+            &ptrPayload->inventory[index],
+            ptrBuffer + countWidth + index * sizeof(InventoryVector),
+            sizeof(InventoryVector)
+        );
+    }
+    return countWidth + count * sizeof(InventoryVector);
+}
+
 bool begins_width_header(void *p) {
     return combine_uint32(p) == parameters.magic;
 }

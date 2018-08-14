@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "parameters.h"
 #include "datatypes.h"
+#include "hash.h"
 
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#version
 
@@ -25,8 +26,23 @@ struct VersionPayload {
 
 typedef struct VersionPayload VersionPayload;
 
+struct InventoryVector {
+    uint32_t type : 4 * BITS_IN_BYTE;
+    SHA256_HASH hash;
+};
+
+typedef struct InventoryVector InventoryVector;
+
+struct InvPayload {
+    uint64_t count;
+    struct InventoryVector inventory[MAX_INV_SIZE];
+};
+
+typedef struct InvPayload InvPayload;
+
 union Payload {
-    struct VersionPayload version;
+    VersionPayload version;
+    InvPayload inv;
 };
 
 typedef union Payload Payload;
@@ -98,6 +114,11 @@ uint64_t parse_message_header(
 uint64_t parse_version_payload(
         uint8_t *ptrBuffer,
         struct VersionPayload *ptrPayload
+);
+
+uint64_t parse_inv_payload(
+        Byte *ptrBuffer,
+        InvPayload *ptrPayload
 );
 
 bool begins_width_header(void *p);

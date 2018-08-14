@@ -53,6 +53,17 @@ uint64_t load_version_payload(
     return payloadOffset;
 }
 
+uint64_t load_inv_payload(
+        uint8_t *ptrBuffer,
+        Message *ptrMessage
+) {
+    InvPayload payload = {0};
+    const uint64_t payloadOffset = parse_inv_payload(ptrBuffer, &payload);
+    ptrMessage->payload = malloc(sizeof(InvPayload)); //FIXME: Free
+    memcpy(ptrMessage->payload, &payload, sizeof(InvPayload));
+    return payloadOffset;
+}
+
 uint64_t load_payload(
         uint8_t *ptrBuffer,
         uint8_t *command,
@@ -64,9 +75,12 @@ uint64_t load_payload(
     else if (strcmp((char *)command, "verack") == 0) {
         return 0;
     }
+    else if (strcmp((char *)command, "inv") == 0) {
+        return load_inv_payload(ptrBuffer, ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot load payload for COMMAND %s\n", command);
-        return 0;
+        return 1;
     }
 }
 
@@ -91,6 +105,17 @@ void print_message_payload(
     }
     else if (strcmp((char *)command, "verack") == 0) {
         printf("(verack payload is empty)\n");
+    }
+    else if (strcmp((char *)command, "inv") == 0) {
+        InvPayload *ptrPayloadTyped = (InvPayload *)ptrPayload;
+        printf("payload: count=%llu\n",
+               ptrPayloadTyped->count
+        );
+        for (uint8_t i = 0; i < ptrPayloadTyped->count; i++) {
+            InventoryVector iv = ptrPayloadTyped->inventory[i];
+            printf("type %u", iv.type);
+            print_object(iv.hash, SHA256_LENGTH);
+        }
     }
     else {
         fprintf(stderr, "Cannot print payload for COMMAND %s\n", command);

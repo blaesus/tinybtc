@@ -20,6 +20,8 @@
 
 #define MESSAGE_BUFFER_SIZE 1024
 
+#define MAX_INV_SIZE 50000
+
 struct Parameters {
     uint32_t magic;
     ServiceBits services;
