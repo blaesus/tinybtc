@@ -9,6 +9,8 @@
 
 #define MAX_VARIABLE_LENGTH_STRING_LENGTH 2048
 
+typedef uint8_t Byte;
+
 typedef uint8_t IP[16];
 
 typedef char DomainName[DOMAIN_NAME_LENGTH];
@@ -49,8 +51,13 @@ struct MessageCache {
 
 typedef struct MessageCache MessageCache;
 
+struct HandshakeState {
+    uint8_t acceptThem : 1;
+    uint8_t acceptUs : 1;
+};
+
 struct Peer {
-    bool valid;
+    struct HandshakeState handshake;
     uv_tcp_t *socket;
     uv_connect_t *connection;
     bool myClient;
@@ -59,3 +66,4 @@ struct Peer {
 };
 
 typedef struct Peer Peer;
+

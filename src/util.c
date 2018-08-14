@@ -89,7 +89,7 @@ void printUint64(uint64_t input) {
     printf("%"PRIu64"\n", input);
 }
 
-void printObjectWithLength(uint8_t *ptrData, uint64_t length) {
+void print_object(uint8_t *ptrData, uint64_t length) {
     uint64_t index;
     uint8_t character = 0;
     for (index = 0; index < length; index++) {

@@ -8,6 +8,8 @@ const struct Parameters parameters = {
     // see Satoshi's version.h
     .protocolVersion = 70015,
 
+    .minimalPeerVersion = 31800,
+
     .port = MAIN_NET_PORT,
 
     .services = SERVICE_NODE_NETWORK & SERVICE_NODE_WITNESS,

@@ -100,7 +100,7 @@ int dns_bootstrap() {
 
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
-                add_peer(ips[ipIndex], false);
+                add_peer_address(ips[ipIndex]);
                 printf("%s\n", convert_ipv4_readable(ips[ipIndex]));
             }
         }

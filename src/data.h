@@ -1,4 +1,4 @@
 #pragma once
 
-int save_peers();
-int load_peers();
+int save_peer_addresses();
+int load_peer_addresses();

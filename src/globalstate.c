@@ -10,13 +10,8 @@ GlobalState global = {
     .blockchainHeight = 0,
 };
 
-void add_peer(IP ip, bool myClient) {
-    const uint32_t index = global.peerCount;
-    global.peerCount += 1;
-
-    memset(&global.peers[index], 0, sizeof(struct Peer));
-
-    global.peers[index].valid = 1;
-    global.peers[index].myClient = myClient;
-    memcpy(global.peers[index].address.ip, ip, sizeof(IP));
+void add_peer_address(IP ip) {
+    const uint32_t index = global.peerAddressCount;
+    global.peerAddressCount += 1;
+    memcpy(global.peerAddresses[index], ip, sizeof(IP));
 }

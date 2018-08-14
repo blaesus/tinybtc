@@ -9,37 +9,35 @@
 
 #define PEER_LIST_FILENAME "peers.dat"
 
-int save_peers() {
+int save_peer_addresses() {
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
     uint8_t peerCountBytes[4] = { 0 };
-    segment_int32(global.peerCount, peerCountBytes);
+    segment_int32(global.peerAddressCount, peerCountBytes);
     fwrite(peerCountBytes, 1, 4, file);
 
-    for (uint8_t index = 0; index < global.peerCount; index++) {
-        fwrite(global.peers[index].address.ip, 1, 16, file);
+    for (uint8_t index = 0; index < global.peerAddressCount; index++) {
+        fwrite(global.peerAddresses[index], 1, 16, file);
     }
 
-    printf("Saved %u peers", global.peerCount);
+    printf("Saved %u peers\n", global.peerAddressCount);
 
     fclose(file);
     return 0;
 }
 
-int load_peers() {
+int load_peer_addresses() {
     printf("Loading global state ");
     FILE *file = fopen(PEER_LIST_FILENAME, "rb");
 
     uint8_t buffer[16] = {0};
 
     fread(&buffer, 1, 4, file);
-    global.peerCount = combine_uint32(buffer);
-    printf("(%u peers to recover)...", global.peerCount);
-    for (uint32_t index = 0; index < global.peerCount; index++) {
+    global.peerAddressCount = combine_uint32(buffer);
+    printf("(%u peers to recover)...", global.peerAddressCount);
+    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
         fread(&buffer, 1, 16, file);
-        memset(&global.peers[index], 0, sizeof(struct Peer));
-        memcpy(global.peers[index].address.ip, buffer, sizeof(IP));
-        global.peers[index].valid = true;
+        memcpy(global.peerAddresses[index], buffer, sizeof(IP));
     }
     printf("Done\n");
     return 0;

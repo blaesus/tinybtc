@@ -24,6 +24,7 @@ struct Parameters {
     uint32_t magic;
     ServiceBits services;
     int32_t protocolVersion;
+    int32_t minimalPeerVersion;
     DomainName dnsSeeds[6];
     uint16_t port;
     uint8_t backlog;

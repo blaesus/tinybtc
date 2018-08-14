@@ -288,15 +288,15 @@ uint64_t parse_version_payload(
     p += sizeof ptrPayload->timestamp;
 
     struct NetworkAddress recipientAddress = {0};
-    uint64_t width = parse_network_address(p, &recipientAddress);
+    uint64_t recipientAddressWidth = parse_network_address(p, &recipientAddress);
     ptrPayload->addr_recv = recipientAddress;
-    p += width;
+    p += recipientAddressWidth;
 
     if (ptrPayload->version >= 106) {
         struct NetworkAddress senderAddress = {0};
-        uint64_t width = parse_network_address(p, &senderAddress);
+        uint64_t sendAddressWidth = parse_network_address(p, &senderAddress);
         ptrPayload->addr_from = senderAddress;
-        p += width;
+        p += sendAddressWidth;
 
         memcpy(&ptrPayload->nonce, p, sizeof(ptrPayload->nonce));
         p += sizeof ptrPayload->nonce;

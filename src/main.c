@@ -12,7 +12,7 @@
 void cleanup() {
     printf("Cleaning up\n");
     free_networking_resources();
-    save_peers();
+    save_peer_addresses();
 }
 
 int32_t run_main_loop() {
@@ -46,7 +46,7 @@ int32_t test_version_messages() {
             fixturePeerIp
     );
     struct Peer fixturePeer = {
-            .valid = true,
+            .handshake = 0,
             .socket = NULL,
             .myClient = false,
             .address = {
@@ -68,7 +68,7 @@ int32_t test_version_messages() {
             MESSAGE_BUFFER_SIZE
     );
 
-    printObjectWithLength(messageBuffer, dataSize);
+    print_object(messageBuffer, dataSize);
 
     return 0;
 }
@@ -81,15 +81,15 @@ void testHash() {
     uint8_t buffer[SHA256_LENGTH] = {0};
     char *data = "hello";
     dsha256(data, 5, buffer);
-    printObjectWithLength(buffer, SHA256_LENGTH);
+    print_object(buffer, SHA256_LENGTH);
     //Should be 95 95 c9 df ...
 }
 
 int32_t network() {
-    load_peers();
-    if (!global.peerCount) {
+    load_peer_addresses();
+    if (global.peerAddressCount == 0) {
         dns_bootstrap();
-        save_peers();
+        save_peer_addresses();
     }
     setup_main_event_loop(true);
     setup_listen_socket();
@@ -98,7 +98,7 @@ int32_t network() {
     return 0;
 }
 
-int32_t main() {
+int32_t main(int32_t argc, char **argv) {
     init();
 //    testHash();
 //    test_version_messages();
