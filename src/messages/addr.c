@@ -40,12 +40,10 @@ int32_t parse_into_addr_message(
 void print_addr_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
     AddrPayload *ptrPayload = (AddrPayload *)ptrMessage->payload;
-    printf("payload: count=%llu\n",
-           ptrPayload->count
+    AddrRecord record = ptrPayload->addr_list[0];
+    char *ipString = convert_ipv4_readable(record.net_addr.ip);
+    printf("payload: count=%llu, first being %s\n",
+           ptrPayload->count,
+           ipString
     );
-    for (uint8_t i = 0; i < ptrPayload->count; i++) {
-        AddrRecord record = ptrPayload->addr_list[i];
-        char *ipString = convert_ipv4_readable(record.net_addr.ip);
-        printf("Addr %u: %s\n", i, ipString);
-    }
 }

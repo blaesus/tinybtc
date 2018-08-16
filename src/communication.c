@@ -21,7 +21,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 5e7) {
+    if (global.eventCounter >= 2e7) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -156,6 +156,21 @@ void on_incoming_message(
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
         send_message(ptrPeer->connection, CMD_VERACK);
+    }
+    else if (strcmp(command, CMD_ADDR) == 0) {
+        AddrPayload *ptrPayload = message.payload;
+        for (uint64_t i = 0; i < ptrPayload->count; i++) {
+            struct AddressRecord *target = &global.peerAddresses[global.peerAddressCount];
+            struct AddrRecord *record = &ptrPayload->addr_list[i];
+            memcpy(
+                target->ip,
+                record->net_addr.ip,
+                sizeof(IP)
+            );
+            target->timestamp = record->net_addr.time;
+            global.peerAddressCount += 1;
+        }
+
     }
 
     if (ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem) {
