@@ -21,7 +21,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 2e7) {
+    if (global.eventCounter >= 3e7) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -159,18 +159,24 @@ void on_incoming_message(
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
         AddrPayload *ptrPayload = message.payload;
+        uint64_t skipped = 0;
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddressRecord *target = &global.peerAddresses[global.peerAddressCount];
             struct AddrRecord *record = &ptrPayload->addr_list[i];
-            memcpy(
-                target->ip,
-                record->net_addr.ip,
-                sizeof(IP)
-            );
-            target->timestamp = record->net_addr.time;
-            global.peerAddressCount += 1;
+            if (is_ipv4(record->net_addr.ip)) {
+                memcpy(
+                    target->ip,
+                    record->net_addr.ip,
+                    sizeof(IP)
+                );
+                target->timestamp = record->net_addr.time;
+                global.peerAddressCount += 1;
+            }
+            else {
+                skipped++;
+            }
         }
-
+        printf("Skipped %llu IPs\n", skipped);
     }
 
     if (ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem) {
@@ -312,7 +318,7 @@ int32_t connect_to_peers() {
     uint32_t maxConnection = min(parameters.maxOutgoing, global.peerAddressCount);
     printf("Connecting to %u peers\n", maxConnection);
     // TODO: randomize properly
-    uint32_t OFFSET = (uint32_t)((random_uint64() % maxConnection) % 0xFFFFFFFF);
+    uint32_t OFFSET = (uint32_t)((random_uint64() % global.peerAddressCount) % 0xFFFFFFFF);
     for (uint32_t peerIndex = OFFSET; peerIndex < maxConnection + OFFSET; peerIndex++) {
         IP ip = {0};
         memcpy(ip, global.peerAddresses[peerIndex].ip, sizeof(ip));

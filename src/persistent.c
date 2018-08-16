@@ -8,6 +8,19 @@
 
 #define PEER_LIST_FILENAME "peers.dat"
 
+int32_t save_peer_addresses_human() {
+    FILE *file = fopen("peers.human.dat", "wb");
+
+    for (uint64_t i = 0; i < global.peerAddressCount; i++) {
+        struct AddressRecord *record = &global.peerAddresses[i];
+        char *ipString = convert_ipv4_readable(record->ip);
+        fprintf(file, "%llu - %s\n", i, ipString);
+    }
+    fclose(file);
+
+    return 0;
+}
+
 int32_t save_peer_addresses() {
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
@@ -25,6 +38,8 @@ int32_t save_peer_addresses() {
     printf("Saved %u peers\n", global.peerAddressCount);
 
     fclose(file);
+
+    save_peer_addresses_human();
     return 0;
 }
 

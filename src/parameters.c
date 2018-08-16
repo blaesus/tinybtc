@@ -29,7 +29,7 @@ const struct Parameters parameters = {
 
     .maxIncoming = 125,
 
-    .maxOutgoing = 8,
+    .maxOutgoing = 16,
 
     .backlog = 32,
 };

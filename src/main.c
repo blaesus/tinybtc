@@ -72,13 +72,13 @@ int32_t test_version_messages() {
 }
 
 void init() {
+    load_peer_addresses();
     srand((unsigned int)time(NULL));
     setup_main_event_loop(true);
     init_db();
 }
 
 int32_t setup_peers() {
-    load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
         save_peer_addresses();

@@ -18,10 +18,10 @@
 
 
 uint32_t get_v4_binary_representation(const IP ip) {
-    const uint32_t number = (ip[15] << 3 * BITS_IN_BYTE)
-                            + (ip[14] << 2 * BITS_IN_BYTE)
-                            + (ip[13] << 1 * BITS_IN_BYTE)
-                            + (ip[12]);
+    const uint32_t number = (ip[12] << 3 * BITS_IN_BYTE)
+                            + (ip[13] << 2 * BITS_IN_BYTE)
+                            + (ip[14] << 1 * BITS_IN_BYTE)
+                            + (ip[15]);
     return htonl(number);
 }
 
@@ -47,10 +47,10 @@ int convert_ipv4_address_to_ip_array(uint32_t address, IP ip) {
     }
     ip[10] = (uint8_t)0xFF;
     ip[11] = (uint8_t)0xFF;
-    ip[12] = (uint8_t)(address & 0xFF);
-    ip[13] = (uint8_t)((address >> 1 * BITS_IN_BYTE) & 0xFF);
-    ip[14] = (uint8_t)((address >> 2 * BITS_IN_BYTE) & 0xFF);
     ip[15] = (uint8_t)((address >> 3 * BITS_IN_BYTE) & 0xFF);
+    ip[14] = (uint8_t)((address >> 2 * BITS_IN_BYTE) & 0xFF);
+    ip[13] = (uint8_t)((address >> 1 * BITS_IN_BYTE) & 0xFF);
+    ip[12] = (uint8_t)(address & 0xFF);
     return 0;
 }
 
@@ -78,7 +78,7 @@ int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]) {
         }
         else {
             uint32_t address = (((struct sockaddr_in *) response->ai_addr)->sin_addr).s_addr;
-            convert_ipv4_address_to_ip_array(ntohl(address), ip);
+            convert_ipv4_address_to_ip_array(address, ip);
         }
         memcpy(ips[ipIndex], ip, sizeof(IP));
         ipIndex += 1;
@@ -135,4 +135,21 @@ bool isIPEmpty(const IP ip) {
         }
     }
     return true;
+}
+
+bool is_ipv4(IP ip) {
+    return (
+        ip[0] == 0 &&
+        ip[1] == 0 &&
+        ip[2] == 0 &&
+        ip[3] == 0 &&
+        ip[4] == 0 &&
+        ip[5] == 0 &&
+        ip[6] == 0 &&
+        ip[7] == 0 &&
+        ip[8] == 0 &&
+        ip[9] == 0 &&
+        ip[10] == (uint8_t)0xFF &&
+        ip[11] == (uint8_t)0xFF
+    );
 }
