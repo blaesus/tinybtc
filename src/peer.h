@@ -1,13 +1,13 @@
 #pragma once
 
 #include <stdbool.h>
-#include <datatypes.h>
-#include <parameters.h>
+#include "datatypes.h"
+#include "parameters.h"
 
 struct MessageCache {
-    uint64_t bufferLength;
-    Byte buffer[MESSAGE_BUFFER_SIZE];
-    bool bufferReady;
+    uint64_t bufferIndex;
+    Byte buffer[65536];
+    uint64_t expectedLength;
 };
 
 typedef struct MessageCache MessageCache;

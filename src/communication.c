@@ -181,8 +181,8 @@ void on_incoming_message(
 void reset_message_cache(
     MessageCache *ptrCache
 ) {
-    ptrCache->bufferLength = 0;
-    ptrCache->bufferReady = false;
+    ptrCache->bufferIndex = 0;
+    ptrCache->expectedLength = 0;
     memset(ptrCache->buffer, 0, sizeof(ptrCache->buffer));
 }
 
@@ -204,42 +204,21 @@ void on_incoming_data(
     } else {
         if (begins_with_header(buf->base)) {
             reset_message_cache(ptrCache);
-
             Header header = get_empty_header();
             parse_message_header((Byte *)buf->base, &header);
+            ptrCache->expectedLength = sizeof(Header) + header.length;
+        }
+        memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, nread);
+        ptrCache->bufferIndex += nread;
 
-            bool payloadIncluded = nread - sizeof(Header) == header.length;
-            if (payloadIncluded) {
-                memcpy(ptrCache->buffer, buf->base, nread);
-                ptrCache->bufferLength += nread;
-                ptrCache->bufferReady = true;
+        if (ptrCache->bufferIndex == ptrCache->expectedLength) {
+            Message message = get_empty_message();
+            int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
+            if (!error) {
+                on_incoming_message(data->peer, message);
             }
-            else {
-                memcpy(ptrCache->buffer, buf->base, sizeof(Header));
-                ptrCache->bufferLength += sizeof(Header);
-            }
-        } else if ((!ptrCache->bufferReady) && (ptrCache->bufferLength > 0)) {
-            memcpy(
-                ptrCache->buffer + ptrCache->bufferLength,
-                buf->base,
-                nread
-            );
-            ptrCache->bufferLength += nread;
-            ptrCache->bufferReady = true;
-        } else {
-            printf("\nUnexpected data");
-            print_object((Byte *)buf->base, (uint64_t)nread);
             reset_message_cache(ptrCache);
         }
-    }
-
-    if (ptrCache->bufferReady) {
-        Message message = get_empty_message();
-        int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
-        if (!error) {
-            on_incoming_message(data->peer, message);
-        }
-        reset_message_cache(ptrCache);
     }
 }
 

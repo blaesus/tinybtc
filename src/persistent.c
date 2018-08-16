@@ -32,7 +32,7 @@ int32_t load_peer_addresses() {
     printf("Loading global state ");
     FILE *file = fopen(PEER_LIST_FILENAME, "rb");
 
-    uint8_t buffer[16] = {0};
+    Byte buffer[sizeof(struct AddressRecord)] = {0};
 
     fread(&buffer, 1, 4, file);
     global.peerAddressCount = combine_uint32(buffer);
