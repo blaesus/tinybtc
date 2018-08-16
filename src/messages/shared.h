@@ -8,6 +8,8 @@
 #define CMD_VERSION "version"
 #define CMD_VERACK "verack"
 #define CMD_INV "inv"
+#define CMD_ADDR "addr"
+#define CMD_GETADDR "getaddr"
 
 #define VAR_INT_CHECKPOINT_8  0xFD
 #define VAR_INT_PREFIX_16  0xFD
@@ -61,6 +63,11 @@ uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,
     uint8_t *ptrBuffer,
     uint32_t bufferSize
+);
+
+uint64_t parse_network_address_with_time(
+    uint8_t *ptrBuffer,
+    struct NetworkAddressWithTime *ptrAddress
 );
 
 Message get_empty_message(void);

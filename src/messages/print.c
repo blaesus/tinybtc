@@ -6,6 +6,7 @@
 #include "messages/version.h"
 #include "messages/verack.h"
 #include "messages/inv.h"
+#include "messages/addr.h"
 
 void print_message(
     Message *ptrMessage
@@ -20,6 +21,9 @@ void print_message(
     }
     else if (strcmp(command, CMD_INV) == 0) {
         print_inv_message(ptrMessage);
+    }
+    else if (strcmp(command, CMD_ADDR) == 0) {
+        print_addr_message(ptrMessage);
     }
     else {
         fprintf(stderr, "Cannot print payload for COMMAND %s\n", command);

@@ -12,6 +12,8 @@
 #include "messages/version.h"
 #include "messages/verack.h"
 #include "messages/inv.h"
+#include "messages/addr.h"
+#include "messages/getaddr.h"
 #include "messages/print.h"
 
 void on_idle(uv_idle_t *handle) {
@@ -19,7 +21,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 2e7) {
+    if (global.eventCounter >= 5e7) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -66,6 +68,9 @@ int32_t parse_buffer_into_message(
     else if (strcmp(command, CMD_INV) == 0) {
         return parse_into_inv_message(ptrBuffer, ptrMessage);
     }
+    else if (strcmp(command, CMD_ADDR) == 0) {
+        return parse_into_addr_message(ptrBuffer, ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot parse message with unknown command '%s'\n", command);
         return 1;
@@ -100,8 +105,6 @@ void send_message(
 ) {
     Message message = get_empty_message();
     Byte buffer[MESSAGE_BUFFER_SIZE] = {0};
-    char *ipString = get_peer_ip(req);
-    printf("Sending message to peer %s\n", ipString);
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
@@ -116,11 +119,22 @@ void send_message(
         make_verack_message(&message);
         dataSize = serialize_verack_message(&message, buffer);
     }
+    else if (strcmp(command, CMD_GETADDR) == 0) {
+        make_getaddr_message(&message);
+        dataSize = serialize_getaddr_message(&message, buffer);
+    }
     else {
         fprintf(stderr, "Cannot recognize command %s", command);
         return;
     }
     uvBuffer.len = dataSize;
+
+    char *ipString = get_peer_ip(req);
+    printf(
+        "Sending %s to peer %s\n",
+        message.header.command,
+        ipString
+    );
     write_buffer(req, &uvBuffer);
 }
 
@@ -131,17 +145,21 @@ void on_incoming_message(
 ) {
     print_message(&message);
 
-    Byte *command = message.header.command;
+    char *command = (char *)message.header.command;
 
-    if (strcmp((char *)command, CMD_VERSION) == 0) {
+    if (strcmp(command, CMD_VERSION) == 0) {
         VersionPayload *ptrPayloadTyped = message.payload;
         if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
     }
-    else if (strcmp((char *)command, CMD_VERACK) == 0) {
+    else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
         send_message(ptrPeer->connection, CMD_VERACK);
+    }
+
+    if (ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem) {
+        send_message(ptrPeer->connection, CMD_GETADDR);
     }
 }
 
@@ -224,7 +242,7 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     else {
         printf("connected with peer %s \n", ipString);
         req->handle->data = req->data;
-        send_message(req, "version");
+        send_message(req, CMD_VERSION);
         uv_read_start(req->handle, alloc_buffer, on_incoming_data);
     }
 }

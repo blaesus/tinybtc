@@ -1,27 +1,22 @@
 #include <string.h>
 
-#include "verack.h"
-#include "header.h"
+#include "messages/verack.h"
+#include "messages/header.h"
+#include "messages/common.h"
 
 uint64_t serialize_verack_message(
     Message *ptrMessage,
     uint8_t *ptrBuffer
 ) {
-    const uint64_t messageHeaderSize = sizeof(ptrMessage->header);
-    memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
-    return messageHeaderSize + ptrMessage->header.length;
+    return serialize_header_only_message(ptrMessage, ptrBuffer);
 }
 
 int32_t make_verack_message(Message *ptrMessage) {
-    ptrMessage->header.magic = parameters.magic;
-    memcpy(ptrMessage->header.command, CMD_VERACK, sizeof(CMD_VERACK));
-    ptrMessage->header.length = 0;
-    calculate_payload_checksum(
-        ptrMessage->payload,
-        ptrMessage->header.length,
-        ptrMessage->header.checksum
+    return make_header_only_message(
+        ptrMessage,
+        CMD_VERACK,
+        sizeof(CMD_VERACK)
     );
-    return 0;
 }
 
 int32_t parse_into_verack_message(

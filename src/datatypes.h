@@ -37,7 +37,7 @@ struct NetworkAddress {
     uint16_t port;
 };
 
-// version >= 31402; not for version
+// version >= 31402; not for version message
 struct NetworkAddressWithTime {
     uint32_t time;
     uint64_t services;
