@@ -303,7 +303,7 @@ int32_t connect_to_peers() {
     uint32_t OFFSET = (uint32_t)((random_uint64() % maxConnection) % 0xFFFFFFFF);
     for (uint32_t peerIndex = OFFSET; peerIndex < maxConnection + OFFSET; peerIndex++) {
         IP ip = {0};
-        memcpy(ip, global.peerAddresses[peerIndex], sizeof(ip));
+        memcpy(ip, global.peerAddresses[peerIndex].ip, sizeof(ip));
         connect_to_peer_at_ip(ip);
     }
     return 0;

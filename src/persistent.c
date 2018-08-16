@@ -13,11 +13,14 @@ int32_t save_peer_addresses() {
 
     uint8_t peerCountBytes[4] = { 0 };
     segment_int32(global.peerAddressCount, peerCountBytes);
-    fwrite(peerCountBytes, 1, 4, file);
+    fwrite(peerCountBytes, 1, sizeof(global.peerAddressCount), file);
 
-    for (uint8_t index = 0; index < global.peerAddressCount; index++) {
-        fwrite(global.peerAddresses[index], 1, 16, file);
-    }
+    fwrite(
+        &global.peerAddresses,
+        global.peerAddressCount,
+        sizeof(struct AddressRecord),
+        file
+    );
 
     printf("Saved %u peers\n", global.peerAddressCount);
 
@@ -35,8 +38,8 @@ int32_t load_peer_addresses() {
     global.peerAddressCount = combine_uint32(buffer);
     printf("(%u peers to recover)...", global.peerAddressCount);
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        fread(&buffer, 1, 16, file);
-        memcpy(global.peerAddresses[index], buffer, sizeof(IP));
+        fread(&buffer, 1, sizeof(struct AddressRecord), file);
+        memcpy(&global.peerAddresses[index], buffer, sizeof(struct AddressRecord));
     }
     printf("Done.\n");
     return 0;
