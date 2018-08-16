@@ -7,7 +7,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
 include_directories(src)
 include_directories(deps/)
 include_directories(deps/uv)
-file(GLOB SOURCES "src/*.c")
+file(GLOB SOURCES ${SOURCES} "src/*.c")
+file(GLOB SOURCES ${SOURCES} "src/messages/*.c")
 
 add_executable(diy-bitcoin
         ${SOURCES}

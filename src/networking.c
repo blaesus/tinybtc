@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 #include "globalstate.h"
-#include "inet.h"
+#include "networking.h"
 #include "util.h"
 
 

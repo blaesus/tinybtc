@@ -2,13 +2,7 @@
 #include <stdbool.h>
 #include "globalstate.h"
 
-GlobalState global = {
-    .listenSocket = {0},
-    .peers = {},
-    .peerCount = 0,
-    .eventCounter = 0,
-    .blockchainHeight = 0,
-};
+GlobalState global;
 
 void add_peer_address(IP ip) {
     const uint32_t index = global.peerAddressCount;

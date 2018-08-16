@@ -5,6 +5,7 @@
 #include "redis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
+#include "peer.h"
 
 #define MAX_PEERS 256
 #define MAX_ADDR_CACHE 65536

@@ -1,15 +1,14 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <arpa/inet.h>
+
+#include "persistent.h"
 
 #include "globalstate.h"
-#include "data.h"
-#include "inet.h"
+#include "networking.h"
+#include "util.h"
 
 #define PEER_LIST_FILENAME "peers.dat"
 
-int save_peer_addresses() {
+int32_t save_peer_addresses() {
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
     uint8_t peerCountBytes[4] = { 0 };
@@ -26,7 +25,7 @@ int save_peer_addresses() {
     return 0;
 }
 
-int load_peer_addresses() {
+int32_t load_peer_addresses() {
     printf("Loading global state ");
     FILE *file = fopen(PEER_LIST_FILENAME, "rb");
 
@@ -39,6 +38,29 @@ int load_peer_addresses() {
         fread(&buffer, 1, 16, file);
         memcpy(global.peerAddresses[index], buffer, sizeof(IP));
     }
-    printf("Done\n");
+    printf("Done.\n");
     return 0;
 }
+
+
+int32_t init_db() {
+    printf("Connecting to redis database...\n");
+    redisContext *c;
+    const char *hostname = "127.0.0.1";
+    int port = 6379;
+
+    struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+    c = redisConnectWithTimeout(hostname, port, timeout);
+    if (c == NULL || c->err) {
+        if (c) {
+            printf("Connection error: %s\n", c->errstr);
+            redisFree(c);
+        } else {
+            printf("Connection error: can't allocate redis context\n");
+        }
+        return 1;
+    }
+    printf("Redis connected");
+    return 0;
+}
+

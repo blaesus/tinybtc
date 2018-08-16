@@ -5,6 +5,8 @@
 
 #define BITS_IN_BYTE 8 // TODO: Dubious?
 
+#define BYTES(X) (BITS_IN_BYTE * X)
+
 #define DOMAIN_NAME_LENGTH 50
 
 #define MAX_VARIABLE_LENGTH_STRING_LENGTH 2048
@@ -42,28 +44,3 @@ struct NetworkAddressWithTime {
     uint8_t ip[16];
     uint16_t port;
 };
-
-struct MessageCache {
-    bool headerLoaded;
-    bool payloadLoaded;
-    struct Message *message;
-};
-
-typedef struct MessageCache MessageCache;
-
-struct HandshakeState {
-    uint8_t acceptThem : 1;
-    uint8_t acceptUs : 1;
-};
-
-struct Peer {
-    struct HandshakeState handshake;
-    uv_tcp_t *socket;
-    uv_connect_t *connection;
-    bool myClient;
-    struct NetworkAddress address;
-    struct MessageCache messageCache;
-};
-
-typedef struct Peer Peer;
-
