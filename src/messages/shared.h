@@ -39,12 +39,12 @@ struct InventoryVector {
 
 typedef struct InventoryVector InventoryVector;
 
-struct GenericDataPayload {
+struct GenericIVPayload {
     uint64_t count;
     struct InventoryVector inventory[MAX_INV_SIZE];
 };
 
-typedef struct GenericDataPayload GenericDataPayload;
+typedef struct GenericIVPayload GenericIVPayload;
 
 #define Payload void
 

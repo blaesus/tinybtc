@@ -47,6 +47,5 @@ void print_addr_message(Message *ptrMessage) {
         AddrRecord record = ptrPayload->addr_list[i];
         char *ipString = convert_ipv4_readable(record.net_addr.ip);
         printf("Addr %u: %s\n", i, ipString);
-        print_object(record.net_addr.ip, sizeof(IP));
     }
 }
