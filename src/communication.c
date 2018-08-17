@@ -164,8 +164,8 @@ void on_incoming_message(
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
-                record->timestamp -= HOUR(2);
-                add_peer_address(record->net_addr.ip, record->timestamp);
+                uint32_t timestampForRecord = record->timestamp - HOUR(2);
+                add_peer_address(record->net_addr, timestampForRecord);
             }
             else {
                 skipped++;
@@ -254,14 +254,14 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     }
 }
 
-int32_t connect_to_peer_at_ip(IP ip) {
-    char *ipString = convert_ipv4_readable(ip);
+int32_t connect_to_address(NetworkAddress addr) {
+    char *ipString = convert_ipv4_readable(addr.ip);
     printf(" > connecting with peer %s as peer %u\n", ipString, global.peerCount);
 
     Peer *ptrPeer = &global.peers[global.peerCount];
     global.peerCount += 1;
 
-    memcpy(ptrPeer->address.ip, ip, sizeof(IP));
+    memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
     ptrPeer->socket = malloc(sizeof(uv_tcp_t));
     uv_tcp_init(uv_default_loop(), ptrPeer->socket);
 
@@ -272,7 +272,7 @@ int32_t connect_to_peer_at_ip(IP ip) {
     connection->data = data;
 
     struct sockaddr_in remoteAddress = {0};
-    uv_ip4_addr(ipString, parameters.port, &remoteAddress);
+    uv_ip4_addr(ipString, htons(addr.port), &remoteAddress);
     uv_tcp_connect(
             connection,
             ptrPeer->socket,
@@ -339,10 +339,10 @@ int32_t connect_to_peers() {
     uint32_t counter = 0;
     while (picked < outgoing) {
         uint32_t index = counter % global.peerAddressCount;
-        struct AddressRecord *ptrRecord = &global.peerAddresses[index];
+        struct AddrRecord *ptrRecord = &global.peerAddresses[index];
         bool pick = random_betwen_0_1() > probPick;
         if (pick) {
-            connect_to_peer_at_ip(ptrRecord->ip);
+            connect_to_address(ptrRecord->net_addr);
             picked++;
         }
         counter++;

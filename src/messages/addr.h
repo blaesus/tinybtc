@@ -6,13 +6,6 @@
 
 #define MAX_ADDR_LIST 1024
 
-struct AddrRecord {
-    uint32_t timestamp;
-    struct NetworkAddress net_addr;
-};
-
-typedef struct AddrRecord AddrRecord;
-
 struct AddrPayload {
     uint64_t count;
     struct AddrRecord addr_list[MAX_ADDR_LIST];

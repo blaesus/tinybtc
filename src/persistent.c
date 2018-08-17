@@ -12,8 +12,8 @@ int32_t save_peer_addresses_human() {
     FILE *file = fopen("peers.csv", "wb");
 
     for (uint64_t i = 0; i < global.peerAddressCount; i++) {
-        struct AddressRecord *record = &global.peerAddresses[i];
-        char *ipString = convert_ipv4_readable(record->ip);
+        struct AddrRecord *record = &global.peerAddresses[i];
+        char *ipString = convert_ipv4_readable(record->net_addr.ip);
         fprintf(file, "%s\n", ipString);
     }
     fclose(file);
@@ -26,14 +26,14 @@ int32_t save_peer_addresses() {
     clear_old_addr();
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
-    uint8_t peerCountBytes[4] = { 0 };
+    uint8_t peerCountBytes[PEER_ADDRESS_COUNT_WIDTH] = { 0 };
     segment_int32(global.peerAddressCount, peerCountBytes);
     fwrite(peerCountBytes, 1, sizeof(global.peerAddressCount), file);
 
     fwrite(
         &global.peerAddresses,
         global.peerAddressCount,
-        sizeof(struct AddressRecord),
+        sizeof(struct AddrRecord),
         file
     );
 
@@ -49,14 +49,14 @@ int32_t load_peer_addresses() {
     printf("Loading global state ");
     FILE *file = fopen(PEER_LIST_FILENAME, "rb");
 
-    Byte buffer[sizeof(struct AddressRecord)] = {0};
+    Byte buffer[sizeof(struct AddrRecord)] = {0};
 
-    fread(&buffer, 1, 4, file);
+    fread(&buffer, 1, PEER_ADDRESS_COUNT_WIDTH, file);
     global.peerAddressCount = combine_uint32(buffer);
     printf("(%u peers to recover)...", global.peerAddressCount);
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        fread(&buffer, 1, sizeof(struct AddressRecord), file);
-        memcpy(&global.peerAddresses[index], buffer, sizeof(struct AddressRecord));
+        fread(&buffer, 1, sizeof(struct AddrRecord), file);
+        memcpy(&global.peerAddresses[index], buffer, sizeof(struct AddrRecord));
     }
     printf("Done.\n");
     return 0;

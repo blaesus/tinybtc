@@ -100,7 +100,13 @@ int dns_bootstrap() {
 
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
-                add_peer_address(ips[ipIndex], 0);
+                NetworkAddress addr = {
+                    .ip = {0},
+                    .port = parameters.port,
+                    .services = SERVICE_NODE_NETWORK,
+                };
+                memcpy(addr.ip, ips[ipIndex], sizeof(IP));
+                add_peer_address(addr, 0);
                 printf("%s\n", convert_ipv4_readable(ips[ipIndex]));
             }
         }

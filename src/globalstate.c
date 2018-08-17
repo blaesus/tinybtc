@@ -8,25 +8,26 @@
 
 GlobalState global;
 
-void add_peer_address(IP ip, uint32_t timestamp) {
+void add_peer_address(NetworkAddress addr, uint32_t timestamp) {
     const uint32_t index = global.peerAddressCount;
-    global.peerAddressCount += 1;
     global.peerAddresses[index].timestamp = timestamp;
-    memcpy(global.peerAddresses[index].ip, ip, sizeof(IP));
+    memcpy(&global.peerAddresses[index].net_addr, &addr, sizeof(addr));
+
+    global.peerAddressCount += 1;
 }
 
 void dedupe_global_addr_cache() {
     printf("Duplicating address cache...\n");
-    struct AddressRecord buffer[MAX_ADDR_CACHE];
+    struct AddrRecord buffer[MAX_ADDR_CACHE];
     memset(buffer, 0, sizeof(buffer));
 
     uint32_t newLength = 0;
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        Byte *ipAtIndex = global.peerAddresses[index].ip;
+        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
 
         bool duplicated = false;
         for (uint32_t search = index+1; search < global.peerAddressCount; search++) {
-            Byte *ipAtSearch = global.peerAddresses[search].ip;
+            Byte *ipAtSearch = global.peerAddresses[search].net_addr.ip;
             if (ips_equal(ipAtSearch, ipAtIndex)) {
                 duplicated = true;
                 break;
@@ -37,7 +38,7 @@ void dedupe_global_addr_cache() {
             memcpy(
                 &buffer[newLength],
                 &global.peerAddresses[index],
-                sizeof(struct AddressRecord)
+                sizeof(struct AddrRecord)
             );
             newLength++;
         }
@@ -50,7 +51,7 @@ void dedupe_global_addr_cache() {
 
 void clear_old_addr() {
     printf("Clearing up old address cache...\n");
-    struct AddressRecord buffer[MAX_ADDR_CACHE];
+    struct AddrRecord buffer[MAX_ADDR_CACHE];
     memset(buffer, 0, sizeof(buffer));
 
     uint32_t now = (uint32_t) time(NULL);
@@ -63,7 +64,7 @@ void clear_old_addr() {
             memcpy(
                 &buffer[newLength],
                 &global.peerAddresses[index],
-                sizeof(struct AddressRecord)
+                sizeof(struct AddrRecord)
             );
             newLength++;
         }
@@ -76,7 +77,7 @@ void clear_old_addr() {
 
 int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        Byte *ipAtIndex = global.peerAddresses[index].ip;
+        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
         if (ips_equal(ipAtIndex, ip)) {
             global.peerAddresses[index].timestamp = timestamp;
             char *ipString = convert_ipv4_readable(ip);

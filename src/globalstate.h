@@ -9,18 +9,13 @@
 
 #define MAX_PEERS 256
 #define MAX_ADDR_CACHE 65536
-
-struct AddressRecord {
-    uint32_t timestamp;
-    IP ip;
-};
-
+#define PEER_ADDRESS_COUNT_WIDTH 4
 
 struct GlobalState {
     uv_tcp_t listenSocket;
     uv_idle_t idler;
 
-    struct AddressRecord peerAddresses[MAX_ADDR_CACHE];
+    struct AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;
 
     struct Peer peers[MAX_PEERS];
@@ -35,7 +30,7 @@ typedef struct GlobalState GlobalState;
 
 extern GlobalState global;
 
-void add_peer_address(IP ip, uint32_t timestamp);
+void add_peer_address(NetworkAddress addr, uint32_t timestamp);
 
 void dedupe_global_addr_cache(void);
 

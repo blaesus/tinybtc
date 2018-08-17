@@ -38,3 +38,13 @@ struct NetworkAddress {
     IP ip;
     uint16_t port;
 };
+
+typedef struct NetworkAddress NetworkAddress;
+
+struct AddrRecord {
+    uint32_t timestamp;
+    struct NetworkAddress net_addr;
+};
+
+typedef struct AddrRecord AddrRecord;
+

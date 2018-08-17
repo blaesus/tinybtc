@@ -81,7 +81,6 @@ void init() {
 int32_t setup_peers() {
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
-        save_peer_addresses();
     }
     setup_listen_socket();
     connect_to_peers();
