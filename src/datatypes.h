@@ -38,11 +38,3 @@ struct NetworkAddress {
     IP ip;
     uint16_t port;
 };
-
-// version >= 31402; not for version message
-struct NetworkAddressWithTime {
-    uint32_t time;
-    uint64_t services;
-    uint8_t ip[16];
-    uint16_t port;
-};

@@ -65,11 +65,6 @@ uint64_t serialize_network_address(
     uint32_t bufferSize
 );
 
-uint64_t parse_network_address_with_time(
-    uint8_t *ptrBuffer,
-    struct NetworkAddressWithTime *ptrAddress
-);
-
 Message get_empty_message(void);
 
 uint64_t parse_network_address(

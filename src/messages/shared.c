@@ -125,27 +125,6 @@ uint64_t parse_network_address(
     return p - ptrBuffer;
 }
 
-uint64_t parse_network_address_with_time(
-    uint8_t *ptrBuffer,
-    struct NetworkAddressWithTime *ptrAddress
-) {
-    uint8_t *p = ptrBuffer;
-
-    memcpy(&ptrAddress->time, p, sizeof(ptrAddress->time));
-    p += sizeof(ptrAddress->time);
-
-    memcpy(&ptrAddress->services, p, sizeof(ptrAddress->services));
-    p += sizeof(ptrAddress->services);
-
-    memcpy(&ptrAddress->ip, p, sizeof(ptrAddress->ip));
-    p += sizeof(ptrAddress->ip);
-
-    memcpy(&ptrAddress->port, p, sizeof(ptrAddress->port));
-    p += sizeof(ptrAddress->port);
-
-    return p - ptrBuffer;
-}
-
 bool begins_with_header(void *p) {
     return combine_uint32(p) == parameters.magic;
 }

@@ -1,14 +1,14 @@
 #pragma once
 
 #include <stdint.h>
-#include <datatypes.h>
+#include "datatypes.h"
 #include "messages/shared.h"
 
 #define MAX_ADDR_LIST 1024
 
 struct AddrRecord {
     uint32_t timestamp;
-    struct NetworkAddressWithTime net_addr;
+    struct NetworkAddress net_addr;
 };
 
 typedef struct AddrRecord AddrRecord;

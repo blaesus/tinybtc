@@ -15,6 +15,7 @@ struct AddressRecord {
     IP ip;
 };
 
+
 struct GlobalState {
     uv_tcp_t listenSocket;
     uv_idle_t idler;

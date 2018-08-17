@@ -1,5 +1,3 @@
-#pragma once
-
 #include <stdint.h>
 #include "messages/shared.h"
 #include "messages/common.h"

@@ -164,6 +164,7 @@ void on_incoming_message(
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
+                record->timestamp -= HOUR(2);
                 add_peer_address(record->net_addr.ip, record->timestamp);
             }
             else {

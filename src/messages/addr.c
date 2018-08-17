@@ -14,11 +14,15 @@ void parse_addr_payload(
     p += countWidth;
 
     for (uint64_t i = 0; i < ptrPayload->count; i++) {
-        uint64_t dataWidth = parse_network_address_with_time(
+        AddrRecord *record = &ptrPayload->addr_list[i];
+
+        memcpy(&record->timestamp, p, sizeof(uint32_t));
+        p += sizeof(uint32_t);
+        uint64_t networkAddressWidth = parse_network_address(
             p,
-            &ptrPayload->addr_list[i].net_addr
+            &record->net_addr
         );
-        p += dataWidth;
+        p += networkAddressWidth;
     }
 }
 
