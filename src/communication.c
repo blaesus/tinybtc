@@ -321,31 +321,15 @@ int32_t setup_listen_socket() {
     return 0;
 }
 
-int32_t connect_to_peers() {
-    uint32_t outgoing = 0;
-    uint32_t offset = 0;
-    if (parameters.maxOutgoing < global.peerAddressCount) {
-        outgoing = parameters.maxOutgoing;
-        offset = random_range(0, global.peerAddressCount - parameters.maxOutgoing);
-    }
-    else {
-        outgoing = global.peerAddressCount;
-        offset = 0;
-    }
+static NetworkAddress pick_random_addr() {
+    uint32_t index = random_range(0, global.peerAddressCount - 1);
+    return global.peerAddresses[index].net_addr;
+}
 
-    printf("Connecting to %u peers (starting offset %u)\n", outgoing, offset);
-    double probPick = (double)outgoing / (double)global.peerAddressCount;
-    uint32_t picked = 0;
-    uint32_t counter = 0;
-    while (picked < outgoing) {
-        uint32_t index = counter % global.peerAddressCount;
-        struct AddrRecord *ptrRecord = &global.peerAddresses[index];
-        bool pick = random_betwen_0_1() > probPick;
-        if (pick) {
-            connect_to_address(ptrRecord->net_addr);
-            picked++;
-        }
-        counter++;
+int32_t connect_to_peers() {
+    uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
+    for (uint32_t i = 0; i < outgoing; i++) {
+        connect_to_address(pick_random_addr());
     }
     return 0;
 }
