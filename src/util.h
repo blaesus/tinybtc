@@ -2,11 +2,6 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define SECOND 1
-#define MINUTE(X) (60 * SECOND * X)
-#define HOUR(X) (60 * MINUTE(X))
-#define DAY(X) (24 * HOUR(X))
-
 int segment_int32(uint32_t number, uint8_t chars[4]);
 uint16_t combine_uint16(const uint8_t *chars);
 uint32_t combine_uint32(const uint8_t *chars);

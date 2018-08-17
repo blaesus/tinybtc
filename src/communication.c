@@ -8,6 +8,7 @@
 #include "globalstate.h"
 #include "networking.h"
 #include "util.h"
+#include "units.h"
 
 #include "messages/shared.h"
 #include "messages/version.h"
