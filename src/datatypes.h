@@ -22,8 +22,9 @@ typedef char DomainName[DOMAIN_NAME_LENGTH];
 typedef uint64_t ServiceBits;
 
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
+// Memory representation of VarInt. Only differs from normal ints when serialized.
 
-typedef uint8_t VariableLengthInteger[64];
+typedef uint64_t VarIntMem;
 
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_string
 

@@ -56,9 +56,9 @@ typedef struct TxWitness TxWitness;
 struct TxPayload {
     int32_t version;
     Byte flag;
-    uint64_t tx_in_count;
+    VarIntMem tx_in_count;
     TxIn tx_in[MAX_TX_COUNT];
-    uint64_t tx_out_count;
+    VarIntMem tx_out_count;
     TxOut tx_out[MAX_TX_COUNT];
     TxWitness tx_witness[MAX_TX_COUNT];
     uint32_t lock_time;

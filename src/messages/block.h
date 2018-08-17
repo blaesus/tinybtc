@@ -14,7 +14,7 @@ struct BlockPayload {
     uint32_t timestamp;
     uint32_t bits;
     uint32_t nonce;
-    uint64_t txn_count;
+    VarIntMem txn_count;
     TX txns[MAX_TX_PER_BLOCK];
 };
 
