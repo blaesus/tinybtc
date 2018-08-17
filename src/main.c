@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "persistent.h"
 #include "globalstate.h"
+// #include "genesis.h"
 #include "messages/shared.h"
 #include "messages/version.h"
 
@@ -88,12 +89,12 @@ int32_t setup_peers() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    init();
-//    testHash();
-//    test_version_messages();
-    setup_peers();
-    run_main_loop();
-    atexit(&cleanup);
+    // init();
+    // test_version_messages();
+    //  setup_peers();
+    //  run_main_loop();
+    //  atexit(&cleanup);
+    // print_object(&genesisBlock, sizeof(genesisBlock));
     return 0;
 }
 

@@ -2,6 +2,8 @@
 #include "parameters.h"
 #include "units.h"
 
+// @see https://en.bitcoin.it/wiki/Genesis_block
+
 const struct Parameters parameters = {
 
     .magic = MAIN_NET_MAGIC,

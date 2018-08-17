@@ -9,8 +9,6 @@
 #define MAX_WITNESS_COMPONENT_DATA_LENGTH 4096
 #define MAX_WITNESS_COMPONENT_COUNT 1024
 
-#define TX int
-
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#tx
 
 struct Outpoint {
@@ -55,7 +53,7 @@ typedef struct TxWitness TxWitness;
 
 struct TxPayload {
     int32_t version;
-    Byte flag;
+    Byte flag[2];
     VarIntMem tx_in_count;
     TxIn tx_in[MAX_TX_COUNT];
     VarIntMem tx_out_count;
@@ -63,3 +61,5 @@ struct TxPayload {
     TxWitness tx_witness[MAX_TX_COUNT];
     uint32_t lock_time;
 };
+
+typedef struct TxPayload TxPayload;

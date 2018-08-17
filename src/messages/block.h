@@ -15,7 +15,7 @@ struct BlockPayload {
     uint32_t bits;
     uint32_t nonce;
     VarIntMem txn_count;
-    TX txns[MAX_TX_PER_BLOCK];
+    TxPayload txns[MAX_TX_PER_BLOCK];
 };
 
 typedef struct BlockPayload BlockPayload;
