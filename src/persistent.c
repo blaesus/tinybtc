@@ -14,7 +14,14 @@ int32_t save_peer_addresses_human() {
     for (uint64_t i = 0; i < global.peerAddressCount; i++) {
         struct AddrRecord *record = &global.peerAddresses[i];
         char *ipString = convert_ipv4_readable(record->net_addr.ip);
-        fprintf(file, "%s\n", ipString);
+        fprintf(
+            file,
+            "%u,%s,%u,%llu\n",
+            record->timestamp,
+            ipString,
+            ntohs(record->net_addr.port),
+            record->net_addr.services
+        );
     }
     fclose(file);
 
