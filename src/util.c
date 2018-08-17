@@ -5,8 +5,6 @@
 #include "util.h"
 #include "datatypes.h"
 
-#define __STDC_FORMAT_MACROS
-
 int segment_int32(uint32_t number, uint8_t chars[4]) {
     chars[0] = (uint8_t)(number & 0xFF);
     chars[1] = (uint8_t)((number >> 1 * BITS_IN_BYTE) & 0xFF);
@@ -42,7 +40,7 @@ uint64_t combine_uint64(const uint8_t *chars) {
     return number;
 }
 
-uint32_t count_string_length(char *s) {
+uint32_t count_string_length(const char *s) {
     uint32_t i;
     for (i = 0; s[i] != '\0'; i++);
     return i+1;
@@ -113,13 +111,6 @@ void print_object(uint8_t *ptrData, uint64_t length) {
         ptrData++;
     }
     printf("END \n");
-}
-
-uint32_t min(uint32_t a, uint32_t b) {
-    if (a <= b) {
-        return a;
-    }
-    return b;
 }
 
 bool ips_equal(IP ipA, IP ipB) {
