@@ -6,10 +6,9 @@
 
 GlobalState global;
 
-void add_peer_address(IP ip) {
+void add_peer_address(IP ip, uint32_t timestamp) {
     const uint32_t index = global.peerAddressCount;
     global.peerAddressCount += 1;
-    uint32_t timestamp = (uint32_t)time(NULL);
     global.peerAddresses[index].timestamp = timestamp;
     memcpy(global.peerAddresses[index].ip, ip, sizeof(IP));
 }

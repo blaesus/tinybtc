@@ -34,4 +34,4 @@ typedef struct GlobalState GlobalState;
 
 extern GlobalState global;
 
-void add_peer_address(IP ip);
+void add_peer_address(IP ip, uint32_t timestamp);

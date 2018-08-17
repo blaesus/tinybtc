@@ -14,7 +14,7 @@ int32_t save_peer_addresses_human() {
     for (uint64_t i = 0; i < global.peerAddressCount; i++) {
         struct AddressRecord *record = &global.peerAddresses[i];
         char *ipString = convert_ipv4_readable(record->ip);
-        fprintf(file, "%llu - %s\n", i, ipString);
+        fprintf(file, "%s\n", ipString);
     }
     fclose(file);
 

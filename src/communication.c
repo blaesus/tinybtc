@@ -22,7 +22,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 1e8) {
+    if (global.eventCounter >= 5e7) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -162,16 +162,9 @@ void on_incoming_message(
         AddrPayload *ptrPayload = message.payload;
         uint64_t skipped = 0;
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
-            struct AddressRecord *target = &global.peerAddresses[global.peerAddressCount];
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
-                memcpy(
-                    target->ip,
-                    record->net_addr.ip,
-                    sizeof(IP)
-                );
-                target->timestamp = record->net_addr.time;
-                global.peerAddressCount += 1;
+                add_peer_address(record->net_addr.ip, record->timestamp);
             }
             else {
                 skipped++;
