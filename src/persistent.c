@@ -23,6 +23,7 @@ int32_t save_peer_addresses_human() {
 
 int32_t save_peer_addresses() {
     dedupe_global_addr_cache();
+    clear_old_addr();
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
     uint8_t peerCountBytes[4] = { 0 };

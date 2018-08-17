@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "parameters.h"
+#include "util.h"
 
 const struct Parameters parameters = {
 
@@ -32,4 +33,6 @@ const struct Parameters parameters = {
     .maxOutgoing = 16,
 
     .backlog = 32,
+
+    .addrLife = DAY(14),
 };

@@ -39,4 +39,6 @@ void add_peer_address(IP ip, uint32_t timestamp);
 
 void dedupe_global_addr_cache(void);
 
+void clear_old_addr(void);
+
 int32_t set_addr_timestamp(IP ip, uint32_t timestamp);

@@ -48,6 +48,32 @@ void dedupe_global_addr_cache() {
     global.peerAddressCount = newLength;
 }
 
+void clear_old_addr() {
+    printf("Clearing up old address cache...\n");
+    struct AddressRecord buffer[MAX_ADDR_CACHE];
+    memset(buffer, 0, sizeof(buffer));
+
+    uint32_t now = (uint32_t) time(NULL);
+
+    uint32_t newLength = 0;
+    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
+        bool shouldRemove = (now - global.peerAddresses[index].timestamp > parameters.addrLife);
+
+        if (!shouldRemove) {
+            memcpy(
+                &buffer[newLength],
+                &global.peerAddresses[index],
+                sizeof(struct AddressRecord)
+            );
+            newLength++;
+        }
+    }
+    printf("Cleared old peer addresses: %u => %u\n", global.peerAddressCount, newLength);
+
+    memcpy(&global.peerAddresses, &buffer, sizeof(buffer));
+    global.peerAddressCount = newLength;
+}
+
 int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
         Byte *ipAtIndex = global.peerAddresses[index].ip;
