@@ -7,7 +7,7 @@
 #include "datatypes.h"
 #include "peer.h"
 
-#define MAX_PEERS 256
+#define MAX_PEERS 1024
 #define MAX_ADDR_CACHE 65536
 #define PEER_ADDRESS_COUNT_WIDTH 4
 
@@ -15,14 +15,14 @@ struct GlobalState {
     uv_tcp_t listenSocket;
     uv_idle_t idler;
 
-    struct AddrRecord peerAddresses[MAX_ADDR_CACHE];
+    AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;
 
-    struct Peer peers[MAX_PEERS];
+    Peer peers[MAX_PEERS];
     uint32_t peerCount;
 
     uint64_t eventCounter;
-    struct NetworkAddress myAddress;
+    NetworkAddress myAddress;
     uint32_t blockchainHeight;
 };
 

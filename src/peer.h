@@ -22,12 +22,13 @@ struct PeerFlags {
 };
 
 struct Peer {
+    uint32_t index;
     struct HandshakeState handshake;
     uv_tcp_t *socket;
     uv_connect_t *connection;
     bool myClient;
-    struct NetworkAddress address;
-    struct MessageCache messageCache;
+    NetworkAddress address;
+    MessageCache messageCache;
     struct PeerFlags flags;
 };
 

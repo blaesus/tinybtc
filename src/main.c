@@ -83,7 +83,7 @@ int32_t setup_peers() {
         dns_bootstrap();
     }
     setup_listen_socket();
-    connect_to_peers();
+    connect_to_initial_peers();
     return 0;
 }
 

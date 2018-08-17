@@ -254,13 +254,13 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     }
 }
 
-int32_t connect_to_address(NetworkAddress addr) {
+int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
     char *ipString = convert_ipv4_readable(addr.ip);
-    printf(" > connecting with peer %s as peer %u\n", ipString, global.peerCount);
+    printf(" > connecting with peer %s as peer %u\n", ipString, peerIndex);
 
-    Peer *ptrPeer = &global.peers[global.peerCount];
-    global.peerCount += 1;
+    Peer *ptrPeer = &global.peers[peerIndex];
 
+    ptrPeer->index = peerIndex;
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
     ptrPeer->socket = malloc(sizeof(uv_tcp_t));
     uv_tcp_init(uv_default_loop(), ptrPeer->socket);
@@ -334,11 +334,16 @@ static NetworkAddress pick_random_nonpeer_addr() {
     return addr;
 }
 
-int32_t connect_to_peers() {
+void connect_to_random_addr_for_peer(uint32_t peerIndex) {
+    NetworkAddress addr = pick_random_nonpeer_addr();
+    connect_to_address_as_peer(addr, peerIndex);
+}
+
+int32_t connect_to_initial_peers() {
     uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
-        NetworkAddress addr = pick_random_nonpeer_addr();
-        connect_to_address(addr);
+        connect_to_random_addr_for_peer(i);
+        global.peerCount += 1;
     }
     return 0;
 }
