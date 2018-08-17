@@ -35,4 +35,6 @@ const struct Parameters parameters = {
     .backlog = 32,
 
     .addrLife = DAY(14),
+
+    .getaddrThreshold = 1000,
 };

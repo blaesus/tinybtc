@@ -175,11 +175,14 @@ void on_incoming_message(
 //        dedupe_global_addr_cache();
     }
 
-    if (
-        ptrPeer->handshake.acceptUs
+    bool shouldSendGetaddr =
+        global.peerAddressCount < parameters.getaddrThreshold
+        && ptrPeer->handshake.acceptUs
         && ptrPeer->handshake.acceptThem
         && !ptrPeer->flags.attemptedGetaddr
-    ) {
+    ;
+
+    if (shouldSendGetaddr) {
         send_message(ptrPeer->connection, CMD_GETADDR);
         ptrPeer->flags.attemptedGetaddr = true;
     }

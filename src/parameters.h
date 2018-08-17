@@ -34,6 +34,7 @@ struct Parameters {
     uint32_t maxOutgoing;
     uint8_t userAgent[128];
     uint32_t addrLife;
+    uint16_t getaddrThreshold;
 };
 
 extern const struct Parameters parameters;
