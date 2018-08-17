@@ -4,6 +4,7 @@
 
 #include "globalstate.h"
 #include "util.h"
+#include "networking.h"
 
 GlobalState global;
 
@@ -45,4 +46,16 @@ void dedupe_global_addr_cache() {
 
     memcpy(&global.peerAddresses, &buffer, sizeof(buffer));
     global.peerAddressCount = newLength;
+}
+
+int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
+    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
+        Byte *ipAtIndex = global.peerAddresses[index].ip;
+        if (ips_equal(ipAtIndex, ip)) {
+            global.peerAddresses[index].timestamp = timestamp;
+            char *ipString = convert_ipv4_readable(ip);
+            printf("Updated timestamp of ip %s to %u\n", ipString, timestamp);
+        }
+    }
+    return 0;
 }

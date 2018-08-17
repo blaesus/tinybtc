@@ -182,6 +182,9 @@ void on_incoming_message(
         send_message(ptrPeer->connection, CMD_GETADDR);
         ptrPeer->flags.attemptedGetaddr = true;
     }
+
+    uint32_t now = (uint32_t)time(NULL);
+    set_addr_timestamp(ptrPeer->address.ip, now);
 }
 
 void reset_message_cache(
