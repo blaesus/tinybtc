@@ -121,3 +121,12 @@ uint32_t min(uint32_t a, uint32_t b) {
     }
     return b;
 }
+
+bool ips_equal(IP ipA, IP ipB) {
+    for (uint8_t i = 0; i < sizeof(IP); i++) {
+        if (ipA[i] != ipB[i]) {
+            return false;
+        }
+    }
+    return true;
+}

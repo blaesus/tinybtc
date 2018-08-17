@@ -11,9 +11,11 @@
 
 #define MAX_VARIABLE_LENGTH_STRING_LENGTH 2048
 
+#define IP_BYTES 16
+
 typedef uint8_t Byte;
 
-typedef uint8_t IP[16];
+typedef uint8_t IP[IP_BYTES];
 
 typedef char DomainName[DOMAIN_NAME_LENGTH];
 

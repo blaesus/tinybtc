@@ -171,6 +171,7 @@ void on_incoming_message(
             }
         }
         printf("Skipped %llu IPs\n", skipped);
+//        dedupe_global_addr_cache();
     }
 
     if (

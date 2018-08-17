@@ -9,7 +9,7 @@
 #define PEER_LIST_FILENAME "peers.dat"
 
 int32_t save_peer_addresses_human() {
-    FILE *file = fopen("peers.human.dat", "wb");
+    FILE *file = fopen("peers.csv", "wb");
 
     for (uint64_t i = 0; i < global.peerAddressCount; i++) {
         struct AddressRecord *record = &global.peerAddresses[i];
@@ -22,6 +22,7 @@ int32_t save_peer_addresses_human() {
 }
 
 int32_t save_peer_addresses() {
+    dedupe_global_addr_cache();
     FILE *file = fopen(PEER_LIST_FILENAME, "wb");
 
     uint8_t peerCountBytes[4] = { 0 };
@@ -78,7 +79,7 @@ int32_t init_db() {
         }
         return 1;
     }
-    printf("Redis connected");
+    printf("Redis connected\n");
     return 0;
 }
 
