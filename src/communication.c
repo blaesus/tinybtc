@@ -326,10 +326,19 @@ static NetworkAddress pick_random_addr() {
     return global.peerAddresses[index].net_addr;
 }
 
+static NetworkAddress pick_random_nonpeer_addr() {
+    NetworkAddress addr;
+    do {
+        addr = pick_random_addr();
+    } while (is_peer(addr.ip));
+    return addr;
+}
+
 int32_t connect_to_peers() {
     uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
-        connect_to_address(pick_random_addr());
+        NetworkAddress addr = pick_random_nonpeer_addr();
+        connect_to_address(addr);
     }
     return 0;
 }

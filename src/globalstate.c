@@ -86,3 +86,12 @@ int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
     }
     return 0;
 }
+
+bool is_peer(IP ip) {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        if (ips_equal(global.peers[i].address.ip, ip)) {
+            return true;
+        }
+    }
+    return false;
+}
