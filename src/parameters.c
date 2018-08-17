@@ -26,11 +26,11 @@ const struct Parameters parameters = {
         "seed.btc.petertodd.org",
     },
 
-    .userAgent = "/Satoshi:0.16.2/",
+    .userAgent = "/Satoshi:0.16.2/diy-bitcoin:0.0.1/",
 
     .maxIncoming = 125,
 
-    .maxOutgoing = 16,
+    .maxOutgoing = 8,
 
     .backlog = 32,
 
