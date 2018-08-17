@@ -11,5 +11,6 @@ int32_t free_networking_resources(void);
 void connect_to_random_addr_for_peer(uint32_t peerIndex);
 void send_message(
     uv_connect_t *req,
-    char *command
+    char *command,
+    void *data
 );

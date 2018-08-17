@@ -7,12 +7,12 @@
 int32_t make_header_only_message(
     Message *ptrMessage,
     char* command,
-    uint16_t commandLength
+    uint16_t commandSize
 ) {
     ptrMessage->header.magic = parameters.magic;
-    memcpy(ptrMessage->header.command, command, commandLength);
+    memcpy(ptrMessage->header.command, command, commandSize);
     ptrMessage->header.length = 0;
-    calculate_payload_checksum(
+    calculate_data_checksum(
         ptrMessage->payload,
         ptrMessage->header.length,
         ptrMessage->header.checksum
@@ -44,6 +44,38 @@ static uint64_t parse_iv_payload(
         );
     }
     return countWidth + count * sizeof(InventoryVector);
+}
+
+static uint64_t serialize_iv_payload(
+    GenericIVPayload *ptrPayload,
+    Byte *ptrBuffer
+) {
+    Byte *p = ptrBuffer;
+    uint64_t countWidth = serialize_to_varint(ptrPayload->count, p);
+    p += countWidth;
+
+    for (uint64_t i = 0; i < ptrPayload->count; i++) {
+        InventoryVector iv = ptrPayload->inventory[i];
+        memcpy(p, &iv.type, sizeof(iv.type));
+        p += sizeof(iv.type);
+        memcpy(p, &iv.hash, sizeof(iv.hash));
+        p += sizeof(iv.hash);
+    }
+    return p - ptrBuffer;
+}
+
+uint64_t serialize_iv_message(
+    Message *ptrMessage,
+    uint8_t *ptrBuffer
+) {
+    uint64_t messageHeaderSize = sizeof(ptrMessage->header);
+    memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
+    serialize_iv_payload(
+        (GenericIVPayload *)ptrMessage->payload,
+        ptrBuffer+messageHeaderSize
+    );
+    return messageHeaderSize + ptrMessage->header.length;
+
 }
 
 int32_t parse_into_iv_message(
@@ -101,4 +133,27 @@ void print_iv_message(Message *ptrMessage) {
         char *typeString = get_iv_type(iv.type);
         printf("Inventory of type %s(%u)\n", typeString, iv.type);
     }
+}
+
+int32_t make_iv_message(
+    Message *ptrMessage,
+    GenericIVPayload *ptrPayload,
+    Byte *command,
+    uint32_t commandSize
+) {
+    ptrMessage->header.magic = parameters.magic;
+    memcpy(ptrMessage->header.command, command, commandSize);
+
+    ptrMessage->payload = malloc(sizeof(GenericIVPayload));
+    memcpy(ptrMessage->payload, ptrPayload, sizeof(GenericIVPayload));
+
+    Byte buffer[MESSAGE_BUFFER_SIZE] = {0};
+    uint64_t payloadLength = serialize_iv_payload(ptrPayload, buffer);
+    calculate_data_checksum(
+        &buffer,
+        ptrMessage->header.length,
+        ptrMessage->header.checksum
+    );
+    ptrMessage->header.length = (uint32_t)payloadLength;
+    return 0;
 }

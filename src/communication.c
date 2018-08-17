@@ -10,6 +10,7 @@
 #include "util.h"
 #include "units.h"
 
+#include "messages/common.h"
 #include "messages/shared.h"
 #include "messages/version.h"
 #include "messages/verack.h"
@@ -103,7 +104,8 @@ void write_buffer(
 
 void send_message(
     uv_connect_t *req,
-    char *command
+    char *command,
+    void *ptrData
 ) {
     Message message = get_empty_message();
     Byte buffer[MESSAGE_BUFFER_SIZE] = {0};
@@ -125,8 +127,18 @@ void send_message(
         make_getaddr_message(&message);
         dataSize = serialize_getaddr_message(&message, buffer);
     }
+    else if (strcmp(command, CMD_GETDATA) == 0) {
+        GenericIVPayload *ptrPayload = ptrData;
+        make_iv_message(
+            &message,
+            ptrPayload,
+            (Byte *)CMD_GETDATA,
+            sizeof(CMD_GETDATA)
+        );
+        dataSize = serialize_iv_message(&message, buffer);
+    }
     else {
-        fprintf(stderr, "Cannot recognize command %s", command);
+        fprintf(stderr, "send_message: Cannot recognize command %s", command);
         return;
     }
     uvBuffer.len = dataSize;
@@ -157,7 +169,7 @@ void on_incoming_message(
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
-        send_message(ptrPeer->connection, CMD_VERACK);
+        send_message(ptrPeer->connection, CMD_VERACK, NULL);
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
         AddrPayload *ptrPayload = message.payload;
@@ -173,7 +185,11 @@ void on_incoming_message(
             }
         }
         printf("Skipped %llu IPs\n", skipped);
-//        dedupe_global_addr_cache();
+        // dedupe_global_addr_cache();
+    }
+    else if (strcmp(command, CMD_INV) == 0) {
+        InvPayload *ptrPayload = message.payload;
+        send_message(ptrPeer->connection, CMD_GETDATA, ptrPayload);
     }
 
     bool shouldSendGetaddr =
@@ -184,7 +200,7 @@ void on_incoming_message(
     ;
 
     if (shouldSendGetaddr) {
-        send_message(ptrPeer->connection, CMD_GETADDR);
+        send_message(ptrPeer->connection, CMD_GETADDR, NULL);
         ptrPeer->flags.attemptedGetaddr = true;
     }
 
@@ -260,7 +276,7 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     else {
         printf("connected with peer %s \n", ipString);
         req->handle->data = req->data;
-        send_message(req, CMD_VERSION);
+        send_message(req, CMD_VERSION, NULL);
         uv_read_start(req->handle, alloc_buffer, on_incoming_data);
     }
 }

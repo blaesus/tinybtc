@@ -10,6 +10,7 @@
 #define CMD_INV "inv"
 #define CMD_ADDR "addr"
 #define CMD_GETADDR "getaddr"
+#define CMD_GETDATA "getdata"
 
 #define VAR_INT_CHECKPOINT_8  0xFD
 #define VAR_INT_PREFIX_16  0xFD
@@ -33,7 +34,7 @@ uint64_t serialize_varstr(
 );
 
 struct InventoryVector {
-    uint32_t type : 4 * BITS_IN_BYTE;
+    uint32_t type;
     SHA256_HASH hash;
 };
 
@@ -41,7 +42,7 @@ typedef struct InventoryVector InventoryVector;
 
 struct GenericIVPayload {
     uint64_t count;
-    struct InventoryVector inventory[MAX_INV_SIZE];
+    InventoryVector inventory[MAX_INV_SIZE];
 };
 
 typedef struct GenericIVPayload GenericIVPayload;

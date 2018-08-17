@@ -90,7 +90,7 @@ int32_t make_version_message(
     ptrMessage->header.length = payloadLength;
     ptrMessage->payload = malloc(sizeof(struct VersionPayload));
     memcpy(ptrMessage->payload, &payload, sizeof(struct VersionPayload));
-    calculate_payload_checksum(
+    calculate_data_checksum(
         checksumCalculationBuffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum

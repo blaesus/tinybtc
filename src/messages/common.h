@@ -26,3 +26,15 @@ int32_t parse_into_iv_message(
 );
 
 void print_iv_message(Message *ptrMessage);
+
+int32_t make_iv_message(
+    Message *ptrMessage,
+    GenericIVPayload *ptrPayload,
+    Byte *command,
+    uint32_t commandSize
+);
+
+uint64_t serialize_iv_message(
+    Message *ptrMessage,
+    uint8_t *ptrBuffer
+);
