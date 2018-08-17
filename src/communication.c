@@ -244,7 +244,17 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
     ContextData *data = (ContextData *)req->data;
     char *ipString = convert_ipv4_readable(data->peer->address.ip);
     if (status) {
-        fprintf(stderr, "connection failed with peer %s: %s \n", ipString, uv_strerror(status));
+        fprintf(
+            stderr,
+            "connection failed with peer %s: %s(%i) \n",
+            ipString,
+            uv_strerror(status),
+            status
+        );
+        if (data->peer->relationship == REL_MY_SERVER) {
+            disable_ip(data->peer->address.ip);
+            connect_to_random_addr_for_peer(data->peer->index);
+        }
     }
     else {
         printf("connected with peer %s \n", ipString);
@@ -256,7 +266,7 @@ void on_peer_connect(uv_connect_t* req, int32_t status) {
 
 int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
     char *ipString = convert_ipv4_readable(addr.ip);
-    printf(" > connecting with peer %s as peer %u\n", ipString, peerIndex);
+    printf("connecting with peer %s for peer %u\n", ipString, peerIndex);
 
     Peer *ptrPeer = &global.peers[peerIndex];
 

@@ -21,12 +21,15 @@ struct PeerFlags {
     bool attemptedGetaddr;
 };
 
+#define REL_MY_SERVER 0
+#define REL_MY_CLIENT 1
+
 struct Peer {
     uint32_t index;
     struct HandshakeState handshake;
     uv_tcp_t *socket;
     uv_connect_t *connection;
-    bool myClient;
+    uint8_t relationship;
     NetworkAddress address;
     MessageCache messageCache;
     struct PeerFlags flags;

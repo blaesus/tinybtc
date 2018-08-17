@@ -75,6 +75,10 @@ void clear_old_addr() {
     global.peerAddressCount = newLength;
 }
 
+int32_t disable_ip(IP ip) {
+    return set_addr_timestamp(ip, 0);
+}
+
 int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
         Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;

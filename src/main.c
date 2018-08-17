@@ -53,7 +53,7 @@ int32_t test_version_messages() {
             .acceptUs = false,
         },
         .socket = NULL,
-        .myClient = false,
+        .relationship = REL_MY_SERVER,
         .address = {
             .services = 0x9,
             .ip = {0},
