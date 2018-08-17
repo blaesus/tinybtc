@@ -85,6 +85,18 @@ uint64_t random_uint64() {
     return combine_uint64(nonceBytes);
 }
 
+// borders inclusive
+uint32_t random_range(
+    uint32_t lower,
+    uint32_t upper
+) {
+    return lower + (rand() % (upper - lower + 1));
+}
+
+double random_betwen_0_1() {
+    return (double)rand() / (double)RAND_MAX ;
+}
+
 void printUint64(uint64_t input) {
     printf("%"PRIu64"\n", input);
 }

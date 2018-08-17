@@ -17,6 +17,10 @@ struct HandshakeState {
     uint8_t acceptUs : 1;
 };
 
+struct PeerFlags {
+    bool attemptedGetaddr;
+};
+
 struct Peer {
     struct HandshakeState handshake;
     uv_tcp_t *socket;
@@ -24,6 +28,7 @@ struct Peer {
     bool myClient;
     struct NetworkAddress address;
     struct MessageCache messageCache;
+    struct PeerFlags flags;
 };
 
 typedef struct Peer Peer;

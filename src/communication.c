@@ -7,6 +7,7 @@
 #include "communication.h"
 #include "globalstate.h"
 #include "networking.h"
+#include "util.h"
 
 #include "messages/shared.h"
 #include "messages/version.h"
@@ -21,7 +22,7 @@ void on_idle(uv_idle_t *handle) {
     if (global.eventCounter % 1000000 == 0) {
         printf("Event count %llu\n", global.eventCounter);
     }
-    if (global.eventCounter >= 3e7) {
+    if (global.eventCounter >= 1e8) {
         printf("Stopping main loop...\n");
         uv_idle_stop(handle);
         uv_loop_close(uv_default_loop());
@@ -179,8 +180,13 @@ void on_incoming_message(
         printf("Skipped %llu IPs\n", skipped);
     }
 
-    if (ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem) {
+    if (
+        ptrPeer->handshake.acceptUs
+        && ptrPeer->handshake.acceptThem
+        && !ptrPeer->flags.attemptedGetaddr
+    ) {
         send_message(ptrPeer->connection, CMD_GETADDR);
+        ptrPeer->flags.attemptedGetaddr = true;
     }
 }
 
@@ -315,14 +321,30 @@ int32_t setup_listen_socket() {
 }
 
 int32_t connect_to_peers() {
-    uint32_t maxConnection = min(parameters.maxOutgoing, global.peerAddressCount);
-    printf("Connecting to %u peers\n", maxConnection);
-    // TODO: randomize properly
-    uint32_t OFFSET = (uint32_t)((random_uint64() % global.peerAddressCount) % 0xFFFFFFFF);
-    for (uint32_t peerIndex = OFFSET; peerIndex < maxConnection + OFFSET; peerIndex++) {
-        IP ip = {0};
-        memcpy(ip, global.peerAddresses[peerIndex].ip, sizeof(ip));
-        connect_to_peer_at_ip(ip);
+    uint32_t outgoing = 0;
+    uint32_t offset = 0;
+    if (parameters.maxOutgoing < global.peerAddressCount) {
+        outgoing = parameters.maxOutgoing;
+        offset = random_range(0, global.peerAddressCount - parameters.maxOutgoing);
+    }
+    else {
+        outgoing = global.peerAddressCount;
+        offset = 0;
+    }
+
+    printf("Connecting to %u peers (starting offset %u)\n", outgoing, offset);
+    double probPick = (double)outgoing / (double)global.peerAddressCount;
+    uint32_t picked = 0;
+    uint32_t counter = 0;
+    while (picked < outgoing) {
+        uint32_t index = counter % global.peerAddressCount;
+        struct AddressRecord *ptrRecord = &global.peerAddresses[index];
+        bool pick = random_betwen_0_1() > probPick;
+        if (pick) {
+            connect_to_peer_at_ip(ptrRecord->ip);
+            picked++;
+        }
+        counter++;
     }
     return 0;
 }
