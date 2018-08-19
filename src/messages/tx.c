@@ -8,13 +8,8 @@ static uint64_t serialize_outpoint(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-
-    memcpy(p, &ptrOutpoint->index, sizeof(ptrOutpoint->index));
-    p += sizeof(ptrOutpoint->index);
-
-    memcpy(p, &ptrOutpoint->hash, sizeof(ptrOutpoint->hash));
-    p += sizeof(ptrOutpoint->hash);
-
+    p += SERIALIZE_TO(ptrOutpoint->index, p);
+    p += SERIALIZE_TO(ptrOutpoint->hash, p);
     return p - ptrBuffer;
 }
 
@@ -23,17 +18,10 @@ static uint64_t serialize_tx_in(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-
     p += serialize_outpoint(&ptrTxIn->previous_output, p);
-
     p += serialize_to_varint(ptrTxIn->script_length, p);
-
-    memcpy(p, &ptrTxIn->signature_script, ptrTxIn->script_length);
-    p += ptrTxIn->script_length;
-
-    memcpy(p, &ptrTxIn->sequence, sizeof(ptrTxIn->sequence));
-    p += sizeof(ptrTxIn->sequence);
-
+    p += SERIALIZE_TO_OF_LENGTH(ptrTxIn->signature_script, p, ptrTxIn->script_length);
+    p += SERIALIZE_TO(ptrTxIn->sequence, p);
     return p - ptrBuffer;
 }
 
@@ -42,15 +30,9 @@ static uint64_t serialize_tx_out(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-
-    memcpy(p, &ptrTxOut->value, sizeof(ptrTxOut->value));
-    p += sizeof(ptrTxOut->value);
-
+    p += SERIALIZE_TO(ptrTxOut->value, p);
     p += serialize_to_varint(ptrTxOut->pk_script_length, p);
-
-    memcpy(p, &ptrTxOut->pk_script, ptrTxOut->pk_script_length);
-    p += ptrTxOut->pk_script_length;
-
+    p += SERIALIZE_TO_OF_LENGTH(ptrTxOut->pk_script, p, ptrTxOut->pk_script_length);
     return p - ptrBuffer;
 }
 
@@ -59,13 +41,8 @@ static uint64_t serialize_tx_witness(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-
-    uint8_t countWidth = serialize_to_varint(ptrTxWitness->length, p);
-    p += countWidth;
-
-    memcpy(p, ptrTxWitness->data, ptrTxWitness->length);
-    p += ptrTxWitness->length;
-
+    p += serialize_to_varint(ptrTxWitness->length, p);
+    p += SERIALIZE_TO_OF_LENGTH(ptrTxWitness->data, p, ptrTxWitness->length);
     return p - ptrBuffer;
 }
 
@@ -74,40 +51,31 @@ uint64_t serialize_tx_payload(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-    memcpy(p, &ptrPayload->version, sizeof(ptrPayload->version));
-    p += sizeof(ptrPayload->version);
+    p += SERIALIZE_TO(ptrPayload->version, p);
 
     bool hasWitnessData = (ptrPayload->marker == WITNESS_MARKER) && (ptrPayload->flag == WITNESS_FLAG);
     if (hasWitnessData) {
-        memcpy(p, &ptrPayload->marker, sizeof(ptrPayload->marker));
-        p += sizeof(ptrPayload->marker);
-        memcpy(p, &ptrPayload->flag, sizeof(ptrPayload->flag));
-        p += sizeof(ptrPayload->flag);
+        p += SERIALIZE_TO(ptrPayload->marker, p);
+        p += SERIALIZE_TO(ptrPayload->flag, p);
     }
 
     p += serialize_to_varint(ptrPayload->txInputCount, p);
-
     for (uint64_t i = 0; i < ptrPayload->txInputCount; i++) {
         p += serialize_tx_in(&ptrPayload->txInputs[i], p);
     }
 
     p += serialize_to_varint(ptrPayload->txOutputCount, p);
-
     for (uint64_t i = 0; i < ptrPayload->txOutputCount; i++) {
         p += serialize_tx_out(&ptrPayload->txOutputs[i], p);
     }
 
     if (hasWitnessData) {
         p += serialize_to_varint(ptrPayload->txWitnessCount, p);
-
         for (uint64_t i = 0; i < ptrPayload->txWitnessCount; i++) {
             p += serialize_tx_witness(&ptrPayload->txWitnesses[i], p);
         }
     }
-
-    memcpy(p, &ptrPayload->lockTime, sizeof(ptrPayload->lockTime));
-    p += sizeof(ptrPayload->lockTime);
-
+    p += SERIALIZE_TO(ptrPayload->lockTime, p);
     return p - ptrBuffer;
 }
 
@@ -116,17 +84,10 @@ static uint64_t parse_tx_in(
     TxIn *ptrTxIn
 ) {
     Byte *p = ptrBuffer;
-    memcpy(&ptrTxIn->previous_output, p, sizeof(ptrTxIn->previous_output));
-    p += sizeof(ptrTxIn->previous_output);
-
+    p += PARSE_INTO(p, ptrTxIn->previous_output);
     p += parse_varint(p, &ptrTxIn->script_length);
-
-    memcpy(&ptrTxIn->signature_script, p, ptrTxIn->script_length);
-    p += ptrTxIn->script_length;
-
-    memcpy(&ptrTxIn->sequence, p, sizeof(ptrTxIn->sequence));
-    p += sizeof(ptrTxIn->sequence);
-
+    p += PARSE_INTO_OF_LENGTH(p, ptrTxIn->signature_script, ptrTxIn->script_length);
+    p += PARSE_INTO(p, ptrTxIn->sequence);
     return p - ptrBuffer;
 }
 
@@ -135,15 +96,9 @@ static uint64_t parse_tx_out(
     TxOut *ptrTxOut
 ) {
     Byte *p = ptrBuffer;
-
-    memcpy(&ptrTxOut->value, p, sizeof(ptrTxOut->value));
-    p += sizeof(ptrTxOut->value);
-
+    p += PARSE_INTO(p, ptrTxOut->value);
     p += parse_varint(p, &ptrTxOut->pk_script_length);
-
-    memcpy(&ptrTxOut->pk_script, p, ptrTxOut->pk_script_length);
-    p += ptrTxOut->pk_script_length;
-
+    p += PARSE_INTO_OF_LENGTH(p, ptrTxOut->pk_script, ptrTxOut->pk_script_length);
     return p - ptrBuffer;
 }
 
@@ -152,12 +107,8 @@ static uint64_t parse_tx_witness(
     TxWitness *ptrTxWitness
 ) {
     Byte *p = ptrBuffer;
-
     p += parse_varint(p, &ptrTxWitness->length);
-
-    memcpy(&ptrTxWitness->data, p, ptrTxWitness->length);
-    p += ptrTxWitness->length;
-
+    p += PARSE_INTO_OF_LENGTH(p, ptrTxWitness->data, ptrTxWitness->length);
     return p - ptrBuffer;
 }
 
@@ -166,9 +117,7 @@ uint64_t parse_tx_payload(
     TxPayload *ptrTx
 ) {
     Byte *p = ptrBuffer;
-
-    memcpy(&ptrTx->version, p, sizeof(ptrTx->version));
-    p += sizeof(ptrTx->version);
+    p += PARSE_INTO(p, ptrTx->version);
 
     Byte possibleMarker = 0;
     Byte possibleFlag = 0;
@@ -176,10 +125,8 @@ uint64_t parse_tx_payload(
     memcpy(&possibleFlag, p + sizeof(ptrTx->marker), sizeof(ptrTx->flag));
     bool hasWitness = (possibleMarker == WITNESS_MARKER) && (possibleFlag == WITNESS_FLAG);
     if (hasWitness) {
-        memcpy(&ptrTx->marker, p, sizeof(ptrTx->marker));
-        p += sizeof(ptrTx->marker);
-        memcpy(&ptrTx->flag, p, sizeof(ptrTx->flag));
-        p += sizeof(ptrTx->flag);
+        PARSE_INTO(p, ptrTx->marker);
+        PARSE_INTO(p, ptrTx->flag);
     }
 
     p += parse_varint(p, &ptrTx->txInputCount);
@@ -198,10 +145,7 @@ uint64_t parse_tx_payload(
             p += parse_tx_witness(p, &ptrTx->txWitnesses[i]);
         }
     }
-
-    memcpy(&ptrTx->lockTime, p, sizeof(ptrTx->lockTime));
-    p += sizeof(ptrTx->lockTime);
-
+    p += PARSE_INTO(p, ptrTx->lockTime);
     return p - ptrBuffer;
 }
 

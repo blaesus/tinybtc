@@ -123,9 +123,9 @@ static void test_block_parsing_and_serialization() {
     Message message = get_empty_message();
     load_block_message("fixtures/block_7323.dat", &message);
 
-    Byte messageBuffer[4096] = {0};
-    serialize_block_message(&message, messageBuffer);
-    print_object(messageBuffer, message.header.length + sizeof(message.header));
+    // Byte messageBuffer[4096] = {0};
+    // serialize_block_message(&message, messageBuffer);
+    // print_object(messageBuffer, message.header.length + sizeof(message.header));
 
     Byte checksum[4] = {0};
     Byte payloadBuffer[4096] = {0};
@@ -174,7 +174,7 @@ void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    // test_block_parsing_and_serialization();
+    test_block_parsing_and_serialization();
     test_merkles();
 
 }

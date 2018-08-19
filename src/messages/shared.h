@@ -21,6 +21,22 @@
 #define VAR_INT_CHECKPIONT_32  0xFFFFFFFF
 #define VAR_INT_PREFIX_64  0xFF
 
+#define PARSE_INTO(buffer, obj) ( \
+    memcpy(&obj, buffer, sizeof(obj)), sizeof(obj) \
+)
+
+#define PARSE_INTO_OF_LENGTH(buffer, obj, length) ( \
+    memcpy(&obj, buffer, length), length \
+)
+
+#define SERIALIZE_TO(obj, buffer) ( \
+    memcpy(buffer, &obj, sizeof(obj)), sizeof(obj) \
+)
+
+#define SERIALIZE_TO_OF_LENGTH(obj, buffer, length) ( \
+    memcpy(buffer, &obj, length), length \
+)
+
 uint8_t calc_number_varint_width(uint64_t number);
 
 uint8_t serialize_to_varint(uint64_t data, uint8_t *ptrBuffer);
