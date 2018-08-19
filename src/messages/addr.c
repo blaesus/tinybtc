@@ -36,14 +36,14 @@ int32_t parse_into_addr_message(
 
     AddrPayload payload = {0};
     parse_addr_payload(ptrBuffer + sizeof(header), &payload);
-    ptrMessage->payload = malloc(sizeof(AddrPayload));
-    memcpy(ptrMessage->payload, &payload, sizeof(payload));
+    ptrMessage->ptrPayload = malloc(sizeof(AddrPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }
 
 void print_addr_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
-    AddrPayload *ptrPayload = (AddrPayload *)ptrMessage->payload;
+    AddrPayload *ptrPayload = (AddrPayload *)ptrMessage->ptrPayload;
     AddrRecord record = ptrPayload->addr_list[0];
     char *ipString = convert_ipv4_readable(record.net_addr.ip);
     printf("payload: count=%llu, first being %s\n",

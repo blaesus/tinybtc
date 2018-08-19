@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "redis/hiredis.h"
 
 #include "persistent.h"
 
@@ -6,10 +7,11 @@
 #include "networking.h"
 #include "util.h"
 
-#define PEER_LIST_FILENAME "peers.dat"
+#define PEER_LIST_BINARY_FILENAME "peers.dat"
+#define PEER_LIST_CSV_FILENAME "peers.csv"
 
 int32_t save_peer_addresses_human() {
-    FILE *file = fopen("peers.csv", "wb");
+    FILE *file = fopen(PEER_LIST_CSV_FILENAME, "wb");
 
     for (uint64_t i = 0; i < global.peerAddressCount; i++) {
         struct AddrRecord *record = &global.peerAddresses[i];
@@ -31,11 +33,11 @@ int32_t save_peer_addresses_human() {
 int32_t save_peer_addresses() {
     dedupe_global_addr_cache();
     clear_old_addr();
-    FILE *file = fopen(PEER_LIST_FILENAME, "wb");
+    FILE *file = fopen(PEER_LIST_BINARY_FILENAME, "wb");
 
     uint8_t peerCountBytes[PEER_ADDRESS_COUNT_WIDTH] = { 0 };
     segment_int32(global.peerAddressCount, peerCountBytes);
-    fwrite(peerCountBytes, 1, sizeof(global.peerAddressCount), file);
+    fwrite(peerCountBytes, sizeof(global.peerAddressCount), 1, file);
 
     fwrite(
         &global.peerAddresses,
@@ -54,11 +56,11 @@ int32_t save_peer_addresses() {
 
 int32_t load_peer_addresses() {
     printf("Loading global state ");
-    FILE *file = fopen(PEER_LIST_FILENAME, "rb");
+    FILE *file = fopen(PEER_LIST_BINARY_FILENAME, "rb");
 
     Byte buffer[sizeof(struct AddrRecord)] = {0};
 
-    fread(&buffer, 1, PEER_ADDRESS_COUNT_WIDTH, file);
+    fread(&buffer, PEER_ADDRESS_COUNT_WIDTH, 1, file);
     global.peerAddressCount = combine_uint32(buffer);
     printf("(%u peers to recover)...", global.peerAddressCount);
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {

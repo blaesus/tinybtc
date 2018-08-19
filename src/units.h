@@ -4,3 +4,5 @@
 #define MINUTE(X) (60 * SECOND * X)
 #define HOUR(X) (60 * MINUTE(X))
 #define DAY(X) (24 * HOUR(X))
+
+#define COIN(X) (1e8 * X)

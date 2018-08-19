@@ -105,7 +105,7 @@ void print_object(uint8_t *ptrData, uint64_t length) {
     for (index = 0; index < length; index++) {
         character = (uint8_t)(*ptrData & 0xFF);
         if (index % 16 == 0) {
-            printf("\n%03"PRIx64"0 - ", index / 16);
+            printf("\n%03llx0 - ", index / 16);
         }
         printf("%02x ", character);
         ptrData++;

@@ -7,7 +7,7 @@
 
 #define BYTES(X) (BITS_IN_BYTE * X)
 
-#define DOMAIN_NAME_LENGTH 50
+#define MAX_DOMAIN_NAME_LENGTH 128
 
 #define MAX_VARIABLE_LENGTH_STRING_LENGTH 2048
 
@@ -17,7 +17,7 @@ typedef uint8_t Byte;
 
 typedef uint8_t IP[IP_BYTES];
 
-typedef char DomainName[DOMAIN_NAME_LENGTH];
+typedef char DomainName[MAX_DOMAIN_NAME_LENGTH];
 
 typedef uint64_t ServiceBits;
 

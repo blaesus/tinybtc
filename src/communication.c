@@ -108,7 +108,7 @@ void send_message(
     void *ptrData
 ) {
     Message message = get_empty_message();
-    Byte buffer[MESSAGE_BUFFER_SIZE] = {0};
+    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
@@ -162,7 +162,7 @@ void on_incoming_message(
     char *command = (char *)message.header.command;
 
     if (strcmp(command, CMD_VERSION) == 0) {
-        VersionPayload *ptrPayloadTyped = message.payload;
+        VersionPayload *ptrPayloadTyped = message.ptrPayload;
         if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
@@ -172,7 +172,7 @@ void on_incoming_message(
         send_message(ptrPeer->connection, CMD_VERACK, NULL);
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
-        AddrPayload *ptrPayload = message.payload;
+        AddrPayload *ptrPayload = message.ptrPayload;
         uint64_t skipped = 0;
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
@@ -188,7 +188,7 @@ void on_incoming_message(
         // dedupe_global_addr_cache();
     }
     else if (strcmp(command, CMD_INV) == 0) {
-        InvPayload *ptrPayload = message.payload;
+        InvPayload *ptrPayload = message.ptrPayload;
         send_message(ptrPeer->connection, CMD_GETDATA, ptrPayload);
     }
 

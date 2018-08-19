@@ -3,26 +3,32 @@
 #include <stdint.h>
 #include "datatypes.h"
 #include "hash.h"
-
-#define MAX_TX_COUNT 4096
-#define MAX_SCRIPT_LENGTH 65536
-#define MAX_WITNESS_COMPONENT_DATA_LENGTH 4096
-#define MAX_WITNESS_COMPONENT_COUNT 1024
+#include "shared.h"
 
 // @see https://en.bitcoin.it/wiki/Protocol_documentation#tx
+// For witness related: @see https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki
+
+#define WITNESS_MARKER 0x00
+#define WITNESS_FLAG 0x01
+
+#define MAX_SIGNATURE_SCRIPT_LENGTH 4096
+#define MAX_PK_SCRIPT_LENGTH 4096
+#define MAX_WITNESS_DATA_LENGTH 4096
+
+#define MAX_TX_ITEM_PER_TX 128
 
 struct Outpoint {
-    SHA256_HASH hash;
     uint32_t index;
+    SHA256_HASH hash;
 };
 
 typedef struct Outpoint Outpoint;
 
 struct TxIn {
     Outpoint previous_output;
-    uint64_t script_length;
-    Byte signature_script[MAX_SCRIPT_LENGTH];
     uint32_t sequence;
+    uint64_t script_length;
+    Byte signature_script[MAX_SIGNATURE_SCRIPT_LENGTH];
 };
 
 typedef struct TxIn TxIn;
@@ -30,36 +36,63 @@ typedef struct TxIn TxIn;
 struct TxOut {
     int64_t value;
     uint64_t pk_script_length;
-    Byte pk_script[MAX_SCRIPT_LENGTH];
+    Byte pk_script[MAX_PK_SCRIPT_LENGTH];
 };
 
 typedef struct TxOut TxOut;
 
 // @see https://bitcoin.stackexchange.com/questions/68924/
 
-struct WitnessComponent {
-    uint64_t length;
-    Byte data[MAX_WITNESS_COMPONENT_DATA_LENGTH];
-};
-
-typedef struct WitnessComponent WitnessComponent;
-
 struct TxWitness {
-    uint64_t count;
-    WitnessComponent components[MAX_WITNESS_COMPONENT_COUNT];
+    VarIntMem length;
+    Byte data[MAX_WITNESS_DATA_LENGTH];
 };
 
 typedef struct TxWitness TxWitness;
 
 struct TxPayload {
     int32_t version;
-    Byte flag[2];
-    VarIntMem tx_in_count;
-    TxIn tx_in[MAX_TX_COUNT];
-    VarIntMem tx_out_count;
-    TxOut tx_out[MAX_TX_COUNT];
-    TxWitness tx_witness[MAX_TX_COUNT];
-    uint32_t lock_time;
+    Byte marker;
+    Byte flag;
+    VarIntMem txInputCount;
+    TxIn txInputs[MAX_TX_ITEM_PER_TX];
+    VarIntMem txOutputCount;
+    TxOut txOutputs[MAX_TX_ITEM_PER_TX];
+    VarIntMem txWitnessCount;
+    TxWitness txWitnesses[MAX_TX_ITEM_PER_TX];
+    uint32_t lockTime;
 };
 
 typedef struct TxPayload TxPayload;
+
+struct TxNode {
+    TxPayload tx;
+    struct TxNode *next;
+};
+
+typedef struct TxNode TxNode;
+
+uint64_t serialize_tx_payload(
+    TxPayload *ptrPayload,
+    Byte *ptrBuffer
+);
+
+uint64_t parse_tx_payload(
+    Byte *ptrBuffer,
+    TxPayload *ptrTx
+);
+
+uint64_t serialize_tx_message(
+    Message *ptrPayload,
+    Byte *ptrBuffer
+);
+
+int32_t make_tx_message(
+    Message *ptrMessage,
+    TxPayload *ptrPayload
+);
+
+int32_t compute_merkle_root(
+    TxNode *ptrFirstTxNode,
+    SHA256_HASH result
+);

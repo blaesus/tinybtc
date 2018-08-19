@@ -83,13 +83,13 @@ int32_t make_version_message(
 ) {
     struct VersionPayload payload = {0};
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
-    uint8_t checksumCalculationBuffer[MESSAGE_BUFFER_SIZE] = {0};
-    serialize_version_payload(&payload, checksumCalculationBuffer, MESSAGE_BUFFER_SIZE);
+    uint8_t checksumCalculationBuffer[MAX_MESSAGE_LENGTH] = {0};
+    serialize_version_payload(&payload, checksumCalculationBuffer, MAX_MESSAGE_LENGTH);
     ptrMessage->header.magic = parameters.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
-    ptrMessage->payload = malloc(sizeof(struct VersionPayload));
-    memcpy(ptrMessage->payload, &payload, sizeof(struct VersionPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(struct VersionPayload));
     calculate_data_checksum(
         checksumCalculationBuffer,
         ptrMessage->header.length,
@@ -105,7 +105,7 @@ uint64_t serialize_version_message(
     uint64_t messageHeaderSize = 24;
     memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
     serialize_version_payload(
-        (struct VersionPayload *)ptrMessage->payload,
+        (struct VersionPayload *)ptrMessage->ptrPayload,
         ptrBuffer+messageHeaderSize,
         1000
     );
@@ -167,14 +167,14 @@ int32_t parse_into_version_message(
     parse_message_header(ptrBuffer, &header);
     parse_version_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->payload = malloc(sizeof(struct VersionPayload));
-    memcpy(ptrMessage->payload, &payload, sizeof(payload));
+    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }
 
 void print_version_message(struct Message *ptrMessage) {
     print_message_header(ptrMessage->header);
-    VersionPayload* payload = (VersionPayload *)ptrMessage->payload;
+    VersionPayload* payload = (VersionPayload *)ptrMessage->ptrPayload;
     printf("payload: version=%u, user_agent=%s\n",
            payload->version,
            payload->user_agent.string

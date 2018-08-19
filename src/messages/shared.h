@@ -11,6 +11,8 @@
 #define CMD_ADDR "addr"
 #define CMD_GETADDR "getaddr"
 #define CMD_GETDATA "getdata"
+#define CMD_TX "tx"
+#define CMD_BLOCK "block"
 
 #define VAR_INT_CHECKPOINT_8  0xFD
 #define VAR_INT_PREFIX_16  0xFD
@@ -53,7 +55,7 @@ typedef struct GenericIVPayload GenericIVPayload;
 
 struct Message {
     Header header;
-    Payload *payload;
+    Payload *ptrPayload;
 };
 
 typedef struct Message Message;

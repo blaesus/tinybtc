@@ -13,7 +13,7 @@ int32_t make_header_only_message(
     memcpy(ptrMessage->header.command, command, commandSize);
     ptrMessage->header.length = 0;
     calculate_data_checksum(
-        ptrMessage->payload,
+        ptrMessage->ptrPayload,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
@@ -71,11 +71,10 @@ uint64_t serialize_iv_message(
     uint64_t messageHeaderSize = sizeof(ptrMessage->header);
     memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
     serialize_iv_payload(
-        (GenericIVPayload *)ptrMessage->payload,
+        (GenericIVPayload *)ptrMessage->ptrPayload,
         ptrBuffer+messageHeaderSize
     );
     return messageHeaderSize + ptrMessage->header.length;
-
 }
 
 int32_t parse_into_iv_message(
@@ -87,8 +86,8 @@ int32_t parse_into_iv_message(
     parse_message_header(ptrBuffer, &header);
     parse_iv_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->payload = malloc(sizeof(GenericIVPayload));
-    memcpy(ptrMessage->payload, &payload, sizeof(payload));
+    ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }
 
@@ -124,7 +123,7 @@ char *get_iv_type(uint32_t type) {
 
 void print_iv_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
-    GenericIVPayload *ptrPayload = (GenericIVPayload *)ptrMessage->payload;
+    GenericIVPayload *ptrPayload = (GenericIVPayload *)ptrMessage->ptrPayload;
     printf("payload: count=%llu\n",
            ptrPayload->count
     );
@@ -144,10 +143,10 @@ int32_t make_iv_message(
     ptrMessage->header.magic = parameters.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
 
-    ptrMessage->payload = malloc(sizeof(GenericIVPayload));
-    memcpy(ptrMessage->payload, ptrPayload, sizeof(GenericIVPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));
+    memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(GenericIVPayload));
 
-    Byte buffer[MESSAGE_BUFFER_SIZE] = {0};
+    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
     uint64_t payloadLength = serialize_iv_payload(ptrPayload, buffer);
     calculate_data_checksum(
         &buffer,

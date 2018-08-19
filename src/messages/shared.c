@@ -132,7 +132,7 @@ bool begins_with_header(void *p) {
 Message get_empty_message() {
     Message message = {
         .header = {0},
-        .payload = NULL
+        .ptrPayload = NULL
     };
     return message;
 }
