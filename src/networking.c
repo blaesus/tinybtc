@@ -15,8 +15,6 @@
 #include "networking.h"
 #include "util.h"
 
-
-
 uint32_t get_v4_binary_representation(const IP ip) {
     const uint32_t number = (ip[12] << 3 * BITS_IN_BYTE)
                             + (ip[13] << 2 * BITS_IN_BYTE)
@@ -101,12 +99,12 @@ int dns_bootstrap() {
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
                 NetworkAddress addr = {
-                    .ip = {0},
-                    .port = parameters.port,
+                    .port = htons(parameters.port),
                     .services = SERVICE_NODE_NETWORK,
+                    // .ip = ips[ipIndex] <- via memcpy
                 };
                 memcpy(addr.ip, ips[ipIndex], sizeof(IP));
-                add_peer_address(addr, 0);
+                add_peer_address(addr, DNS_BOOTSTRAP_PEER_TIMESTAMP);
                 printf("%s\n", convert_ipv4_readable(ips[ipIndex]));
             }
         }

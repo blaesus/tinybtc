@@ -19,27 +19,62 @@
 #include "messages/getaddr.h"
 #include "messages/print.h"
 
-void on_idle(uv_idle_t *handle) {
-    global.eventCounter++;
-    if (global.eventCounter % 1000000 == 0) {
-        printf("Event count %llu\n", global.eventCounter);
+bool peerHandShaken(Peer *ptrPeer) {
+    return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
+}
+
+void timeout_peers() {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        time_t now = time(NULL);
+        if (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC) {
+            if (!peerHandShaken(ptrPeer)) {
+                printf("Timeout peer %u\n", i);
+                disable_ip(ptrPeer->address.ip);
+                uv_handle_t *ptrHandle = (uv_handle_t *)ptrPeer->connection->handle;
+                if (!uv_is_closing(ptrHandle)) {
+                    uv_close(ptrHandle, NULL);
+                }
+                connect_to_random_addr_for_peer(i);
+            }
+        }
     }
-    if (global.eventCounter >= 5e7) {
+}
+
+uint16_t print_peer_status() {
+    uint16_t validPeers = 0;
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        if (peerHandShaken(&global.peers[i])) {
+            validPeers++;
+            printf("O ");
+        }
+        else {
+            printf("X ");
+        }
+    }
+    printf(" (%u/%u)\n", validPeers, global.peerCount);
+    return validPeers;
+}
+
+void on_interval(uv_timer_t *handle) {
+    timeout_peers();
+    print_peer_status();
+    printf("%u addresses\n", global.peerAddressCount);
+    time_t now = time(NULL);
+    if (now - global.start_time >= PROGRAM_EXIT_TIME_SEC) {
         printf("Stopping main loop...\n");
-        uv_idle_stop(handle);
-        uv_loop_close(uv_default_loop());
+        uv_timer_stop(handle);
         uv_stop(uv_default_loop());
+        uv_loop_close(uv_default_loop());
         printf("Done.\n");
     }
 }
 
-uint32_t setup_main_event_loop(bool setupIdle) {
+uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
-    if (setupIdle) {
-        uv_idle_init(uv_default_loop(), &global.idler);
-        uv_idle_start(&global.idler, on_idle);
-    }
+    uv_timer_init(uv_default_loop(), &global.mainTimer);
+    uv_timer_start(&global.mainTimer, &on_interval, 0, MAIN_TIMER_INTERVAL_MSEC);
     printf("Done.\n");
     return 0;
 }
@@ -166,6 +201,7 @@ void on_incoming_message(
         if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
+        set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
@@ -286,8 +322,10 @@ int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
     printf("connecting with peer %s for peer %u\n", ipString, peerIndex);
 
     Peer *ptrPeer = &global.peers[peerIndex];
+    memset(ptrPeer, 0, sizeof(Peer));
 
     ptrPeer->index = peerIndex;
+    ptrPeer->connectionStart = time(NULL);
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
     ptrPeer->socket = malloc(sizeof(uv_tcp_t));
     uv_tcp_init(uv_default_loop(), ptrPeer->socket);
@@ -379,9 +417,9 @@ int32_t free_networking_resources() {
     printf("Freeing networking resources...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
-        if (peer->socket) {
-//            uv_close(peer->connection->handle, on_close);
-            free(peer->socket);
+        uv_handle_t* ptrHandle = (uv_handle_t*)peer->connection->handle;
+        if (!uv_is_closing(ptrHandle)) {
+            uv_close(ptrHandle, NULL);
         }
     }
     uv_loop_close(uv_default_loop());

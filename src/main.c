@@ -21,27 +21,28 @@ int32_t run_main_loop() {
 }
 
 void init() {
+    global.start_time = time(NULL);
     load_peer_addresses();
+    if (global.peerAddressCount == 0) {
+        dns_bootstrap();
+    }
     srand((unsigned int)time(NULL));
-    setup_main_event_loop(true);
+    setup_main_event_loop();
     init_db();
 }
 
 int32_t setup_peers() {
-    if (global.peerAddressCount == 0) {
-        dns_bootstrap();
-    }
     setup_listen_socket();
     connect_to_initial_peers();
     return 0;
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    // init();
-    // setup_peers();
-    // run_main_loop();
-    // atexit(&cleanup);
-    test();
+    init();
+    setup_peers();
+    run_main_loop();
+    atexit(&cleanup);
+    // test();
     return 0;
 }
 

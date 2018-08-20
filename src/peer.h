@@ -29,6 +29,7 @@ struct Peer {
     struct HandshakeState handshake;
     uv_tcp_t *socket;
     uv_connect_t *connection;
+    time_t connectionStart;
     uint8_t relationship;
     NetworkAddress address;
     MessageCache messageCache;

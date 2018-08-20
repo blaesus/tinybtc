@@ -22,6 +22,11 @@
 
 #define MAX_INV_SIZE 50000
 
+#define MAIN_TIMER_INTERVAL_MSEC 2000
+#define PROGRAM_EXIT_TIME_SEC 20
+
+#define CLEAR_OLD_ADDR_THRESHOLD 1000
+
 struct Parameters {
     uint32_t magic;
     ServiceBits services;

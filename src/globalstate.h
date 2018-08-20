@@ -12,7 +12,7 @@
 
 struct GlobalState {
     uv_tcp_t listenSocket;
-    uv_idle_t idler;
+    uv_timer_t mainTimer;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;
@@ -20,7 +20,7 @@ struct GlobalState {
     Peer peers[MAX_PEERS];
     uint32_t peerCount;
 
-    uint64_t eventCounter;
+    time_t start_time;
     NetworkAddress myAddress;
     uint32_t blockchainHeight;
 };
@@ -36,6 +36,7 @@ void dedupe_global_addr_cache(void);
 void clear_old_addr(void);
 
 int32_t set_addr_timestamp(IP ip, uint32_t timestamp);
+int32_t set_addr_services(IP ip, ServiceBits bits);
 int32_t disable_ip(IP ip);
 
 bool is_peer(IP ip);

@@ -23,7 +23,7 @@ add_custom_command(
         TARGET diy-bitcoin PRE_BUILD
         COMMAND cp -R
         ${CMAKE_CURRENT_SOURCE_DIR}/src/test/fixtures/*.dat
-        ${CMAKE_CURRENT_BINARY_DIR}/fixtures
+        ${CMAKE_CURRENT_BINARY_DIR}/fixtures/
 )
 
 add_custom_command(

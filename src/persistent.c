@@ -32,7 +32,9 @@ int32_t save_peer_addresses_human() {
 
 int32_t save_peer_addresses() {
     dedupe_global_addr_cache();
-    clear_old_addr();
+    if (global.peerAddressCount > CLEAR_OLD_ADDR_THRESHOLD) {
+        clear_old_addr();
+    }
     FILE *file = fopen(PEER_LIST_BINARY_FILENAME, "wb");
 
     uint8_t peerCountBytes[PEER_ADDRESS_COUNT_WIDTH] = { 0 };

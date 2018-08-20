@@ -2,8 +2,6 @@
 #include "parameters.h"
 #include "units.h"
 
-// @see https://en.bitcoin.it/wiki/Genesis_block
-
 const struct Parameters parameters = {
 
     .magic = MAIN_NET_MAGIC,
@@ -32,7 +30,7 @@ const struct Parameters parameters = {
 
     .maxIncoming = 125,
 
-    .maxOutgoing = 32,
+    .maxOutgoing = 8,
 
     .backlog = 32,
 

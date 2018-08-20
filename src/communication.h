@@ -4,7 +4,9 @@
 #include <stdbool.h>
 #include "uv/uv.h"
 
-uint32_t setup_main_event_loop(bool setupIdle);
+#define PEER_CONNECTION_TIMEOUT_SEC 5
+
+uint32_t setup_main_event_loop();
 int32_t setup_listen_socket(void);
 int32_t connect_to_initial_peers(void);
 int32_t free_networking_resources(void);

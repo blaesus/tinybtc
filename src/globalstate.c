@@ -91,6 +91,22 @@ int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
     return 0;
 }
 
+int32_t set_addr_services(IP ip, ServiceBits bits) {
+    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
+        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
+        if (ips_equal(ipAtIndex, ip)) {
+            memcpy(
+                &global.peerAddresses[index].net_addr.services,
+                &bits,
+                sizeof(ServiceBits)
+            );
+            char *ipString = convert_ipv4_readable(ip);
+            printf("Updated services of ip %s to %llu\n", ipString, bits);
+        }
+    }
+    return 0;
+}
+
 bool is_peer(IP ip) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (ips_equal(global.peers[i].address.ip, ip)) {

@@ -10,6 +10,8 @@
 
 #define MAX_IP_PER_DNS 100
 
+#define DNS_BOOTSTRAP_PEER_TIMESTAMP 0
+
 char *convert_ipv4_readable(IP ip);
 int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]);
 bool isIPEmpty(const IP ip);
