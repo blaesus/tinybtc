@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
 
 #include "datatypes.h"
 #include "networking.h"
@@ -9,6 +11,7 @@
 #include "messages/version.h"
 #include "messages/block.h"
 #include "test/test.h"
+#include "mine.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -169,12 +172,69 @@ static void test_merkles() {
      */
 }
 
+static void test_mine() {
+    Message message = get_empty_message();
+    load_block_message("genesis.dat", &message);
+    BlockPayload *ptrPayload = message.ptrPayload;
+
+    uint32_t nonce = 0;
+    char label[10] = "";
+    pid_t childId1 = fork();
+    pid_t childId2 = fork();
+    pid_t childId3 = fork();
+    if (childId1 > 0) {
+        if (childId2 > 0) {
+            if (childId3 > 0) {
+                strcpy(label, "parent");
+                nonce = 0;
+            }
+            else {
+                strcpy(label, "child1");
+                nonce = UINT32_MAX / 8 * 1;
+            }
+        }
+        else {
+            if (childId3 > 0) {
+                strcpy(label, "child2");
+                nonce = UINT32_MAX / 8 * 2;
+            }
+            else {
+                strcpy(label, "child3");
+                nonce = UINT32_MAX / 8 * 3;
+            }
+        }
+    }
+    else {
+        if (childId2 > 0) {
+            if (childId3 > 0) {
+                strcpy(label, "child4");
+                nonce = UINT32_MAX / 8 * 4;
+            }
+            else {
+                strcpy(label, "child5");
+                nonce = UINT32_MAX / 8 * 5;
+            }
+        }
+        else {
+            if (childId3 > 0) {
+                strcpy(label, "child6");
+                nonce = UINT32_MAX / 8 * 6;
+            }
+            else {
+                strcpy(label, "child7");
+                nonce = UINT32_MAX / 8 * 7;
+            }
+        }
+    }
+    mine_header(ptrPayload->header, nonce, label);
+}
+
 
 void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    test_block_parsing_and_serialization();
-    test_merkles();
-
+    // test_block_parsing_and_serialization();
+    // test_merkles();
+    test_mine();
 }
