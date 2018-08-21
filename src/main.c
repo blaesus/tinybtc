@@ -38,11 +38,11 @@ int32_t setup_peers() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    init();
-    setup_peers();
-    run_main_loop();
-    atexit(&cleanup);
-    // test();
+    // init();
+    // setup_peers();
+    // run_main_loop();
+    // atexit(&cleanup);
+    test();
     return 0;
 }
 

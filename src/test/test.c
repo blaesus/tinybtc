@@ -234,7 +234,7 @@ void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    // test_block_parsing_and_serialization();
+    test_block_parsing_and_serialization();
     // test_merkles();
-    test_mine();
+    // test_mine();
 }

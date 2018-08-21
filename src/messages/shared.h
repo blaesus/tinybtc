@@ -21,12 +21,12 @@
 #define VAR_INT_CHECKPIONT_32  0xFFFFFFFF
 #define VAR_INT_PREFIX_64  0xFF
 
-#define PARSE_INTO(buffer, obj) ( \
-    memcpy(&obj, buffer, sizeof(obj)), sizeof(obj) \
+#define PARSE_INTO(buffer, ptrObj) ( \
+    memcpy(ptrObj, buffer, sizeof(*ptrObj)), sizeof(*ptrObj) \
 )
 
-#define PARSE_INTO_OF_LENGTH(buffer, obj, length) ( \
-    memcpy(&obj, buffer, length), length \
+#define PARSE_INTO_OF_LENGTH(buffer, ptrObj, length) ( \
+    memcpy(ptrObj, buffer, length), length \
 )
 
 #define SERIALIZE_TO(obj, buffer) ( \

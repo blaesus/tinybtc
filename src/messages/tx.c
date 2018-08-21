@@ -84,10 +84,10 @@ static uint64_t parse_tx_in(
     TxIn *ptrTxIn
 ) {
     Byte *p = ptrBuffer;
-    p += PARSE_INTO(p, ptrTxIn->previous_output);
+    p += PARSE_INTO(p, &ptrTxIn->previous_output);
     p += parse_varint(p, &ptrTxIn->script_length);
-    p += PARSE_INTO_OF_LENGTH(p, ptrTxIn->signature_script, ptrTxIn->script_length);
-    p += PARSE_INTO(p, ptrTxIn->sequence);
+    p += PARSE_INTO_OF_LENGTH(p, &ptrTxIn->signature_script, ptrTxIn->script_length);
+    p += PARSE_INTO(p, &ptrTxIn->sequence);
     return p - ptrBuffer;
 }
 
@@ -96,9 +96,9 @@ static uint64_t parse_tx_out(
     TxOut *ptrTxOut
 ) {
     Byte *p = ptrBuffer;
-    p += PARSE_INTO(p, ptrTxOut->value);
+    p += PARSE_INTO(p, &ptrTxOut->value);
     p += parse_varint(p, &ptrTxOut->pk_script_length);
-    p += PARSE_INTO_OF_LENGTH(p, ptrTxOut->pk_script, ptrTxOut->pk_script_length);
+    p += PARSE_INTO_OF_LENGTH(p, &ptrTxOut->pk_script, ptrTxOut->pk_script_length);
     return p - ptrBuffer;
 }
 
@@ -108,7 +108,7 @@ static uint64_t parse_tx_witness(
 ) {
     Byte *p = ptrBuffer;
     p += parse_varint(p, &ptrTxWitness->length);
-    p += PARSE_INTO_OF_LENGTH(p, ptrTxWitness->data, ptrTxWitness->length);
+    p += PARSE_INTO_OF_LENGTH(p, &ptrTxWitness->data, ptrTxWitness->length);
     return p - ptrBuffer;
 }
 
@@ -117,7 +117,7 @@ uint64_t parse_tx_payload(
     TxPayload *ptrTx
 ) {
     Byte *p = ptrBuffer;
-    p += PARSE_INTO(p, ptrTx->version);
+    p += PARSE_INTO(p, &ptrTx->version);
 
     Byte possibleMarker = 0;
     Byte possibleFlag = 0;
@@ -125,8 +125,8 @@ uint64_t parse_tx_payload(
     memcpy(&possibleFlag, p + sizeof(ptrTx->marker), sizeof(ptrTx->flag));
     bool hasWitness = (possibleMarker == WITNESS_MARKER) && (possibleFlag == WITNESS_FLAG);
     if (hasWitness) {
-        PARSE_INTO(p, ptrTx->marker);
-        PARSE_INTO(p, ptrTx->flag);
+        PARSE_INTO(p, &ptrTx->marker);
+        PARSE_INTO(p, &ptrTx->flag);
     }
 
     p += parse_varint(p, &ptrTx->txInputCount);
@@ -145,7 +145,7 @@ uint64_t parse_tx_payload(
             p += parse_tx_witness(p, &ptrTx->txWitnesses[i]);
         }
     }
-    p += PARSE_INTO(p, ptrTx->lockTime);
+    p += PARSE_INTO(p, &ptrTx->lockTime);
     return p - ptrBuffer;
 }
 

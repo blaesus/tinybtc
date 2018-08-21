@@ -37,9 +37,7 @@ int32_t parse_into_block_payload(
 ) {
     Byte *p = ptrBuffer;
 
-    memcpy(&ptrBlock->header, p, sizeof(ptrBlock->header));
-    p += sizeof(ptrBlock->header);
-
+    p += PARSE_INTO(p, &ptrBlock->header);
     p += parse_varint(p, &ptrBlock->txCount);
 
     TxNode *ptrPreviousNode = NULL;
@@ -63,11 +61,10 @@ uint64_t serialize_block_payload(
 ) {
     Byte *p = ptrBuffer;
 
-    uint64_t headerWidth = serialize_block_payload_header(ptrPayload, p);
-    p += headerWidth;
+    BlockPayloadHeader *ptrHeader = &ptrPayload->header;
 
-    uint64_t txn_count_width = serialize_to_varint(ptrPayload->txCount, p);
-    p += txn_count_width;
+    p += serialize_block_payload_header(ptrHeader, p);
+    p += serialize_to_varint(ptrPayload->txCount, p);
 
     TxNode *txNode = ptrPayload->ptrFirstTxNode;
     for (uint64_t i = 0; i < ptrPayload->txCount; i++) {
