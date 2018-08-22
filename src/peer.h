@@ -6,8 +6,8 @@
 
 struct MessageCache {
     uint64_t bufferIndex;
-    Byte buffer[65536];
-    uint64_t expectedLength;
+    Byte buffer[MAX_MESSAGE_LENGTH];
+    uint64_t expectedMessageLength;
 };
 
 typedef struct MessageCache MessageCache;
@@ -18,7 +18,7 @@ struct HandshakeState {
 };
 
 struct PeerFlags {
-    bool attemptedGetaddr;
+    bool DUMMY;
 };
 
 #define REL_MY_SERVER 0

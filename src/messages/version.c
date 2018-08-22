@@ -69,6 +69,7 @@ uint32_t make_version_payload(
     ptrPayload->addr_from = global.myAddress;
     ptrPayload->nonce = nonce;
     ptrPayload->user_agent.length = userAgentDataLength;
+    ptrPayload->start_height = 0;
     strcpy((char *)ptrPayload->user_agent.string, (char *)parameters.userAgent);
     ptrPayload->relay = true;
 

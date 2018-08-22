@@ -4,6 +4,19 @@
 #include "messages/block.h"
 #include "util.h"
 
+uint64_t parse_block_payload_header(
+    Byte *ptrBuffer,
+    BlockPayloadHeader *ptrHeader
+) {
+    Byte *p = ptrBuffer;
+    p += PARSE_INTO(p, &ptrHeader->version);
+    p += PARSE_INTO(p, &ptrHeader->merkle_root);
+    p += PARSE_INTO(p, &ptrHeader->timestamp);
+    p += PARSE_INTO(p, &ptrHeader->bits);
+    p += PARSE_INTO(p, &ptrHeader->nonce);
+    return p - ptrBuffer;
+}
+
 uint64_t serialize_block_payload_header(
     BlockPayloadHeader *ptrHeader,
     Byte *ptrBuffer
@@ -87,12 +100,12 @@ int32_t make_block_message(
 
     Byte buffer[MAX_MESSAGE_LENGTH] = {0};
     uint64_t payloadLength = serialize_block_payload(ptrPayload, buffer);
+    ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
-    ptrMessage->header.length = (uint32_t)payloadLength;
     return 0;
 }
 
@@ -109,7 +122,7 @@ uint64_t serialize_block_message(
     return messageHeaderSize + ptrMessage->header.length;
 }
 
-void load_block_message(
+uint64_t load_block_message(
     char *path,
     Message *ptrMessage
 ) {
@@ -118,10 +131,12 @@ void load_block_message(
     fread(ptrMessage, sizeof(ptrMessage->header), 1, file);
 
     uint64_t payloadLength = ptrMessage->header.length;
-    Byte *buffer = calloc(1, payloadLength);
+    Byte *buffer = malloc(payloadLength);
     fread(buffer, payloadLength, 1, file);
 
     ptrMessage->ptrPayload = calloc(1, sizeof(BlockPayload));
     parse_into_block_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
+
+    return sizeof(ptrMessage->header)+payloadLength;
 }

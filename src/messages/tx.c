@@ -161,12 +161,12 @@ int32_t make_tx_message(
 
     Byte buffer[MAX_MESSAGE_LENGTH] = {0};
     uint64_t payloadLength = serialize_tx_payload(ptrPayload, buffer);
+    ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
-    ptrMessage->header.length = (uint32_t)payloadLength;
     return 0;
 }
 

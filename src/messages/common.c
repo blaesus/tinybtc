@@ -130,7 +130,7 @@ void print_iv_message(Message *ptrMessage) {
     for (uint8_t i = 0; i < ptrPayload->count; i++) {
         InventoryVector iv = ptrPayload->inventory[i];
         char *typeString = get_iv_type(iv.type);
-        printf("Inventory of type %s(%u)\n", typeString, iv.type);
+        printf("IV type: %s(%u)\n", typeString, iv.type);
     }
 }
 
@@ -148,11 +148,11 @@ int32_t make_iv_message(
 
     Byte buffer[MAX_MESSAGE_LENGTH] = {0};
     uint64_t payloadLength = serialize_iv_payload(ptrPayload, buffer);
+    ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
-    ptrMessage->header.length = (uint32_t)payloadLength;
     return 0;
 }

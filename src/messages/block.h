@@ -39,6 +39,11 @@ uint64_t serialize_block_message(
     uint8_t *ptrBuffer
 );
 
+uint64_t parse_block_payload_header(
+    Byte *ptrBuffer,
+    BlockPayloadHeader *ptrHeader
+);
+
 uint64_t serialize_block_payload_header(
     BlockPayloadHeader *ptrHeader,
     Byte *ptrBuffer
@@ -49,7 +54,7 @@ int32_t parse_into_block_payload(
     BlockPayload *ptrBlock
 );
 
-void load_block_message(
+uint64_t load_block_message(
     char *path,
     Message *ptrMessage
 );

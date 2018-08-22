@@ -23,9 +23,9 @@ Header get_empty_header() {
     return header;
 }
 
-void calculate_data_checksum(void *ptrBuffer, uint32_t count, uint8_t *ptrResult) {
+void calculate_data_checksum(void *ptrInput, uint32_t count, uint8_t *ptrResult) {
     SHA256_HASH hash = {0};
-    dsha256(ptrBuffer, count, hash);
+    dsha256(ptrInput, count, hash);
     memcpy(ptrResult, hash, CHECKSUM_SIZE);
 }
 

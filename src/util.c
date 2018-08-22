@@ -123,3 +123,10 @@ uint32_t min(uint32_t a, uint32_t b) {
 bool ips_equal(IP ipA, IP ipB) {
     return memcmp(ipA, ipB, sizeof(IP)) == 0;
 }
+
+int64_t getFileSize(FILE *file) {
+    fseek(file, 0L, SEEK_END);
+    int64_t filesize = ftell(file);
+    fseek(file, 0L, SEEK_SET);
+    return filesize;
+}

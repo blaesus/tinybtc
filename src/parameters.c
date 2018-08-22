@@ -6,14 +6,14 @@ const struct Parameters parameters = {
 
     .magic = MAIN_NET_MAGIC,
 
-    // see Satoshi's version.h
+    // see Bitcoin Core's version.h
     .protocolVersion = 70015,
 
     .minimalPeerVersion = 31800,
 
     .port = MAIN_NET_PORT,
 
-    .services = SERVICE_NODE_NETWORK & SERVICE_NODE_WITNESS,
+    .services = SERVICE_NODE_NETWORK,
 
     // For node Discovery
     // See https://en.bitcoin.it/wiki/Satoshi_Client_Node_Discovery

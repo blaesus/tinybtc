@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "redis/hiredis.h"
+#include "hiredis/hiredis.h"
 
 #include "persistent.h"
 
@@ -9,6 +9,8 @@
 
 #define PEER_LIST_BINARY_FILENAME "peers.dat"
 #define PEER_LIST_CSV_FILENAME "peers.csv"
+
+#define BLOCK_HEADER_LIST_FILENAME "headers.dat"
 
 int32_t save_peer_addresses_human() {
     FILE *file = fopen(PEER_LIST_CSV_FILENAME, "wb");

@@ -10,6 +10,8 @@
 #include "messages/shared.h"
 #include "messages/version.h"
 #include "messages/block.h"
+#include "messages/getheaders.h"
+#include "messages/getheaders.h"
 #include "test/test.h"
 #include "mine.h"
 
@@ -229,12 +231,59 @@ static void test_mine() {
     mine_header(ptrPayload->header, nonce, label);
 }
 
+void test_getheaders() {
+    GetheadersPayload payload = {
+        .version = parameters.protocolVersion,
+        .hashCount = 1,
+        .hashStop = {0}
+    };
+    Message genesisMessage = get_empty_message();
+    load_block_message("genesis.dat", &genesisMessage);
+    BlockPayload *ptrBlock = (BlockPayload*) genesisMessage.ptrPayload;
+    SHA256_HASH genesisHash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    memcpy(&payload.blockLocatorHash[0], genesisHash, SHA256_LENGTH);
+
+    Message myMessage = get_empty_message();
+    make_getheaders_message(&myMessage, &payload);
+    Byte bufferGenerated[MAX_MESSAGE_LENGTH] = {0};
+    uint64_t w1 = serialize_getheader_message(&myMessage, bufferGenerated);
+
+    Byte bufferFixture[MAX_MESSAGE_LENGTH] = {0};
+    uint64_t w2 = load_file("fixtures/getheaders_initial.dat", &bufferFixture[0]);
+
+    print_object(&bufferGenerated, w1);
+    print_object(&bufferFixture, w2);
+    printf("\ndiff = %x (expecting 0)", memcmp(bufferGenerated, bufferFixture, w1));
+    printf("\npayload diff = %u (expecting 0)",
+        memcmp(bufferGenerated + 5, bufferFixture + 5, w1 - sizeof(Header))
+    );
+}
+
+void test_checksum() {
+    Byte payload[] = {
+        0x7f ,0x11 ,0x01 ,0x00 ,0x01 ,0x6f ,0xe2 ,0x8c
+        ,0x0a ,0xb6 ,0xf1 ,0xb3 ,0x72 ,0xc1 ,0xa6 ,0xa2 ,0x46 ,0xae ,0x63 ,0xf7 ,0x4f ,0x93 ,0x1e ,0x83
+        ,0x65 ,0xe1 ,0x5a ,0x08 ,0x9c ,0x68 ,0xd6 ,0x19 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+    };
+    Byte buffer[4] = {0};
+    calculate_data_checksum(&payload, 69, buffer);
+    print_object(buffer, 4);
+    /*
+     * Expect:
+     * 0000 - 84 f4 95 8d END
+     */
+}
 
 void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    test_block_parsing_and_serialization();
+    // test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
+    test_getheaders();
+    // test_checksum();
 }
