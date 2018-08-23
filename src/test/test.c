@@ -14,6 +14,7 @@
 #include "messages/getheaders.h"
 #include "test/test.h"
 #include "mine.h"
+#include "hashmap.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -277,6 +278,51 @@ void test_checksum() {
      */
 }
 
+#define KEY_COUNT 4096
+#define KEY_WIDTH 32
+#define VALUE_WIDTH 100
+
+void test_hashmap() {
+    Hashmap *ptrHashmap = malloc(sizeof(Hashmap));
+    init_hashmap(ptrHashmap, (2 << 10) - 1, KEY_WIDTH);
+
+    Byte keys[KEY_COUNT][KEY_WIDTH];
+    memset(&keys, 0, sizeof(keys));
+    for (uint16_t i = 0; i < KEY_COUNT; i++) {
+        random_bytes(KEY_WIDTH, keys[i]);
+    }
+
+    for (uint32_t i = 0; i < KEY_COUNT; i++) {
+        Byte valueIn[VALUE_WIDTH] = {0};
+        Byte *key = keys[i];
+        sprintf(valueIn, "data->%u", combine_uint32(key));
+        hashmap_set(ptrHashmap, key, &valueIn, VALUE_WIDTH);
+    }
+    puts("");
+
+    for (uint32_t i = 0; i < KEY_COUNT; i++) {
+        Byte valueIn[VALUE_WIDTH] = {0};
+        Byte *key = keys[i];
+        sprintf(valueIn, "data->%u", combine_uint32(key));
+        uint32_t valueLength = 0;
+        Byte valueOut[VALUE_WIDTH];
+        Byte *ptr = hashmap_get(ptrHashmap, key, &valueLength);
+        if (ptr == NULL) {
+            printf("in = %s, out NOT FOUND\n", valueIn);
+        }
+        else {
+            memcpy(valueOut, ptr, valueLength);
+            uint32_t diff = memcmp(valueIn, valueOut, 100);
+            if (diff) {
+                fprintf(stderr, "MISMATCH: in = %s, out = %s, diff = %u\n", valueIn, valueOut, memcmp(valueIn, valueOut, 100));
+            }
+            else {
+                printf("OK ");
+            }
+        }
+    }
+}
+
 void test() {
     // test_version_messages()
     // test_genesis();
@@ -284,6 +330,7 @@ void test() {
     // test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
-    test_getheaders();
+    // test_getheaders();
     // test_checksum();
+    test_hashmap();
 }

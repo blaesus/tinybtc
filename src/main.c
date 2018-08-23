@@ -51,11 +51,11 @@ int32_t connect_to_peers() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    init();
-    connect_to_peers();
-    run_main_loop();
+    // init();
+    // connect_to_peers();
+    // run_main_loop();
 
-    // test();
+    test();
     return 0;
 }
 

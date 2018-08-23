@@ -71,7 +71,7 @@ int32_t uint_to_str(uint32_t data, char *output) {
     return 0;
 }
 
-void randomBytes(uint32_t count, uint8_t *data) {
+void random_bytes(uint32_t count, uint8_t *data) {
     for (uint32_t i = 0; i < count; i++) {
         data[i] = (uint8_t)(rand() & 0xFF);
     }
@@ -79,7 +79,7 @@ void randomBytes(uint32_t count, uint8_t *data) {
 
 uint64_t random_uint64() {
     uint8_t nonceBytes[8] = {0};
-    randomBytes(8, nonceBytes);
+    random_bytes(8, nonceBytes);
     return combine_uint64(nonceBytes);
 }
 

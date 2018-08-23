@@ -21,7 +21,8 @@ target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/hiredis/libhi
 
 add_custom_command(
         TARGET diy-bitcoin PRE_BUILD
-        COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/fixtures/
+        COMMAND mkdir -p
+        ${CMAKE_CURRENT_BINARY_DIR}/fixtures/
 )
 
 add_custom_command(
