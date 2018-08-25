@@ -42,8 +42,8 @@ uint64_t serialize_version_payload(
     uint64_t varStrLength = serialize_varstr(&ptrPayload->user_agent, p);
     p += varStrLength;
 
-    memcpy(p, &global.blockchainHeight, sizeof(global.blockchainHeight));
-    p += sizeof(global.blockchainHeight);
+    memcpy(p, &global.mainChainHeight, sizeof(global.mainChainHeight));
+    p += sizeof(global.mainChainHeight);
 
     bool relay = ptrPayload->relay;
     memcpy(p, &relay, sizeof(relay));
@@ -69,7 +69,7 @@ uint32_t make_version_payload(
     ptrPayload->addr_from = global.myAddress;
     ptrPayload->nonce = nonce;
     ptrPayload->user_agent.length = userAgentDataLength;
-    ptrPayload->start_height = 0;
+    ptrPayload->start_height = global.mainChainHeight;
     strcpy((char *)ptrPayload->user_agent.string, (char *)parameters.userAgent);
     ptrPayload->relay = true;
 

@@ -5,7 +5,7 @@
 #include "util.h"
 #include "datatypes.h"
 
-int segment_int32(uint32_t number, uint8_t chars[4]) {
+int segment_uint32(uint32_t number, uint8_t *chars) {
     chars[0] = (uint8_t)(number & 0xFF);
     chars[1] = (uint8_t)((number >> 1 * BITS_IN_BYTE) & 0xFF);
     chars[2] = (uint8_t)((number >> 2 * BITS_IN_BYTE) & 0xFF);
@@ -129,4 +129,12 @@ int64_t getFileSize(FILE *file) {
     int64_t filesize = ftell(file);
     fseek(file, 0L, SEEK_SET);
     return filesize;
+}
+
+void reverse_endian(Byte *data, uint32_t width) {
+    for (uint32_t i = 0; i < width / 2; i++) {
+        Byte temp = data[i];
+        data[i] = data[width - i - 1];
+        data[width - i - 1] = temp;
+    }
 }

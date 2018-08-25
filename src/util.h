@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-int segment_int32(uint32_t number, uint8_t chars[4]);
+int segment_uint32(uint32_t number, uint8_t *chars);
 uint16_t combine_uint16(const uint8_t *chars);
 uint32_t combine_uint32(const uint8_t *chars);
 uint64_t combine_uint64(const uint8_t *chars);
@@ -17,3 +17,4 @@ double random_betwen_0_1(void);
 uint32_t min(uint32_t a, uint32_t b);
 bool ips_equal(IP ipA, IP ipB);
 int64_t getFileSize(FILE *file);
+void reverse_endian(Byte *data, uint32_t width);

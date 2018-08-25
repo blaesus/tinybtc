@@ -3,5 +3,7 @@
 
 int32_t save_peer_addresses(void);
 int32_t load_peer_addresses(void);
+int32_t save_headers(void);
+int32_t load_headers(void);
 int32_t init_db(void);
 void init_genesis(void);

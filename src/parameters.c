@@ -37,4 +37,8 @@ const struct Parameters parameters = {
     .addrLife = DAY(14),
 
     .getaddrThreshold = 1000,
+
+    .genesisHeight = 0,
+
+    .difficultyPeriod = 2016,
 };

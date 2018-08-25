@@ -4,14 +4,12 @@
 #include "messages/block.h"
 #include "util.h"
 #include "mine.h"
+#include "blockchain.h"
 
 #define LOG_INTERVAL 1000000
 
-bool is_hash_passable(const SHA256_HASH hash) {
-    return hash[31] == 0 && hash[30] == 0 && hash[29] == 0 && hash[28] == 0 && hash[27] == 0;
-}
 
-uint32_t mine_header(
+uint32_t mine_block_header(
     BlockPayloadHeader header,
     uint32_t initialNonce,
     char *processLabel
@@ -20,6 +18,8 @@ uint32_t mine_header(
     header.nonce = initialNonce;
     struct timeval timer;
     gettimeofday(&timer, NULL);
+    SHA256_HASH targethash = {0};
+    expand_target(header.target_bits, targethash);
     while (true) {
         header.nonce++;
         dsha256(&header, sizeof(header), hash);
@@ -33,7 +33,7 @@ uint32_t mine_header(
 
             printf("%s: trying nonce %u (%1.3lfs)\n", processLabel, header.nonce, delta);
         }
-        if (is_hash_passable(hash)) {
+        if ((hash_satisfies_target(hash, targethash))) {
             printf("Found nonce=%u", header.nonce);
             print_object(hash, SHA256_LENGTH);
             break;

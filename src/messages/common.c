@@ -127,11 +127,13 @@ void print_iv_message(Message *ptrMessage) {
     printf("payload: count=%llu\n",
            ptrPayload->count
     );
+    /*
     for (uint8_t i = 0; i < ptrPayload->count; i++) {
         InventoryVector iv = ptrPayload->inventory[i];
         char *typeString = get_iv_type(iv.type);
         printf("IV type: %s(%u)\n", typeString, iv.type);
     }
+    */
 }
 
 int32_t make_iv_message(

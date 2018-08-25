@@ -10,7 +10,7 @@ struct BlockPayloadHeader {
     SHA256_HASH prev_block;
     SHA256_HASH merkle_root;
     uint32_t timestamp;
-    uint32_t bits;
+    uint32_t target_bits;
     uint32_t nonce;
 };
 

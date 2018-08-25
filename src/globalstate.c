@@ -17,7 +17,7 @@ void add_peer_address(NetworkAddress addr, uint32_t timestamp) {
 }
 
 void dedupe_global_addr_cache() {
-    printf("Duplicating address cache...\n");
+    printf("Deduplicating address cache...\n");
     struct AddrRecord buffer[MAX_ADDR_CACHE];
     memset(buffer, 0, sizeof(buffer));
 

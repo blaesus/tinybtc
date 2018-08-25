@@ -5,6 +5,7 @@
 #include "parameters.h"
 #include "datatypes.h"
 #include "peer.h"
+#include "hashmap.h"
 #include "messages/block.h"
 
 #define MAX_PEERS 1024
@@ -23,9 +24,14 @@ struct GlobalState {
 
     time_t start_time;
     NetworkAddress myAddress;
-    uint32_t blockchainHeight;
 
-    BlockPayloadHeader blockHeaders[1000000];
+    Hashmap headers;
+    Hashmap headersByPrevBlock;
+
+    BlockPayload genesisBlock;
+
+    SHA256_HASH mainChainTip;
+    int32_t mainChainHeight;
 };
 
 typedef struct GlobalState GlobalState;

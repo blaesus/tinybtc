@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "hiredis/hiredis.h"
 
 #include "persistent.h"
@@ -40,7 +41,7 @@ int32_t save_peer_addresses() {
     FILE *file = fopen(PEER_LIST_BINARY_FILENAME, "wb");
 
     uint8_t peerCountBytes[PEER_ADDRESS_COUNT_WIDTH] = { 0 };
-    segment_int32(global.peerAddressCount, peerCountBytes);
+    segment_uint32(global.peerAddressCount, peerCountBytes);
     fwrite(peerCountBytes, sizeof(global.peerAddressCount), 1, file);
 
     fwrite(
@@ -77,7 +78,7 @@ int32_t load_peer_addresses() {
 
 
 int32_t init_db() {
-    printf("Connecting to redis database...\n");
+    printf("Connecting to redis database...");
     redisContext *c;
     const char *hostname = "127.0.0.1";
     int port = 6379;
@@ -86,14 +87,53 @@ int32_t init_db() {
     c = redisConnectWithTimeout(hostname, port, timeout);
     if (c == NULL || c->err) {
         if (c) {
-            printf("Connection error: %s\n", c->errstr);
+            printf("\nConnection error: %s\n", c->errstr);
             redisFree(c);
         } else {
-            printf("Connection error: can't allocate redis context\n");
+            printf("\nConnection error: can't allocate redis context\n");
         }
         return 1;
     }
-    printf("Redis connected\n");
+    printf("Done\n");
     return 0;
 }
 
+int32_t save_headers(void) {
+    FILE *file = fopen(BLOCK_HEADER_LIST_FILENAME, "wb");
+    Byte *keys = calloc(1000000, SHA256_LENGTH);
+    uint32_t headersCount = (uint32_t)hashmap_getkeys(&global.headers, keys);
+    printf("Saving %u headers to %s...\n", headersCount, BLOCK_HEADER_LIST_FILENAME);
+    fwrite(&headersCount, sizeof(headersCount), 1, file);
+    for (uint32_t i = 0; i < headersCount; i++) {
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockPayloadHeader *ptrData = hashmap_get(&global.headers, key, NULL);
+        if (ptrData) {
+            fwrite(ptrData, sizeof(BlockPayloadHeader), 1, file);
+        }
+        else {
+            printf("Key not found");
+        }
+    }
+    free(keys);
+    fclose(file);
+    return 0;
+}
+
+int32_t load_headers(void) {
+    FILE *file = fopen(BLOCK_HEADER_LIST_FILENAME, "rb");
+    uint32_t headersCount = 0;
+    fread(&headersCount, sizeof(headersCount), 1, file);
+    for (uint32_t i = 0; i < headersCount; i++) {
+        BlockPayloadHeader header;
+        memset(&header, 0, sizeof(header));
+        fread(&header, sizeof(header), 1, file);
+
+        SHA256_HASH headerHash = {0};
+        dsha256(&header, sizeof(header), headerHash);
+        hashmap_set(&global.headers, headerHash, &header, sizeof(header));
+        hashmap_set(&global.headersByPrevBlock, header.prev_block, &header, sizeof(header));
+    }
+    printf("Loaded %u headers\n", headersCount);
+    return 0;
+}

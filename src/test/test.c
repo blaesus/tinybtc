@@ -11,10 +11,10 @@
 #include "messages/version.h"
 #include "messages/block.h"
 #include "messages/getheaders.h"
-#include "messages/getheaders.h"
 #include "test/test.h"
 #include "mine.h"
 #include "hashmap.h"
+#include "blockchain.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -229,7 +229,7 @@ static void test_mine() {
             }
         }
     }
-    mine_header(ptrPayload->header, nonce, label);
+    mine_block_header(ptrPayload->header, nonce, label);
 }
 
 void test_getheaders() {
@@ -284,7 +284,7 @@ void test_checksum() {
 
 void test_hashmap() {
     Hashmap *ptrHashmap = malloc(sizeof(Hashmap));
-    init_hashmap(ptrHashmap, (2 << 10) - 1, KEY_WIDTH);
+    hashmap_init(ptrHashmap, (2 << 24) - 1, KEY_WIDTH);
 
     Byte keys[KEY_COUNT][KEY_WIDTH];
     memset(&keys, 0, sizeof(keys));
@@ -323,6 +323,28 @@ void test_hashmap() {
     }
 }
 
+void test_difficulty() {
+    SHA256_HASH hash1 = {0};
+    uint32_t target1 = 0x1d00ffff;
+    expand_target(target1, hash1);
+    print_object(hash1, SHA256_LENGTH);
+
+    SHA256_HASH hash2 = {0};
+    uint32_t target2 = 0x18009645;
+    expand_target(target2, hash2);
+    print_object(hash2, SHA256_LENGTH);
+
+    printf("%i", hash_satisfies_target(hash2, hash1));
+}
+
+void test_print_hash() {
+    SHA256_HASH hash = {0};
+    Byte data[1] = {""};
+    sha256(data, 0, hash);
+    print_object(hash, SHA256_LENGTH);
+    print_sha256_short(hash);
+}
+
 void test() {
     // test_version_messages()
     // test_genesis();
@@ -332,5 +354,8 @@ void test() {
     // test_mine();
     // test_getheaders();
     // test_checksum();
-    test_hashmap();
+    // test_hashmap();
+    // test_difficulty();
+    // test_blockchain_validation();
+    test_print_hash();
 }

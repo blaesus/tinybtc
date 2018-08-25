@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "headers.h"
+#include "util.h"
 
 uint64_t parse_headers_payload(
     Byte *ptrBuffer,
@@ -8,8 +9,8 @@ uint64_t parse_headers_payload(
     Byte *p = ptrBuffer;
     p += parse_varint(p, &ptrPayload->count);
     for (uint64_t i = 0; i < ptrPayload->count; i++) {
-        p += parse_varint(p, &ptrPayload->headers[i].transactionCount);
         p += parse_block_payload_header(p, &ptrPayload->headers[i].header);
+        p += parse_varint(p, &ptrPayload->headers[i].transactionCount);
     }
     return ptrBuffer - p;
 }

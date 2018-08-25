@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define MAX_HASHMAP_BUCKET_COUNT (1UL << 24)
+#define MAX_HASHMAP_BUCKET_COUNT ((1UL << 26) - 1)
 
 #define MAX_HASHMAP_KEY_WIDTH 64
 
@@ -24,8 +24,9 @@ struct Hashmap {
 
 typedef struct Hashmap Hashmap;
 
-void init_hashmap(Hashmap *ptrHashmap, uint64_t size, uint32_t keywidth);
+void hashmap_init(Hashmap *ptrHashmap, uint64_t size, uint32_t keywidth);
 int8_t hashmap_set(Hashmap *ptrHashmap, Byte *key, void *ptrValue, uint32_t valueLength);
 void *hashmap_get(Hashmap *ptrHashmap, Byte *key, uint32_t *ptrValueLength);
+uint64_t hashmap_getkeys(Hashmap *ptrHashmap, Byte *keys);
 void free_hashmap(Hashmap *ptrHashmap);
 void print_hashmap(Hashmap *ptrHashmap);

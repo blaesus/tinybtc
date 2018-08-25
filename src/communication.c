@@ -9,6 +9,7 @@
 #include "networking.h"
 #include "util.h"
 #include "units.h"
+#include "blockchain.h"
 
 #include "messages/common.h"
 #include "messages/shared.h"
@@ -46,7 +47,9 @@ void timeout_peers() {
     }
 }
 
-uint16_t print_peer_status() {
+uint16_t print_node_status() {
+    printf("\n==== Node status ====\n");
+    printf("peers handshake: ");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (peerHandShaken(&global.peers[i])) {
@@ -58,13 +61,15 @@ uint16_t print_peer_status() {
         }
     }
     printf(" (%u/%u)\n", validPeers, global.peerCount);
+    printf("%u addresses\n", global.peerAddressCount);
+    printf("main chain height %u\n", global.mainChainHeight);
+    printf("=====================\n");
     return validPeers;
 }
 
 void on_interval(uv_timer_t *handle) {
     timeout_peers();
-    print_peer_status();
-    printf("%u addresses\n", global.peerAddressCount);
+    print_node_status();
     time_t now = time(NULL);
     if (now - global.start_time >= PROGRAM_EXIT_TIME_SEC) {
         printf("Stopping main loop...\n");
@@ -229,18 +234,14 @@ void send_message(
 void send_getheaders(
     uv_connect_t *connection
 ) {
-    SHA256_HASH genesisHash = {0};
-    Message genesis = get_empty_message();
-    load_block_message("genesis.dat", &genesis);
-    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
-    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    uint32_t hashCount = 1;
 
     GetheadersPayload payload = {
         .version = parameters.protocolVersion,
-        .hashCount = 1,
+        .hashCount = hashCount,
         .hashStop = {0}
     };
-    memcpy(&payload.blockLocatorHash[0], genesisHash, SHA256_LENGTH);
+    memcpy(&payload.blockLocatorHash[0], global.mainChainTip, SHA256_LENGTH);
 
     send_message(connection, CMD_GETHEADERS, &payload);
 }
@@ -248,7 +249,9 @@ void send_getheaders(
 void on_handshake_success(
     Peer *ptrPeer
 ) {
-    send_getheaders(ptrPeer->connection);
+    if (ptrPeer->chain_height > global.mainChainHeight) {
+        send_getheaders(ptrPeer->connection);
+    }
 
     bool shouldSendGetaddr =
         global.peerAddressCount < parameters.getaddrThreshold;
@@ -275,6 +278,7 @@ void on_incoming_message(
         if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
+        ptrPeer->chain_height = ptrPayloadTyped->start_height;
         set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
@@ -299,6 +303,17 @@ void on_incoming_message(
     }
     else if (strcmp(command, CMD_PING) == 0) {
         send_message(ptrPeer->connection, CMD_PONG, message.ptrPayload);
+    }
+    else if (strcmp(command, CMD_HEADERS) == 0) {
+        HeadersPayload *ptrPayload = message.ptrPayload;
+        for (uint64_t i = 0; i < ptrPayload->count; i++) {
+            BlockPayloadHeader *ptrHeader = &ptrPayload->headers[i].header;
+            SHA256_HASH headerHash = {0};
+            dsha256(ptrHeader, sizeof(BlockPayloadHeader), headerHash);
+            hashmap_set(&global.headers, headerHash, ptrHeader, sizeof(BlockPayloadHeader));
+            hashmap_set(&global.headersByPrevBlock, ptrHeader->prev_block, ptrHeader, sizeof(BlockPayloadHeader));
+        }
+        relocate_main_chain();
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
@@ -388,7 +403,7 @@ void on_peer_connect(uv_connect_t* req, int32_t error) {
 
 int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
     char *ipString = convert_ipv4_readable(addr.ip);
-    printf("connecting with peer %s for peer %u\n", ipString, peerIndex);
+    printf("connecting with address %s as peer %u\n", ipString, peerIndex);
 
     Peer *ptrPeer = &global.peers[peerIndex];
     memset(ptrPeer, 0, sizeof(Peer));
@@ -483,7 +498,6 @@ void connect_to_local() {
 }
 
 int32_t connect_to_initial_peers() {
-    printf("Yeah\n");
     uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);

@@ -23,7 +23,7 @@
 #define MAX_INV_SIZE 50000
 
 #define MAIN_TIMER_INTERVAL_MSEC 2000
-#define PROGRAM_EXIT_TIME_SEC 60
+#define PROGRAM_EXIT_TIME_SEC 360
 
 #define CLEAR_OLD_ADDR_THRESHOLD 1000
 
@@ -40,6 +40,8 @@ struct Parameters {
     uint8_t userAgent[128];
     uint32_t addrLife;
     uint16_t getaddrThreshold;
+    uint8_t genesisHeight;
+    uint16_t difficultyPeriod;
 };
 
 extern const struct Parameters parameters;
