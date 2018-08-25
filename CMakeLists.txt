@@ -7,6 +7,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -O3 -march=native")
 include_directories(src)
 include_directories(deps/)
 include_directories(deps/uv)
+include_directories(deps/gmp)
 file(GLOB SOURCES ${SOURCES} "src/*.c")
 file(GLOB SOURCES ${SOURCES} "src/messages/*.c")
 
@@ -18,6 +19,7 @@ add_executable(diy-bitcoin
 )
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/uv/libuv_a.a)
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/hiredis/libhiredis.a)
+target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/gmp/libgmp.a)
 
 add_custom_command(
         TARGET diy-bitcoin PRE_BUILD

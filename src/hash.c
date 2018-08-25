@@ -34,7 +34,14 @@ void print_sha256(Byte *hash) {
 }
 
 void print_sha256_reverse(Byte *hash) {
+    printf("(BE)");
     print_hex_reverse_of_width(hash, SHA256_LENGTH);
+}
+
+void print_tip_with_description(char *description, Byte *hash) {
+    printf("%s", description);
+    print_sha256_reverse(hash);
+    printf("\n");
 }
 
 void print_sha256_short(Byte *hash) {

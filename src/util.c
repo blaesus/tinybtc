@@ -138,3 +138,20 @@ void reverse_endian(Byte *data, uint32_t width) {
         data[width - i - 1] = temp;
     }
 }
+
+int8_t bytescmp(
+    const Byte *bytesA,
+    const Byte *bytesB,
+    uint32_t width
+) {
+    for (uint32_t i = width - 1; i >= 0; i--) {
+        if (bytesA[i] < bytesB[i]) {
+            return -1;
+        }
+        if (bytesA[i] > bytesB[i]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+

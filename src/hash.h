@@ -13,3 +13,4 @@ void dsha256(void *data, uint32_t length, SHA256_HASH result);
 void print_sha256(Byte *hash);
 void print_sha256_reverse(Byte *hash);
 void print_sha256_short(Byte *hash);
+void print_tip_with_description(char *description, Byte*hash);

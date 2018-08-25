@@ -101,20 +101,23 @@ int32_t init_db() {
 int32_t save_headers(void) {
     FILE *file = fopen(BLOCK_HEADER_LIST_FILENAME, "wb");
     Byte *keys = calloc(1000000, SHA256_LENGTH);
-    uint32_t headersCount = (uint32_t)hashmap_getkeys(&global.headers, keys);
-    printf("Saving %u headers to %s...\n", headersCount, BLOCK_HEADER_LIST_FILENAME);
-    fwrite(&headersCount, sizeof(headersCount), 1, file);
-    for (uint32_t i = 0; i < headersCount; i++) {
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.headers, keys);
+    printf("Saving %u headers to %s...\n", keyCount, BLOCK_HEADER_LIST_FILENAME);
+    fwrite(&keyCount, sizeof(keyCount), 1, file);
+    uint32_t actualCount = 0;
+    for (uint32_t i = 0; i < keyCount; i++) {
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
         BlockPayloadHeader *ptrData = hashmap_get(&global.headers, key, NULL);
         if (ptrData) {
             fwrite(ptrData, sizeof(BlockPayloadHeader), 1, file);
+            actualCount += 1;
         }
         else {
-            printf("Key not found");
+            printf("Key not found\n");
         }
     }
+    printf("keyCount = %u, Actual export = %u\n", keyCount, actualCount);
     free(keys);
     fclose(file);
     return 0;

@@ -13,7 +13,7 @@ uint64_t parse_block_payload_header(
     p += PARSE_INTO(p, &ptrHeader->prev_block);
     p += PARSE_INTO(p, &ptrHeader->merkle_root);
     p += PARSE_INTO(p, &ptrHeader->timestamp);
-    p += PARSE_INTO(p, &ptrHeader->target_bits);
+    p += PARSE_INTO(p, &ptrHeader->target);
     p += PARSE_INTO(p, &ptrHeader->nonce);
     return p - ptrBuffer;
 }
@@ -36,8 +36,8 @@ uint64_t serialize_block_payload_header(
     memcpy(p, &ptrHeader->timestamp, sizeof(ptrHeader->timestamp));
     p += sizeof(ptrHeader->timestamp);
 
-    memcpy(p, &ptrHeader->target_bits, sizeof(ptrHeader->target_bits));
-    p += sizeof(ptrHeader->target_bits);
+    memcpy(p, &ptrHeader->target, sizeof(ptrHeader->target));
+    p += sizeof(ptrHeader->target);
 
     memcpy(p, &ptrHeader->nonce, sizeof(ptrHeader->nonce));
     p += sizeof(ptrHeader->nonce);

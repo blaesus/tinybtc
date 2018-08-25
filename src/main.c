@@ -44,6 +44,7 @@ void load_genesis() {
     // Save in headers hashmap
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
     hashmap_set(&global.headers, genesisHash, &ptrBlock->header, sizeof(BlockPayloadHeader));
+    memcpy(global.mainChainTarget, ptrBlock->header.target, TARGET_BITS_WIDTH);
 
     // Save in global
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
@@ -57,8 +58,8 @@ void init() {
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();
-    hashmap_init(&global.headers, (2 << 24) - 1, SHA256_LENGTH);
-    hashmap_init(&global.headersByPrevBlock, (2 << 24) - 1, SHA256_LENGTH);
+    hashmap_init(&global.headers, (1UL << 25) - 1, SHA256_LENGTH);
+    hashmap_init(&global.headersByPrevBlock, (1UL << 25) - 1, SHA256_LENGTH);
     load_genesis();
     load_headers();
     relocate_main_chain();
@@ -78,12 +79,25 @@ int32_t connect_to_peers() {
     return 0;
 }
 
-int32_t main(/* int32_t argc, char **argv */) {
-    init();
-    connect_to_peers();
-    run_main_loop();
+void find() {
+    SHA256_HASH targetHash = {
+        0xcc,0xd6,0x64,0x6e,0x5f,0xf7,0x3a,0xe9,0x70,0x1a,0xa5,0xc3,0x57,0x5b,0x1a,0xbf,0x66,0xf6,0x2d,0xd3,0x98,0xc9,0x37,0x5b,0x07,0x4c,0x07,0xde,0x00,0x00,0x00,0x00
+    };
+    BlockPayloadHeader *ptrHeader = hashmap_get(&global.headers, targetHash, NULL);
+    if (ptrHeader) {
+        printf("Found!");
+    }
+    else {
+        printf("NOT Found!");
+    }
+}
 
-    // test();
+int32_t main(/* int32_t argc, char **argv */) {
+    // init();
+    // connect_to_peers();
+    // run_main_loop();
+
+    test();
     return 0;
 }
 

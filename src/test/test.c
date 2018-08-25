@@ -326,12 +326,12 @@ void test_hashmap() {
 void test_difficulty() {
     SHA256_HASH hash1 = {0};
     uint32_t target1 = 0x1d00ffff;
-    expand_target(target1, hash1);
+    target_4to32(target1, hash1);
     print_object(hash1, SHA256_LENGTH);
 
     SHA256_HASH hash2 = {0};
     uint32_t target2 = 0x18009645;
-    expand_target(target2, hash2);
+    target_4to32(target2, hash2);
     print_object(hash2, SHA256_LENGTH);
 
     printf("%i", hash_satisfies_target(hash2, hash1));
@@ -343,6 +343,21 @@ void test_print_hash() {
     sha256(data, 0, hash);
     print_object(hash, SHA256_LENGTH);
     print_sha256_short(hash);
+}
+
+void test_target_conversions() {
+    TargetQuodBytes genesisQuod = {0x1a, 0xb9, 0x08, 0x18};
+    // TargetQuodBytes genesisQuod = {0xff, 0xff, 0x00, 0x1d};
+    mpz_t genesisMpz;
+    mpz_init(genesisMpz);
+    targetQuodToMpz(genesisQuod, genesisMpz);
+    print_object(genesisQuod, 4);
+    printf("======\n");
+
+    TargetQuodBytes genesisQuodReconstruct = {0};
+
+    targetMpzToQuod(genesisMpz, genesisQuodReconstruct);
+    print_object(genesisQuodReconstruct, 4);
 }
 
 void test() {
@@ -357,5 +372,6 @@ void test() {
     // test_hashmap();
     // test_difficulty();
     // test_blockchain_validation();
-    test_print_hash();
+    // test_print_hash();
+    test_target_conversions();
 }

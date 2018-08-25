@@ -25,8 +25,23 @@
 #include "messages/headers.h"
 #include "messages/print.h"
 
+struct ContextData {
+    struct Peer *peer;
+};
+
+typedef struct ContextData ContextData;
+
+void send_getheaders(
+    uv_connect_t *connection
+);
+
 bool peerHandShaken(Peer *ptrPeer) {
     return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
+}
+
+void on_initiate_reconnection(uv_handle_t* handle) {
+    ContextData *data = (ContextData *)handle->data;
+    connect_to_random_addr_for_peer(data->peer->index);
 }
 
 void timeout_peers() {
@@ -39,10 +54,21 @@ void timeout_peers() {
                 disable_ip(ptrPeer->address.ip);
                 uv_handle_t *ptrHandle = (uv_handle_t *)ptrPeer->connection->handle;
                 if (!uv_is_closing(ptrHandle)) {
-                    uv_close(ptrHandle, NULL);
+                    ContextData *ptrData = malloc(sizeof(ContextData));
+                    ptrData->peer = ptrPeer;
+                    ptrHandle->data = ptrData;
+                    uv_close(ptrHandle, on_initiate_reconnection);
                 }
-                connect_to_random_addr_for_peer(i);
             }
+        }
+    }
+}
+
+void request_data_from_peers() {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (peerHandShaken(ptrPeer)) {
+            send_getheaders(ptrPeer->connection);
         }
     }
 }
@@ -69,6 +95,7 @@ uint16_t print_node_status() {
 
 void on_interval(uv_timer_t *handle) {
     timeout_peers();
+    request_data_from_peers();
     print_node_status();
     time_t now = time(NULL);
     if (now - global.start_time >= PROGRAM_EXIT_TIME_SEC) {
@@ -89,11 +116,19 @@ uint32_t setup_main_event_loop() {
     return 0;
 }
 
-struct ContextData {
-    struct Peer *peer;
-};
+void send_getheaders(uv_connect_t *connection) {
+    uint32_t hashCount = 1;
 
-typedef struct ContextData ContextData;
+    GetheadersPayload payload = {
+        .version = parameters.protocolVersion,
+        .hashCount = hashCount,
+        .hashStop = {0}
+    };
+    memcpy(&payload.blockLocatorHash[0], global.mainChainTip, SHA256_LENGTH);
+
+    send_message(connection, CMD_GETHEADERS, &payload);
+}
+
 
 char *get_peer_ip(uv_connect_t *req) {
     ContextData *data = (ContextData *)req->data;
@@ -162,7 +197,8 @@ void send_message(
     void *ptrData
 ) {
     Message message = get_empty_message();
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    // Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    Byte *buffer = malloc(MAX_MESSAGE_LENGTH);
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
@@ -231,21 +267,6 @@ void send_message(
     write_buffer(req, &uvBuffer);
 }
 
-void send_getheaders(
-    uv_connect_t *connection
-) {
-    uint32_t hashCount = 1;
-
-    GetheadersPayload payload = {
-        .version = parameters.protocolVersion,
-        .hashCount = hashCount,
-        .hashStop = {0}
-    };
-    memcpy(&payload.blockLocatorHash[0], global.mainChainTip, SHA256_LENGTH);
-
-    send_message(connection, CMD_GETHEADERS, &payload);
-}
-
 void on_handshake_success(
     Peer *ptrPeer
 ) {
@@ -310,8 +331,20 @@ void on_incoming_message(
             BlockPayloadHeader *ptrHeader = &ptrPayload->headers[i].header;
             SHA256_HASH headerHash = {0};
             dsha256(ptrHeader, sizeof(BlockPayloadHeader), headerHash);
-            hashmap_set(&global.headers, headerHash, ptrHeader, sizeof(BlockPayloadHeader));
-            hashmap_set(&global.headersByPrevBlock, ptrHeader->prev_block, ptrHeader, sizeof(BlockPayloadHeader));
+            if (!hashmap_get(&global.headers, headerHash, NULL)) {
+                hashmap_set(
+                    &global.headers,
+                    headerHash,
+                    ptrHeader,
+                    sizeof(BlockPayloadHeader)
+                );
+                hashmap_set(
+                    &global.headersByPrevBlock,
+                    ptrHeader->prev_block,
+                    ptrHeader,
+                    sizeof(BlockPayloadHeader)
+                );
+            }
         }
         relocate_main_chain();
     }

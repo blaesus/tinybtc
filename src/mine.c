@@ -19,7 +19,7 @@ uint32_t mine_block_header(
     struct timeval timer;
     gettimeofday(&timer, NULL);
     SHA256_HASH targethash = {0};
-    expand_target(header.target_bits, targethash);
+    target_4to32(header.target, targethash);
     while (true) {
         header.nonce++;
         dsha256(&header, sizeof(header), hash);

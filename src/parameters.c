@@ -6,7 +6,6 @@ const struct Parameters parameters = {
 
     .magic = MAIN_NET_MAGIC,
 
-    // see Bitcoin Core's version.h
     .protocolVersion = 70015,
 
     .minimalPeerVersion = 31800,
@@ -30,7 +29,7 @@ const struct Parameters parameters = {
 
     .maxIncoming = 125,
 
-    .maxOutgoing = 8,
+    .maxOutgoing = 16,
 
     .backlog = 32,
 
@@ -40,5 +39,9 @@ const struct Parameters parameters = {
 
     .genesisHeight = 0,
 
-    .difficultyPeriod = 2016,
+    .retargetPeriod = 2016,
+    .retargetLookBackPeriod = 2015,
+    .desiredRetargetPeriod = DAY(14),
+
+    .blockMaxForwardTimestamp = HOUR(2),
 };

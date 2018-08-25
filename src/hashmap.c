@@ -43,12 +43,12 @@ int8_t hashmap_set(Hashmap *ptrHashmap, Byte *key, void *ptrValue, uint32_t valu
     ptrNewNode->next = NULL;
 
     uint64_t bucketIndex = calculate_index(key, ptrHashmap->keyWidth, ptrHashmap->bucketCount);
-    if (ptrHashmap->data[bucketIndex] == NULL) {
+    HashmapNode *ptrSearch = ptrHashmap->data[bucketIndex];
+    if (ptrSearch == NULL) {
         ptrHashmap->data[bucketIndex] = ptrNewNode;
     }
     else {
         // Collision
-        HashmapNode *ptrSearch = ptrHashmap->data[bucketIndex];
         if (memcmp(ptrSearch->key, key, ptrHashmap->keyWidth) == 0) {
             free(ptrHashmap->data[bucketIndex]->ptrValue);
             ptrHashmap->data[bucketIndex] = ptrNewNode;
@@ -95,6 +95,11 @@ uint64_t hashmap_getkeys(Hashmap *ptrHashmap, Byte *keys) {
         if (ptrNode) {
             memcpy(keys + outputIndex * SHA256_LENGTH, ptrNode->key, SHA256_LENGTH);
             outputIndex++;
+            while (ptrNode->next) {
+                ptrNode = ptrNode->next;
+                memcpy(keys + outputIndex * SHA256_LENGTH, ptrNode->key, SHA256_LENGTH);
+                outputIndex++;
+            }
         }
     }
     return outputIndex;

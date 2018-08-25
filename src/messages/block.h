@@ -5,12 +5,18 @@
 #include "hash.h"
 #include "messages/tx.h"
 
+#define TARGET_BITS_MANTISSA_WIDTH 3
+#define TARGET_BITS_EXPONENT_WIDTH 1
+#define TARGET_BITS_WIDTH (TARGET_BITS_MANTISSA_WIDTH + TARGET_BITS_EXPONENT_WIDTH)
+
+typedef Byte TargetQuodBytes[TARGET_BITS_WIDTH];
+
 struct BlockPayloadHeader {
     int32_t version;
     SHA256_HASH prev_block;
     SHA256_HASH merkle_root;
     uint32_t timestamp;
-    uint32_t target_bits;
+    TargetQuodBytes target;
     uint32_t nonce;
 };
 
@@ -58,3 +64,4 @@ uint64_t load_block_message(
     char *path,
     Message *ptrMessage
 );
+
