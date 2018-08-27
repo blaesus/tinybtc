@@ -10,13 +10,9 @@ include_directories(deps/uv)
 include_directories(deps/openssl)
 file(GLOB SOURCES ${SOURCES} "src/*.c")
 file(GLOB SOURCES ${SOURCES} "src/messages/*.c")
-
 file(GLOB SOURCES ${SOURCES} "src/test/*.c")
 
-add_executable(diy-bitcoin
-        ${SOURCES}
-        deps/sha256/sha256.c
-)
+add_executable(diy-bitcoin ${SOURCES})
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/uv/libuv_a.a)
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/hiredis/libhiredis.a)
 target_link_libraries(diy-bitcoin ${CMAKE_CURRENT_SOURCE_DIR}/deps/openssl/libcrypto.a)

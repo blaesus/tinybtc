@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <unistd.h>
-#include "sha256/sha256.h"
+#include "openssl/sha.h"
 #include "datatypes.h"
 #include "hash.h"
 
 void sha256(void *data, uint32_t length, SHA256_HASH result) {
     SHA256_CTX context;
-    sha256_init(&context);
-    sha256_update(&context, data, length);
-    sha256_final(&context, result);
+    SHA256_Init(&context);
+    SHA256_Update(&context, data, length);
+    SHA256_Final(result, &context);
 }
 
 void dsha256(void *data, uint32_t length, SHA256_HASH result) {
