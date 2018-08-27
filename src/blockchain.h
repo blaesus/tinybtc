@@ -1,14 +1,14 @@
 #pragma once
 #include <stdint.h>
-#include "gmp.h"
+#include "bn.h"
 #include "hash.h"
 #include "datatypes.h"
 #include "messages/block.h"
 
-void target_4to32(TargetQuodBytes targetBytes, Byte *bytes);
-long double targetQuodToRoughDouble(Byte *targetBytes);
-void targetQuodToMpz(Byte *targetBytes, mpz_t targetMpz);
-void targetMpzToQuod(mpz_t targetMpz, Byte *targetBytes);
+void target_4to32(TargetCompact targetBytes, Byte *bytes);
+long double targetQuodToRoughDouble(TargetCompact targetBytes);
+void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget);
+uint32_t targetBignumToCompact(BIGNUM *ptrTarget);
 
 bool hash_satisfies_target(const Byte *hash, const Byte *target);
 bool validate_blockchain(BlockPayloadHeader ptrFirstHeader, uint32_t chainLength);

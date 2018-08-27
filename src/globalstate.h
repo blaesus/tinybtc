@@ -32,7 +32,7 @@ struct GlobalState {
 
     SHA256_HASH mainChainTip;
     int32_t mainChainHeight;
-    TargetQuodBytes mainChainTarget;
+    TargetCompact mainChainTarget;
 };
 
 typedef struct GlobalState GlobalState;

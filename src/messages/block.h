@@ -9,14 +9,14 @@
 #define TARGET_BITS_EXPONENT_WIDTH 1
 #define TARGET_BITS_WIDTH (TARGET_BITS_MANTISSA_WIDTH + TARGET_BITS_EXPONENT_WIDTH)
 
-typedef Byte TargetQuodBytes[TARGET_BITS_WIDTH];
+typedef uint32_t TargetCompact;
 
 struct BlockPayloadHeader {
     int32_t version;
     SHA256_HASH prev_block;
     SHA256_HASH merkle_root;
     uint32_t timestamp;
-    TargetQuodBytes target;
+    TargetCompact target;
     uint32_t nonce;
 };
 

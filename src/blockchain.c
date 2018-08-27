@@ -2,18 +2,16 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "gmp.h"
-
 #include "blockchain.h"
 #include "globalstate.h"
 #include "hash.h"
 #include "util.h"
 #include "units.h"
 
-void target_4to32(Byte *targetBytes, Byte *bytes) {
-    int32_t exponentWidth = targetBytes[TARGET_BITS_MANTISSA_WIDTH] - TARGET_BITS_MANTISSA_WIDTH;
+void target_4to32(uint32_t targetBytes, Byte *bytes) {
+    int32_t exponentWidth = targetBytes >> 24;
     memset(bytes, 0, SHA256_LENGTH);
-    memcpy(bytes + exponentWidth, targetBytes, TARGET_BITS_MANTISSA_WIDTH);
+    memcpy(bytes + exponentWidth, &targetBytes, TARGET_BITS_MANTISSA_WIDTH);
 }
 
 long double pow256(long double x) {
@@ -24,72 +22,37 @@ long double log256(long double x) {
     return log2l(x) / 8;
 }
 
-long double targetQuodToRoughDouble(Byte *targetBytes) {
-    int32_t exponentWidth = targetBytes[TARGET_BITS_MANTISSA_WIDTH] - TARGET_BITS_MANTISSA_WIDTH;
+long double targetQuodToRoughDouble(TargetCompact targetBytes) {
+    uint32_t exponentWidth = targetBytes >> 24;
+    exponentWidth -= 3;
     uint32_t mantissa =
-        + (targetBytes[2] << 2 * BITS_IN_BYTE)
-        + (targetBytes[1] << 1 * BITS_IN_BYTE)
-        + (targetBytes[0]);
+        + ((targetBytes >> 16) & 0xff) * 65536
+        + ((targetBytes >> 8) & 0xff) * 256
+        + (targetBytes & 0xff);
     return mantissa * pow256(exponentWidth);
 }
 
-void targetQuodToMpz(Byte *targetBytes, mpz_t targetMpz) {
-    uint32_t exponentInt =
-        (uint32_t)(targetBytes[TARGET_BITS_MANTISSA_WIDTH] - TARGET_BITS_MANTISSA_WIDTH);
-    printf("Exponent %u\n", exponentInt);
 
-    uint32_t mantissaInt =
-        + (targetBytes[2] << 2 * BITS_IN_BYTE)
-        + (targetBytes[1] << 1 * BITS_IN_BYTE)
-        + (targetBytes[0]);
-    printf("Mantissa %u\n", mantissaInt);
-
-    mpz_t powerMpz;
-    mpz_init(powerMpz);
-    mpz_ui_pow_ui(powerMpz, 256, exponentInt);
-
-    mpz_mul_ui(targetMpz, powerMpz, mantissaInt);
-    mpz_clear(powerMpz);
+void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget) {
+    unsigned int nSize = targetBytes >> 24;
+    Byte vch[64] = {0};
+    vch[3] = nSize;
+    if (nSize >= 1) vch[4] = (targetBytes >> 16) & 0xff;
+    if (nSize >= 2) vch[5] = (targetBytes >> 8) & 0xff;
+    if (nSize >= 3) vch[6] = (targetBytes >> 0) & 0xff;
+    BN_mpi2bn(&vch[0], 4 + nSize, ptrTarget);
 }
 
-uint64_t get_mantissa(uint32_t exponentInt, mpz_t targetMpz) {
-    mpz_t mantissaMpz;
-    mpz_init_set_ui(mantissaMpz, 0);
-
-    mpz_t power;
-    mpz_init_set_ui(power, 1);
-    mpz_ui_pow_ui(power, 256, exponentInt - TARGET_BITS_MANTISSA_WIDTH);
-    mpz_div(mantissaMpz, targetMpz, power);
-    gmp_printf("Mantissa %Zd | target=%Zd, power=%Zd\n", mantissaMpz, targetMpz, power);
-
-    mpz_clear(power);
-
-    return mpz_get_ui(mantissaMpz);
-}
-
-void targetMpzToQuod(mpz_t targetMpz, Byte *targetBytes) {
-    uint32_t exponentInt = 0;
-    mpz_t power;
-    mpz_init_set_ui(power, 1);
-    while (mpz_cmp(power, targetMpz) < 0) {
-        mpz_ui_pow_ui(power, 256, exponentInt);
-        exponentInt++;
-    }
-    printf("Exponent %u\n", exponentInt);
-    targetBytes[3] = (Byte)exponentInt;
-
-    uint64_t mantissaInt = 0;
-    // Maximize significand
-    while (mantissaInt < 0xffff) {
-        printf("move exponent from %u to %u\n", exponentInt, exponentInt - 1);
-        exponentInt--;
-        mantissaInt = get_mantissa(exponentInt, targetMpz);
-    }
-    targetBytes[0] = (uint8_t)(mantissaInt & 0xFF);
-    targetBytes[1] = (uint8_t)((mantissaInt >> 1 * BITS_IN_BYTE) & 0xFF);
-    targetBytes[2] = (uint8_t)((mantissaInt >> 2 * BITS_IN_BYTE) & 0xFF);
-
-    mpz_clear(power);
+uint32_t targetBignumToCompact(BIGNUM *ptrTarget) {
+    uint32_t nSize = (uint32_t) BN_bn2mpi(ptrTarget, NULL);
+    Byte vch[64] = {0};
+    nSize -= 4;
+    BN_bn2mpi(ptrTarget, &vch[0]);
+    uint32_t nCompact = nSize << 24;
+    if (nSize >= 1) nCompact |= (vch[4] << 16);
+    if (nSize >= 2) nCompact |= (vch[5] << 8);
+    if (nSize >= 3) nCompact |= (vch[6] << 0);
+    return nCompact;
 }
 
 bool hash_satisfies_target(
@@ -144,25 +107,16 @@ static void retarget() {
     long double nextTargetFloat = currentTargetFloat * ratio;
     if (nextTargetFloat > MAX_TARGET) {
         printf("Next target hitting ceiling, using ceiling instead\n");
-        memcpy(global.mainChainTarget, global.genesisBlock.header.target, sizeof(TargetQuodBytes));
+        global.mainChainTarget = global.genesisBlock.header.target;
     }
     else {
         long double difficulty = MAX_TARGET / nextTargetFloat;
         printf("retarget: %.3Le -> %.3Le (difficulty %.2Lf)\n", currentTargetFloat, nextTargetFloat, difficulty);
-
-        mpz_t currentTargetPrecise;
-        mpz_init(currentTargetPrecise);
-        targetQuodToMpz(global.mainChainTarget, currentTargetPrecise);
-
-        mpz_t newTargetPrecise;
-        mpz_init(newTargetPrecise);
-        mpz_mul_ui(newTargetPrecise, currentTargetPrecise, actualPeriod);
-        mpz_div_ui(newTargetPrecise, newTargetPrecise, parameters.desiredRetargetPeriod);
-        gmp_printf("new target=%Zd\n", newTargetPrecise);
-
-        TargetQuodBytes newTargetQuod = {0};
-        targetMpzToQuod(newTargetPrecise, newTargetQuod);
-        memcpy(global.mainChainTarget, newTargetQuod, sizeof(newTargetQuod));
+        BIGNUM *newTarget = BN_new();
+        targetCompactToBignum(global.mainChainTarget, newTarget);
+        BN_mul_word(newTarget, actualPeriod);
+        BN_div_word(newTarget, parameters.desiredRetargetPeriod);
+        global.mainChainTarget = targetBignumToCompact(newTarget);
     }
     printf("=============\n");
 }

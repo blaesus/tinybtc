@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "bn.h"
 #include "datatypes.h"
 #include "networking.h"
 #include "peer.h"
@@ -346,18 +347,16 @@ void test_print_hash() {
 }
 
 void test_target_conversions() {
-    TargetQuodBytes genesisQuod = {0x1a, 0xb9, 0x08, 0x18};
-    // TargetQuodBytes genesisQuod = {0xff, 0xff, 0x00, 0x1d};
-    mpz_t genesisMpz;
-    mpz_init(genesisMpz);
-    targetQuodToMpz(genesisQuod, genesisMpz);
-    print_object(genesisQuod, 4);
-    printf("======\n");
+    // TargetQuodBytes genesisQuod = {0x1a, 0xb9, 0x08, 0x18};
+    TargetCompact genesisQuod = 0x1d00ffff;
+    printf("%Lf\n", targetQuodToRoughDouble(genesisQuod));
+    BIGNUM *genesisBN = BN_new();
+    targetCompactToBignum(genesisQuod, genesisBN);
+    BN_add_word(genesisBN, 1);
+    printf("genesisBN=%s\n", BN_bn2dec(genesisBN));
 
-    TargetQuodBytes genesisQuodReconstruct = {0};
-
-    targetMpzToQuod(genesisMpz, genesisQuodReconstruct);
-    print_object(genesisQuodReconstruct, 4);
+    TargetCompact genesisReconstruct = targetBignumToCompact(genesisBN);
+    printf("Regenerated genesis = %x", genesisReconstruct);
 }
 
 void test() {

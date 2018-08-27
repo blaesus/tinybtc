@@ -44,7 +44,7 @@ void load_genesis() {
     // Save in headers hashmap
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
     hashmap_set(&global.headers, genesisHash, &ptrBlock->header, sizeof(BlockPayloadHeader));
-    memcpy(global.mainChainTarget, ptrBlock->header.target, TARGET_BITS_WIDTH);
+    global.mainChainTarget = ptrBlock->header.target;
 
     // Save in global
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
@@ -93,11 +93,11 @@ void find() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    // init();
+    init();
     // connect_to_peers();
     // run_main_loop();
 
-    test();
+    // test();
     return 0;
 }
 
