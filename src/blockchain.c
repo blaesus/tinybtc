@@ -9,7 +9,7 @@
 #include "units.h"
 
 void target_4to32(uint32_t targetBytes, Byte *bytes) {
-    int32_t exponentWidth = targetBytes >> 24;
+    int32_t exponentWidth = (targetBytes >> 24) - 3;
     memset(bytes, 0, SHA256_LENGTH);
     memcpy(bytes + exponentWidth, &targetBytes, TARGET_BITS_MANTISSA_WIDTH);
 }
