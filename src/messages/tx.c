@@ -153,7 +153,7 @@ int32_t make_tx_message(
     Message *ptrMessage,
     TxPayload *ptrPayload
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_TX, sizeof(CMD_TX));
 
     ptrMessage->ptrPayload = malloc(sizeof(TxPayload));

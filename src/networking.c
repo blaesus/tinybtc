@@ -14,6 +14,7 @@
 #include "globalstate.h"
 #include "networking.h"
 #include "util.h"
+#include "config.h"
 
 uint32_t get_v4_binary_representation(const IP ip) {
     const uint32_t number = (ip[12] << 3 * BITS_IN_BYTE)
@@ -88,10 +89,10 @@ int lookup_host(const char *host, IP ips[MAX_IP_PER_DNS]) {
 
 int dns_bootstrap() {
     puts("Bootstrapping peers via DNS");
-    const uint16_t seedCount = sizeof(parameters.dnsSeeds) / sizeof(DomainName);
+    const uint16_t seedCount = sizeof(mainnet.dnsSeeds) / sizeof(DomainName);
     for (int seedIndex = 0; seedIndex < seedCount; seedIndex++) {
         DomainName seed;
-        memcpy(seed, parameters.dnsSeeds[seedIndex], sizeof(seed));
+        memcpy(seed, mainnet.dnsSeeds[seedIndex], sizeof(seed));
         IP ips[MAX_IP_PER_DNS] = {{0}};
         printf("Looking up %s\n", seed);
         lookup_host(seed, ips);
@@ -99,7 +100,7 @@ int dns_bootstrap() {
         for (int ipIndex = 0; ipIndex < MAX_IP_PER_DNS; ipIndex++) {
             if (!isIPEmpty(ips[ipIndex])) {
                 NetworkAddress addr = {
-                    .port = htons(parameters.port),
+                    .port = htons(mainnet.port),
                     .services = SERVICE_NODE_NETWORK,
                     // .ip = ips[ipIndex] <- via memcpy
                 };
@@ -122,7 +123,7 @@ int32_t get_local_listen_address(struct sockaddr_in *addr) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // Use my IP
 
-    uint_to_str(parameters.port, port);
+    uint_to_str(mainnet.port, port);
 
     if ((addrInfoError = getaddrinfo(NULL, port, &hints, &localAddress)) != 0) {
         printf("getaddrinfo: %s\n", gai_strerror(addrInfoError));

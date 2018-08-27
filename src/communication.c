@@ -10,6 +10,7 @@
 #include "util.h"
 #include "units.h"
 #include "blockchain.h"
+#include "config.h"
 
 #include "messages/common.h"
 #include "messages/shared.h"
@@ -98,7 +99,7 @@ void on_interval(uv_timer_t *handle) {
     request_data_from_peers();
     print_node_status();
     time_t now = time(NULL);
-    if (now - global.start_time >= PROGRAM_EXIT_TIME_SEC) {
+    if (config.autoExitPeriod && (now - global.start_time >= config.autoExitPeriod)) {
         printf("Stopping main loop...\n");
         uv_timer_stop(handle);
         uv_stop(uv_default_loop());
@@ -111,7 +112,7 @@ uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
     uv_timer_init(uv_default_loop(), &global.mainTimer);
-    uv_timer_start(&global.mainTimer, &on_interval, 0, MAIN_TIMER_INTERVAL_MSEC);
+    uv_timer_start(&global.mainTimer, &on_interval, 0, config.mainTimerInterval);
     printf("Done.\n");
     return 0;
 }
@@ -120,7 +121,7 @@ void send_getheaders(uv_connect_t *connection) {
     uint32_t hashCount = 1;
 
     GetheadersPayload payload = {
-        .version = parameters.protocolVersion,
+        .version = config.protocolVersion,
         .hashCount = hashCount,
         .hashStop = {0}
     };
@@ -275,7 +276,7 @@ void on_handshake_success(
     }
 
     bool shouldSendGetaddr =
-        global.peerAddressCount < parameters.getaddrThreshold;
+        global.peerAddressCount < mainnet.getaddrThreshold;
 
     if (shouldSendGetaddr) {
         send_message(ptrPeer->connection, CMD_GETADDR, NULL);
@@ -296,7 +297,7 @@ void on_incoming_message(
 
     if (strcmp(command, CMD_VERSION) == 0) {
         VersionPayload *ptrPayloadTyped = message.ptrPayload;
-        if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
+        if (ptrPayloadTyped->version >= mainnet.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
         ptrPeer->chain_height = ptrPayloadTyped->start_height;
@@ -488,12 +489,12 @@ void on_incoming_connection(uv_stream_t *server, int status) {
 int32_t setup_listen_socket() {
     printf("Setting up listen socket...");
     struct sockaddr_in localAddress = {0};
-    uv_ip4_addr("0.0.0.0", parameters.port, &localAddress);
+    uv_ip4_addr("0.0.0.0", mainnet.port, &localAddress);
     uv_tcp_init(uv_default_loop(), &global.listenSocket);
     uv_tcp_bind(&global.listenSocket, (const struct sockaddr*) &localAddress, 0);
     int32_t listenError = uv_listen(
             (uv_stream_t*) &global.listenSocket,
-            parameters.backlog,
+            config.backlog,
             on_incoming_connection);
     if (listenError) {
         fprintf(stderr, "Listen error %s\n", uv_strerror(listenError));
@@ -531,7 +532,7 @@ void connect_to_local() {
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
+    uint32_t outgoing = min(config.maxOutgoing, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);
         global.peerCount += 1;

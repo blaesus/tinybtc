@@ -48,7 +48,7 @@ void load_genesis() {
 
     // Save in global
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
-    global.mainChainHeight = parameters.genesisHeight;
+    global.mainChainHeight = mainnet.genesisHeight;
     memcpy(global.mainChainTip, genesisHash, SHA256_LENGTH);
     printf("Done.\n");
 }
@@ -94,8 +94,8 @@ void find() {
 
 int32_t main(/* int32_t argc, char **argv */) {
     init();
-    // connect_to_peers();
-    // run_main_loop();
+    connect_to_peers();
+    run_main_loop();
 
     // test();
     return 0;

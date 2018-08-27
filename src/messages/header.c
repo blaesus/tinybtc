@@ -15,7 +15,7 @@ uint64_t parse_message_header(
 
 Header get_empty_header() {
     Header header = {
-        .magic = parameters.magic,
+        .magic = mainnet.magic,
         .command = {0},
         .checksum = {0},
         .length = 0

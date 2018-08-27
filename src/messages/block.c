@@ -93,7 +93,7 @@ int32_t make_block_message(
     Message *ptrMessage,
     BlockPayload *ptrPayload
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_BLOCK, sizeof(CMD_BLOCK));
 
     ptrMessage->ptrPayload = malloc(sizeof(BlockPayload));

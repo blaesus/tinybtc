@@ -8,6 +8,7 @@
 #include "globalstate.h"
 #include "peer.h"
 #include "util.h"
+#include "config.h"
 
 uint64_t serialize_version_payload(
     struct VersionPayload *ptrPayload,
@@ -60,17 +61,17 @@ uint32_t make_version_payload(
     struct NetworkAddress recipientAddress = ptrPeer->address;
     uint64_t nonce = random_uint64();
 
-    uint32_t userAgentDataLength = (uint32_t)strlen((char *)parameters.userAgent);
+    uint32_t userAgentDataLength = (uint32_t)strlen((char *)config.userAgent);
 
-    ptrPayload->version = parameters.protocolVersion;
-    ptrPayload->services = parameters.services;
+    ptrPayload->version = config.protocolVersion;
+    ptrPayload->services = config.services;
     ptrPayload->timestamp = time(NULL);
     ptrPayload->addr_recv = recipientAddress;
     ptrPayload->addr_from = global.myAddress;
     ptrPayload->nonce = nonce;
     ptrPayload->user_agent.length = userAgentDataLength;
     ptrPayload->start_height = global.mainChainHeight;
-    strcpy((char *)ptrPayload->user_agent.string, (char *)parameters.userAgent);
+    strcpy((char *)ptrPayload->user_agent.string, (char *)config.userAgent);
     ptrPayload->relay = true;
 
     uint8_t userAgentLengthWidth = calc_number_varint_width(userAgentDataLength);
@@ -86,7 +87,7 @@ int32_t make_version_message(
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
     uint8_t checksumCalculationBuffer[MAX_MESSAGE_LENGTH] = {0};
     serialize_version_payload(&payload, checksumCalculationBuffer, MAX_MESSAGE_LENGTH);
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
     ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));

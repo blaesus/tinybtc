@@ -9,7 +9,7 @@ int32_t make_header_only_message(
     char* command,
     uint16_t commandSize
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
     ptrMessage->header.length = 0;
     calculate_data_checksum(
@@ -142,7 +142,7 @@ int32_t make_iv_message(
     Byte *command,
     uint32_t commandSize
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
 
     ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));

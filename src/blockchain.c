@@ -66,7 +66,7 @@ bool is_block_header_legal_as_tip(
     BlockPayloadHeader *ptrHeader
 ) {
     bool timestampLegal =
-        (int64_t)ptrHeader->timestamp - time(NULL) < parameters.blockMaxForwardTimestamp;
+        (int64_t)ptrHeader->timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
 
     SHA256_HASH hash = {0};
     dsha256(ptrHeader, sizeof(*ptrHeader), hash);
@@ -84,7 +84,7 @@ static void retarget() {
         "Retargeting from tip ", global.mainChainTip
     );
     Byte *ptrRetargetPeriodStart = global.mainChainTip;
-    for (uint32_t tracer = 0; tracer < parameters.retargetLookBackPeriod - 1; tracer++) {
+    for (uint32_t tracer = 0; tracer < mainnet.retargetLookBackPeriod - 1; tracer++) {
         BlockPayloadHeader *p = hashmap_get(
             &global.headers, ptrRetargetPeriodStart, NULL
         );
@@ -101,7 +101,7 @@ static void retarget() {
     );
     uint32_t actualPeriod = ptrRetargetEndNode->timestamp - ptrRetargetStartNode->timestamp;
     printf("time difference in retarget period: %2.8f days\n", 1.0 * actualPeriod / DAY(1));
-    long double ratio = (double)actualPeriod / (double)parameters.desiredRetargetPeriod;
+    long double ratio = (double)actualPeriod / (double)mainnet.desiredRetargetPeriod;
     const long double MAX_TARGET = targetQuodToRoughDouble(global.genesisBlock.header.target);
     long double currentTargetFloat = targetQuodToRoughDouble(global.mainChainTarget);
     long double nextTargetFloat = currentTargetFloat * ratio;
@@ -115,7 +115,7 @@ static void retarget() {
         BIGNUM *newTarget = BN_new();
         targetCompactToBignum(global.mainChainTarget, newTarget);
         BN_mul_word(newTarget, actualPeriod);
-        BN_div_word(newTarget, parameters.desiredRetargetPeriod);
+        BN_div_word(newTarget, mainnet.desiredRetargetPeriod);
         global.mainChainTarget = targetBignumToCompact(newTarget);
     }
     printf("=============\n");
@@ -125,7 +125,7 @@ static void update_target() {
     // e.g. Retarget after block 2015 is made, i.e. adjusting target for
     // the incoming 2016 block
     bool shouldRetarget =
-        (global.mainChainHeight + 1) % parameters.retargetPeriod == 0;
+        (global.mainChainHeight + 1) % mainnet.retargetPeriod == 0;
     if (shouldRetarget) {
         retarget();
     }

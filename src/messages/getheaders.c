@@ -36,7 +36,7 @@ int32_t make_getheaders_message(
     Message *ptrMessage,
     GetheadersPayload *ptrPayload
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
 
     ptrMessage->ptrPayload = malloc(sizeof(GetheadersPayload));

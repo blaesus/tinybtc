@@ -16,6 +16,7 @@
 #include "mine.h"
 #include "hashmap.h"
 #include "blockchain.h"
+#include "config.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -24,7 +25,7 @@ static int32_t test_version_messages() {
     IP fixtureMyIp = {0};
     IP fixturePeerIp = {0};
 
-    uv_ip4_addr("", parameters.port, &fixtureAddr);
+    uv_ip4_addr("", mainnet.port, &fixtureAddr);
     convert_ipv4_address_to_ip_array(
         fixtureAddr.sin_addr.s_addr,
         fixtureMyIp
@@ -37,7 +38,7 @@ static int32_t test_version_messages() {
     memcpy(myAddress.ip, fixtureMyIp, sizeof(IP));
     global.myAddress = myAddress;
 
-    uv_ip4_addr("138.68.93.0", parameters.port, &fixtureAddr);
+    uv_ip4_addr("138.68.93.0", mainnet.port, &fixtureAddr);
     convert_ipv4_address_to_ip_array(
         fixtureAddr.sin_addr.s_addr,
         fixturePeerIp
@@ -235,7 +236,7 @@ static void test_mine() {
 
 void test_getheaders() {
     GetheadersPayload payload = {
-        .version = parameters.protocolVersion,
+        .version = config.protocolVersion,
         .hashCount = 1,
         .hashStop = {0}
     };

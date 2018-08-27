@@ -5,6 +5,7 @@
 #include "globalstate.h"
 #include "util.h"
 #include "networking.h"
+#include "config.h"
 
 GlobalState global;
 
@@ -58,7 +59,7 @@ void clear_old_addr() {
 
     uint32_t newLength = 0;
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        bool shouldRemove = (now - global.peerAddresses[index].timestamp > parameters.addrLife);
+        bool shouldRemove = (now - global.peerAddresses[index].timestamp > config.addrLife);
 
         if (!shouldRemove) {
             memcpy(

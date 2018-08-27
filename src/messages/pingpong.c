@@ -8,7 +8,7 @@ int32_t make_pingpong_message(
     PingpongPayload *ptrPayload,
     char *command
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     strcpy(ptrMessage->header.command, command);
 
     ptrMessage->ptrPayload = malloc(sizeof(PingpongPayload));

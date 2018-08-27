@@ -127,7 +127,7 @@ uint64_t parse_network_address(
 }
 
 bool begins_with_header(void *p) {
-    return combine_uint32(p) == parameters.magic;
+    return combine_uint32(p) == mainnet.magic;
 }
 
 Message get_empty_message() {
