@@ -84,11 +84,11 @@ static void retarget() {
         "Retargeting from tip ", global.mainChainTip
     );
     Byte *ptrRetargetPeriodStart = global.mainChainTip;
-    for (uint32_t tracer = 0; tracer < mainnet.retargetLookBackPeriod - 1; tracer++) {
-        BlockPayloadHeader *p = hashmap_get(
+    for (uint32_t tracer = 0; ptrRetargetPeriodStart && tracer < mainnet.retargetLookBackPeriod; tracer++) {
+        BlockPayloadHeader *ptrBlockHeader = hashmap_get(
             &global.headers, ptrRetargetPeriodStart, NULL
         );
-        ptrRetargetPeriodStart = p->prev_block;
+        ptrRetargetPeriodStart = ptrBlockHeader->prev_block;
     }
     print_tip_with_description(
         "Retarget period initial node tracked back to ", ptrRetargetPeriodStart
@@ -100,7 +100,20 @@ static void retarget() {
         &global.headers, global.mainChainTip, NULL
     );
     uint32_t actualPeriod = ptrRetargetEndNode->timestamp - ptrRetargetStartNode->timestamp;
-    printf("time difference in retarget period: %2.8f days\n", 1.0 * actualPeriod / DAY(1));
+    printf(
+        "time difference in retarget period: %u seconds (%2.1f days) [from %u, to %u]\n",
+        actualPeriod,
+        1.0 * actualPeriod / DAY(1),
+        ptrRetargetEndNode->timestamp,
+        ptrRetargetStartNode->timestamp
+    );
+    uint32_t multiplier = actualPeriod;
+    if (multiplier < mainnet.desiredRetargetPeriod / 4) {
+        multiplier = mainnet.desiredRetargetPeriod / 4;
+    }
+    if (multiplier > mainnet.desiredRetargetPeriod * 4) {
+        multiplier = mainnet.desiredRetargetPeriod * 4;
+    }
     long double ratio = (double)actualPeriod / (double)mainnet.desiredRetargetPeriod;
     const long double MAX_TARGET = targetQuodToRoughDouble(global.genesisBlock.header.target);
     long double currentTargetFloat = targetQuodToRoughDouble(global.mainChainTarget);
@@ -113,11 +126,12 @@ static void retarget() {
         long double difficulty = MAX_TARGET / nextTargetFloat;
         printf("retarget: %.3Le -> %.3Le (difficulty %.2Lf)\n", currentTargetFloat, nextTargetFloat, difficulty);
         BIGNUM *newTarget = BN_new();
-        targetCompactToBignum(global.mainChainTarget, newTarget);
-        BN_mul_word(newTarget, actualPeriod);
+        targetCompactToBignum(ptrRetargetEndNode->target, newTarget);
+        BN_mul_word(newTarget, multiplier);
         BN_div_word(newTarget, mainnet.desiredRetargetPeriod);
         global.mainChainTarget = targetBignumToCompact(newTarget);
     }
+    printf("New target %u (%x)\n", global.mainChainTarget, global.mainChainTarget);
     printf("=============\n");
 }
 
