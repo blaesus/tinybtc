@@ -323,6 +323,7 @@ void test_hashmap() {
             }
         }
     }
+    free(ptrHashmap);
 }
 
 void test_difficulty() {
@@ -366,7 +367,7 @@ void test() {
     // test_block();
     // test_block_parsing_and_serialization();
     // test_merkles();
-    // test_mine();
+    test_mine();
     // test_getheaders();
     // test_checksum();
     // test_hashmap();

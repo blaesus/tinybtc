@@ -31,7 +31,7 @@ struct GlobalState {
     BlockPayload genesisBlock;
 
     SHA256_HASH mainChainTip;
-    int32_t mainChainHeight;
+    uint32_t mainChainHeight;
     TargetCompact mainChainTarget;
 };
 

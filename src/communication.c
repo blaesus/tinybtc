@@ -274,8 +274,13 @@ void send_message(
 void on_handshake_success(
     Peer *ptrPeer
 ) {
+    printf("Block headers height: us=%u, peer=%u\n", global.mainChainHeight, ptrPeer->chain_height);
     if (ptrPeer->chain_height > global.mainChainHeight) {
         send_getheaders(ptrPeer->connection);
+    }
+    else if (ptrPeer->chain_height < global.mainChainHeight){
+        // TODO: Tell them about new headers
+        printf("Peer knows less headers than us\n");
     }
     else {
         printf("Block headers synced with %s\n", convert_ipv4_readable(ptrPeer->address.ip));

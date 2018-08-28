@@ -138,6 +138,7 @@ uint64_t load_block_message(
     ptrMessage->ptrPayload = calloc(1, sizeof(BlockPayload));
     parse_into_block_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
+    free(buffer);
 
     return sizeof(ptrMessage->header)+payloadLength;
 }

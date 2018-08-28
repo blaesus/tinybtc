@@ -33,7 +33,7 @@ struct Peer {
     uint8_t relationship;
     NetworkAddress address;
     MessageCache messageCache;
-    int32_t chain_height;
+    uint32_t chain_height;
     struct PeerFlags flags;
 };
 

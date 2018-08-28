@@ -17,7 +17,7 @@ struct VersionPayload {
     struct NetworkAddress addr_from;
     uint64_t nonce;
     struct VariableLengthString user_agent;
-    int32_t start_height;
+    uint32_t start_height;
 
     // After version 70001
     bool relay;
