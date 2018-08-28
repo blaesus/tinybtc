@@ -373,5 +373,5 @@ void test() {
     // test_difficulty();
     // test_blockchain_validation();
     // test_print_hash();
-    test_target_conversions();
+    // test_target_conversions();
 }

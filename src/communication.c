@@ -68,7 +68,10 @@ void timeout_peers() {
 void request_data_from_peers() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        if (peerHandShaken(ptrPeer)) {
+        if (!peerHandShaken(ptrPeer)) {
+            continue;
+        }
+        if (ptrPeer->chain_height > global.mainChainHeight) {
             send_getheaders(ptrPeer->connection);
         }
     }
@@ -273,6 +276,9 @@ void on_handshake_success(
 ) {
     if (ptrPeer->chain_height > global.mainChainHeight) {
         send_getheaders(ptrPeer->connection);
+    }
+    else {
+        printf("Block headers synced with %s\n", convert_ipv4_readable(ptrPeer->address.ip));
     }
 
     bool shouldSendGetaddr =
