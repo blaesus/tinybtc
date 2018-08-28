@@ -373,6 +373,14 @@ void reset_message_cache(
     memset(ptrCache->buffer, 0, sizeof(ptrCache->buffer));
 }
 
+bool checksum_match(Byte *ptrBuffer) {
+    Header messageHeader = {0};
+    parse_message_header(ptrBuffer, &messageHeader);
+    PayloadChecksum checksum = {0};
+    calculate_data_checksum(ptrBuffer + sizeof(messageHeader), messageHeader.length, checksum);
+    return memcmp(checksum, messageHeader.checksum, CHECKSUM_SIZE) == 0;
+}
+
 void on_incoming_data(
     uv_stream_t *client,
     ssize_t nread,
@@ -409,9 +417,14 @@ void on_incoming_data(
 
     if (ptrCache->bufferIndex == ptrCache->expectedMessageLength) {
         Message message = get_empty_message();
-        int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
-        if (!error) {
-            on_incoming_message(data->peer, message);
+        if (!checksum_match(ptrCache->buffer)) {
+            fprintf(stderr, "Payload checksum mismatch\n");
+        }
+        else {
+            int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
+            if (!error) {
+                on_incoming_message(data->peer, message);
+            }
         }
         reset_message_cache(ptrCache);
     }
