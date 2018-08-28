@@ -32,27 +32,28 @@ long double targetQuodToRoughDouble(TargetCompact targetBytes) {
     return mantissa * pow256(exponentWidth);
 }
 
+// Compact-Bignum conversion adapted from Bitcoin 0.0.1 by Satoshi
 
 void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget) {
-    unsigned int nSize = targetBytes >> 24;
-    Byte vch[64] = {0};
-    vch[3] = nSize;
-    if (nSize >= 1) vch[4] = (targetBytes >> 16) & 0xff;
-    if (nSize >= 2) vch[5] = (targetBytes >> 8) & 0xff;
-    if (nSize >= 3) vch[6] = (targetBytes >> 0) & 0xff;
-    BN_mpi2bn(&vch[0], 4 + nSize, ptrTarget);
+    uint32_t size = targetBytes >> 24;
+    Byte inputBytes[64] = {0};
+    inputBytes[3] = (Byte)size;
+    if (size >= 1) inputBytes[4] = (Byte)((targetBytes >> 16) & 0xff);
+    if (size >= 2) inputBytes[5] = (Byte)((targetBytes >> 8) & 0xff);
+    if (size >= 3) inputBytes[6] = (Byte)((targetBytes >> 0) & 0xff);
+    BN_mpi2bn(&inputBytes[0], 4 + size, ptrTarget);
 }
 
 uint32_t targetBignumToCompact(BIGNUM *ptrTarget) {
-    uint32_t nSize = (uint32_t) BN_bn2mpi(ptrTarget, NULL);
-    Byte vch[64] = {0};
-    nSize -= 4;
-    BN_bn2mpi(ptrTarget, &vch[0]);
-    uint32_t nCompact = nSize << 24;
-    if (nSize >= 1) nCompact |= (vch[4] << 16);
-    if (nSize >= 2) nCompact |= (vch[5] << 8);
-    if (nSize >= 3) nCompact |= (vch[6] << 0);
-    return nCompact;
+    uint32_t size = (uint32_t)BN_bn2mpi(ptrTarget, NULL);
+    Byte outputBytes[64] = {0};
+    size -= 4;
+    BN_bn2mpi(ptrTarget, &outputBytes[0]);
+    uint32_t result = size << 24;
+    if (size >= 1) result |= (outputBytes[4] << 16);
+    if (size >= 2) result |= (outputBytes[5] << 8);
+    if (size >= 3) result |= (outputBytes[6] << 0);
+    return result;
 }
 
 bool hash_satisfies_target(
