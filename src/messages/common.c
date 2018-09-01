@@ -148,7 +148,7 @@ int32_t make_iv_message(
     ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(GenericIVPayload));
 
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t payloadLength = serialize_iv_payload(ptrPayload, buffer);
     ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(

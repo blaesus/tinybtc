@@ -58,7 +58,7 @@ static int32_t test_version_messages() {
     };
     memcpy(fixturePeer.address.ip, fixturePeerIp, sizeof(IP));
 
-    uint8_t messageBuffer[MAX_MESSAGE_LENGTH] = {0};
+    uint8_t messageBuffer[MESSAGE_BUFFER_LENGTH] = {0};
 
     make_version_message(&message, &fixturePeer);
     uint64_t dataSize = serialize_version_message(&message, messageBuffer);
@@ -249,10 +249,10 @@ void test_getheaders() {
 
     Message myMessage = get_empty_message();
     make_getheaders_message(&myMessage, &payload);
-    Byte bufferGenerated[MAX_MESSAGE_LENGTH] = {0};
+    Byte bufferGenerated[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t w1 = serialize_getheader_message(&myMessage, bufferGenerated);
 
-    Byte bufferFixture[MAX_MESSAGE_LENGTH] = {0};
+    Byte bufferFixture[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t w2 = load_file("fixtures/getheaders_initial.dat", &bufferFixture[0]);
 
     print_object(&bufferGenerated, w1);

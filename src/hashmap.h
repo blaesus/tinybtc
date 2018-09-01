@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define MAX_HASHMAP_BUCKET_COUNT ((1UL << 26) - 1)
+#define MAX_HASHMAP_BUCKET_COUNT ((1UL << 25) - 1)
 
 #define MAX_HASHMAP_KEY_WIDTH 64
 

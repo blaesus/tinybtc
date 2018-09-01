@@ -55,6 +55,7 @@ void load_genesis() {
 
 void init() {
     printf("Initializing...\n");
+    printf("Size of global state: %lu\n", sizeof(global.headers));
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();

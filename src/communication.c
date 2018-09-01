@@ -11,6 +11,7 @@
 #include "units.h"
 #include "blockchain.h"
 #include "config.h"
+#include "peer.h"
 
 #include "messages/common.h"
 #include "messages/shared.h"
@@ -26,39 +27,31 @@
 #include "messages/headers.h"
 #include "messages/print.h"
 
-struct ContextData {
-    struct Peer *peer;
-};
-
-typedef struct ContextData ContextData;
-
-void send_getheaders(
-    uv_connect_t *connection
-);
+void send_getheaders(uv_tcp_t *socket);
 
 bool peerHandShaken(Peer *ptrPeer) {
     return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
 }
 
-void on_initiate_reconnection(uv_handle_t* handle) {
-    ContextData *data = (ContextData *)handle->data;
+void on_handle_close(uv_handle_t *handle) {
+    SocketContext *data = (SocketContext *)handle->data;
     connect_to_random_addr_for_peer(data->peer->index);
 }
 
 void timeout_peers() {
+    time_t now = time(NULL);
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        time_t now = time(NULL);
         if (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC) {
             if (!peerHandShaken(ptrPeer)) {
                 printf("Timeout peer %u\n", i);
                 disable_ip(ptrPeer->address.ip);
-                uv_handle_t *ptrHandle = (uv_handle_t *)ptrPeer->connection->handle;
-                if (!uv_is_closing(ptrHandle)) {
-                    ContextData *ptrData = malloc(sizeof(ContextData));
+                uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
+                if (ptrHandle && !uv_is_closing(ptrHandle)) {
+                    SocketContext *ptrData = calloc(1, sizeof(SocketContext));
                     ptrData->peer = ptrPeer;
                     ptrHandle->data = ptrData;
-                    uv_close(ptrHandle, on_initiate_reconnection);
+                    uv_close(ptrHandle, on_handle_close);
                 }
             }
         }
@@ -72,7 +65,7 @@ void request_data_from_peers() {
             continue;
         }
         if (ptrPeer->chain_height > global.mainChainHeight) {
-            send_getheaders(ptrPeer->connection);
+            send_getheaders(&ptrPeer->socket);
         }
     }
 }
@@ -120,7 +113,7 @@ uint32_t setup_main_event_loop() {
     return 0;
 }
 
-void send_getheaders(uv_connect_t *connection) {
+void send_getheaders(uv_tcp_t *socket) {
     uint32_t hashCount = 1;
 
     GetheadersPayload payload = {
@@ -130,13 +123,12 @@ void send_getheaders(uv_connect_t *connection) {
     };
     memcpy(&payload.blockLocatorHash[0], global.mainChainTip, SHA256_LENGTH);
 
-    send_message(connection, CMD_GETHEADERS, &payload);
+    send_message(socket, CMD_GETHEADERS, &payload);
 }
 
 
-char *get_peer_ip(uv_connect_t *req) {
-    ContextData *data = (ContextData *)req->data;
-    return convert_ipv4_readable(data->peer->address.ip);
+char *get_ip_from_context(void *data) {
+    return convert_ipv4_readable(((SocketContext *)data)->peer->address.ip);
 }
 
 int32_t parse_buffer_into_message(
@@ -173,8 +165,10 @@ int32_t parse_buffer_into_message(
     }
 }
 
-void on_message_sent(uv_write_t *req, int status) {
-    char *ipString = get_peer_ip((uv_connect_t *)req);
+void on_message_sent(uv_write_t *writeRequest, int status) {
+    struct WriteContext *ptrContext = writeRequest->data;
+
+    char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
         return;
@@ -182,35 +176,40 @@ void on_message_sent(uv_write_t *req, int status) {
     else {
         printf("message sent to %s\n", ipString);
     }
+    free(ptrContext->ptrBufferBase);
+    free(ptrContext);
+    free(writeRequest);
 }
 
-void write_buffer(
-    uv_connect_t *req,
-    uv_buf_t *ptrUvBuffer
+void write_buffer_to_socket(
+    uv_buf_t *ptrUvBuffer,
+    uv_tcp_t *socket
 ) {
-    uv_stream_t* tcp = req->handle;
-    uv_write_t *ptrWriteReq = (uv_write_t*)malloc(sizeof(uv_write_t));
+    SocketContext *ptrSocketContext = socket->data;
+    struct WriteContext *ptrWriteContext = calloc(1, sizeof(*ptrWriteContext));
+    ptrWriteContext->peer = ptrSocketContext->peer;
+    ptrWriteContext->ptrBufferBase = ptrUvBuffer->base;
+    uv_write_t *ptrWriteReq = calloc(1, sizeof(uv_write_t));
     uint8_t bufferCount = 1;
-    ptrWriteReq->data = req->data;
-    uv_write(ptrWriteReq, tcp, ptrUvBuffer, bufferCount, &on_message_sent);
+    ptrWriteReq->data = ptrWriteContext;
+    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_sent);
 }
 
 void send_message(
-    uv_connect_t *req,
+    uv_tcp_t *socket,
     char *command,
     void *ptrData
 ) {
     Message message = get_empty_message();
-    // Byte buffer[MAX_MESSAGE_LENGTH] = {0};
-    Byte *buffer = malloc(MAX_MESSAGE_LENGTH);
+    SocketContext *ptrContext = (SocketContext *)socket->data;
+    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH);
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
     uint64_t dataSize = 0;
 
     if (strcmp(command, CMD_VERSION) == 0) {
-        Peer *ptrPeer = ((ContextData *)(req->data))->peer;
-        make_version_message(&message, ptrPeer);
+        make_version_message(&message, ptrContext->peer);
         dataSize = serialize_version_message(&message, buffer);
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
@@ -256,10 +255,10 @@ void send_message(
     }
     uvBuffer.len = dataSize;
 
-    char *ipString = get_peer_ip(req);
+    char *ipString = get_ip_from_context(socket->data);
     if (strcmp(command, XCMD_BINARY) == 0) {
         printf("Sending binary to peer %s\n", ipString);
-        print_object(uvBuffer.base, uvBuffer.len);
+        print_object((Byte *)uvBuffer.base, uvBuffer.len);
     }
     else {
         printf(
@@ -268,7 +267,8 @@ void send_message(
             ipString
         );
     }
-    write_buffer(req, &uvBuffer);
+    write_buffer_to_socket(&uvBuffer, socket);
+    free(message.ptrPayload);
 }
 
 void on_handshake_success(
@@ -276,7 +276,7 @@ void on_handshake_success(
 ) {
     printf("Block headers height: us=%u, peer=%u\n", global.mainChainHeight, ptrPeer->chain_height);
     if (ptrPeer->chain_height > global.mainChainHeight) {
-        send_getheaders(ptrPeer->connection);
+        send_getheaders(&ptrPeer->socket);
     }
     else if (ptrPeer->chain_height < global.mainChainHeight){
         // TODO: Tell them about new headers
@@ -290,13 +290,13 @@ void on_handshake_success(
         global.peerAddressCount < mainnet.getaddrThreshold;
 
     if (shouldSendGetaddr) {
-        send_message(ptrPeer->connection, CMD_GETADDR, NULL);
+        send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
     }
 
-    send_message(ptrPeer->connection, CMD_SENDHEADERS, NULL);
+    send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
 }
 
-void on_incoming_message(
+void handle_incoming_message(
     Peer *ptrPeer,
     Message message
 ) {
@@ -316,7 +316,7 @@ void on_incoming_message(
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
-        send_message(ptrPeer->connection, CMD_VERACK, NULL);
+        send_message(&ptrPeer->socket, CMD_VERACK, NULL);
         on_handshake_success(ptrPeer);
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
@@ -335,7 +335,7 @@ void on_incoming_message(
         printf("Skipped %llu IPs\n", skipped);
     }
     else if (strcmp(command, CMD_PING) == 0) {
-        send_message(ptrPeer->connection, CMD_PONG, message.ptrPayload);
+        send_message(&ptrPeer->socket, CMD_PONG, message.ptrPayload);
     }
     else if (strcmp(command, CMD_HEADERS) == 0) {
         HeadersPayload *ptrPayload = message.ptrPayload;
@@ -382,23 +382,22 @@ bool checksum_match(Byte *ptrBuffer) {
 }
 
 void on_incoming_data(
-    uv_stream_t *client,
+    uv_stream_t *socket,
     ssize_t nread,
     const uv_buf_t *buf
 ) {
     if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
-            uv_close((uv_handle_t*) client, NULL);
+            uv_close((uv_handle_t*) socket, NULL);
         }
         else {
             // file ended; noop
         }
         return;
     }
-
-    ContextData *data = (ContextData *)client->data;
-    MessageCache *ptrCache = &(data->peer->messageCache);
+    SocketContext *ptrContext = (SocketContext *)socket->data;
+    MessageCache *ptrCache = &(ptrContext->peer->messageCache);
 
     if (begins_with_header(buf->base)) {
         reset_message_cache(ptrCache);
@@ -423,21 +422,21 @@ void on_incoming_data(
         else {
             int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
             if (!error) {
-                on_incoming_message(data->peer, message);
+                handle_incoming_message(ptrContext->peer, message);
             }
         }
         reset_message_cache(ptrCache);
     }
 }
 
-void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     buf->base = (char*)malloc(suggested_size);
     buf->len = suggested_size;
 }
 
-void on_peer_connect(uv_connect_t* req, int32_t error) {
-    ContextData *data = (ContextData *)req->data;
-    char *ipString = convert_ipv4_readable(data->peer->address.ip);
+void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
+    struct ConnectContext *ptrContext = (struct ConnectContext *)connectRequest->data;
+    char *ipString = convert_ipv4_readable(ptrContext->peer->address.ip);
     if (error) {
         fprintf(
             stderr,
@@ -446,48 +445,56 @@ void on_peer_connect(uv_connect_t* req, int32_t error) {
             uv_strerror(error),
             error
         );
-        if (data->peer->relationship == REL_MY_SERVER) {
-            disable_ip(data->peer->address.ip);
-            connect_to_random_addr_for_peer(data->peer->index);
+        if (ptrContext->peer->relationship == REL_MY_SERVER) {
+            disable_ip(ptrContext->peer->address.ip);
+            connect_to_random_addr_for_peer(ptrContext->peer->index);
         }
     }
     else {
         printf("connected with peer %s \n", ipString);
-        req->handle->data = req->data;
-        send_message(req, CMD_VERSION, NULL);
-        uv_read_start(req->handle, alloc_buffer, on_incoming_data);
+
+        SocketContext *socketContext = calloc(1, sizeof(*socketContext));
+        socketContext->peer = ptrContext->peer;
+        connectRequest->handle->data = socketContext;
+        send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
+        uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_data);
     }
+    free(connectRequest);
+    free(ptrContext);
 }
 
-int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
-    char *ipString = convert_ipv4_readable(addr.ip);
-    printf("connecting with address %s as peer %u\n", ipString, peerIndex);
+int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
+    printf(
+        "Initializing peer %u with IP %s \n",
+        peerIndex,
+        convert_ipv4_readable(addr.ip)
+    );
 
     Peer *ptrPeer = &global.peers[peerIndex];
-    memset(ptrPeer, 0, sizeof(Peer));
 
+    reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
     ptrPeer->connectionStart = time(NULL);
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
-    ptrPeer->socket = malloc(sizeof(uv_tcp_t));
-    uv_tcp_init(uv_default_loop(), ptrPeer->socket);
 
-    uv_connect_t* connection = (uv_connect_t*)malloc(sizeof(uv_connect_t));
-    ContextData *data = malloc(sizeof(ContextData)); //TODO: Free me somewhere
-    memset(data, 0, sizeof(ContextData));
-    data->peer = ptrPeer;
-    connection->data = data;
+    // Connection request
+    struct ConnectContext *ptrContext = calloc(1, sizeof(*ptrContext));
+    ptrContext->peer = ptrPeer;
+    uv_connect_t *ptrConnectRequest = calloc(1, sizeof(uv_connect_t));
+    ptrConnectRequest->data = ptrContext;
 
+    // TCP socket
+    uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
+
+    // Connection
     struct sockaddr_in remoteAddress = {0};
-    uv_ip4_addr(ipString, htons(addr.port), &remoteAddress);
+    uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
     uv_tcp_connect(
-            connection,
-            ptrPeer->socket,
-            (const struct sockaddr*)&remoteAddress,
-            &on_peer_connect
+        ptrConnectRequest,
+        &ptrPeer->socket,
+        (const struct sockaddr*)&remoteAddress,
+        &on_peer_connect
     );
-
-    ptrPeer->connection = connection;
     return 0;
 }
 
@@ -502,7 +509,7 @@ void on_incoming_connection(uv_stream_t *server, int status) {
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
-        uv_read_start((uv_stream_t *) client, alloc_buffer, on_incoming_data);
+        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_data);
     } else {
         printf("Cannot accept\n");
         uv_close((uv_handle_t*) client, NULL);
@@ -543,16 +550,7 @@ static NetworkAddress pick_random_nonpeer_addr() {
 
 void connect_to_random_addr_for_peer(uint32_t peerIndex) {
     NetworkAddress addr = pick_random_nonpeer_addr();
-    connect_to_address_as_peer(addr, peerIndex);
-}
-
-void connect_to_local() {
-    NetworkAddress local = {
-        .services = 1037,
-        .ip = {0},
-        .port = htons(8333),
-    };
-    connect_to_address_as_peer(local, 0);
+    initialize_peer(peerIndex, addr);
 }
 
 int32_t connect_to_initial_peers() {
@@ -568,9 +566,12 @@ int32_t release_sockets() {
     printf("Closing sockets...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
-        uv_handle_t* ptrHandle = (uv_handle_t*)peer->connection->handle;
-        if (!uv_is_closing(ptrHandle)) {
-            uv_close(ptrHandle, NULL);
+        uv_handle_t* socket = (uv_handle_t*)&peer->socket;
+        if (!uv_is_closing(socket)) {
+            if (socket->data) {
+                free(socket->data);
+            }
+            uv_close(socket, NULL);
         }
     }
     printf("Done.\n");

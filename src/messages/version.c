@@ -85,8 +85,8 @@ int32_t make_version_message(
 ) {
     struct VersionPayload payload = {0};
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
-    uint8_t checksumCalculationBuffer[MAX_MESSAGE_LENGTH] = {0};
-    serialize_version_payload(&payload, checksumCalculationBuffer, MAX_MESSAGE_LENGTH);
+    uint8_t checksumCalculationBuffer[MESSAGE_BUFFER_LENGTH] = {0};
+    serialize_version_payload(&payload, checksumCalculationBuffer, MESSAGE_BUFFER_LENGTH);
     ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;

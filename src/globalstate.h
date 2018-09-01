@@ -8,7 +8,7 @@
 #include "hashmap.h"
 #include "messages/block.h"
 
-#define MAX_PEERS 1024
+#define MAX_PEERS 256
 #define MAX_ADDR_CACHE 65536
 #define PEER_ADDRESS_COUNT_WIDTH 4
 

@@ -14,7 +14,7 @@ int32_t make_pingpong_message(
     ptrMessage->ptrPayload = malloc(sizeof(PingpongPayload));
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(PingpongPayload));
 
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t payloadLength = serialize_pingpong_payload(ptrPayload, buffer);
     ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
