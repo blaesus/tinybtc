@@ -155,18 +155,21 @@ void relocate_main_chain() {
     do {
         foundNewTip = false;
         update_target();
-        BlockPayloadHeader *ptrNextTip = hashmap_get(&global.headersByPrevBlock, global.mainChainTip, NULL);
-        if (ptrNextTip) {
-            if (!is_block_header_legal_as_tip(ptrNextTip)) {
-                printf("Illegal header (timestamped %u), skipping\n", ptrNextTip->timestamp);
-                continue;
+        Byte *ptrNextHash = hashmap_get(&global.headersPrevBlockToHash, global.mainChainTip, NULL);
+        if (ptrNextHash) {
+            BlockPayloadHeader *ptrNextTip = hashmap_get(&global.headers, ptrNextHash, NULL);
+            if (ptrNextTip) {
+                if (!is_block_header_legal_as_tip(ptrNextTip)) {
+                    printf("Illegal header (timestamped %u), skipping\n", ptrNextTip->timestamp);
+                    continue;
+                }
+                SHA256_HASH hash = {0};
+                dsha256(ptrNextTip, sizeof(*ptrNextTip), hash);
+                memcpy(global.mainChainTip, hash, SHA256_LENGTH);
+                tipEverMoved = true;
+                foundNewTip = true;
+                global.mainChainHeight += 1;
             }
-            SHA256_HASH hash = {0};
-            dsha256(ptrNextTip, sizeof(*ptrNextTip), hash);
-            memcpy(global.mainChainTip, hash, SHA256_LENGTH);
-            tipEverMoved = true;
-            foundNewTip = true;
-            global.mainChainHeight += 1;
         }
     } while (foundNewTip);
     if (tipEverMoved) {

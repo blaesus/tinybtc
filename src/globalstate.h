@@ -26,7 +26,7 @@ struct GlobalState {
     NetworkAddress myAddress;
 
     Hashmap headers;
-    Hashmap headersByPrevBlock;
+    Hashmap headersPrevBlockToHash;
 
     BlockPayload genesisBlock;
 

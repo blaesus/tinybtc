@@ -60,10 +60,11 @@ void init() {
     srand((unsigned int)global.start_time);
     setup_cleanup();
     hashmap_init(&global.headers, (1UL << 25) - 1, SHA256_LENGTH);
-    hashmap_init(&global.headersByPrevBlock, (1UL << 25) - 1, SHA256_LENGTH);
+    hashmap_init(&global.headersPrevBlockToHash, (1UL << 25) - 1, SHA256_LENGTH);
     load_genesis();
     load_headers();
     relocate_main_chain();
+    printf("X\n");
     load_peer_addresses();
     init_db();
     if (global.peerAddressCount == 0) {

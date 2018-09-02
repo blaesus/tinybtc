@@ -135,7 +135,7 @@ int32_t load_headers(void) {
         SHA256_HASH headerHash = {0};
         dsha256(&header, sizeof(header), headerHash);
         hashmap_set(&global.headers, headerHash, &header, sizeof(header));
-        hashmap_set(&global.headersByPrevBlock, header.prev_block, &header, sizeof(header));
+        hashmap_set(&global.headersPrevBlockToHash, header.prev_block, headerHash, sizeof(headerHash));
     }
     printf("Loaded %u headers\n", headersCount);
     return 0;

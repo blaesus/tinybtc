@@ -351,10 +351,10 @@ void handle_incoming_message(
                     sizeof(BlockPayloadHeader)
                 );
                 hashmap_set(
-                    &global.headersByPrevBlock,
+                    &global.headersPrevBlockToHash,
                     ptrHeader->prev_block,
-                    ptrHeader,
-                    sizeof(BlockPayloadHeader)
+                    headerHash,
+                    sizeof(headerHash)
                 );
             }
         }
