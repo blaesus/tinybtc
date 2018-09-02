@@ -31,6 +31,7 @@ struct GlobalState {
     Hashmap blockPrevBlockToHash;
 
     BlockPayload genesisBlock;
+    SHA256_HASH genesisHash;
 
     SHA256_HASH mainChainTip;
     uint32_t mainChainHeight;
@@ -52,3 +53,4 @@ int32_t set_addr_services(IP ip, ServiceBits bits);
 int32_t disable_ip(IP ip);
 
 bool is_peer(IP ip);
+int8_t get_next_missing_block(Byte *hash);

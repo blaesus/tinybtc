@@ -150,6 +150,10 @@ int8_t save_block(BlockPayload *ptrBlock, Byte *hash) {
     if (reply == NULL) {
         return -1;
     }
+    else if (reply->type == REDIS_REPLY_ERROR) {
+        printf("Save error: %s", reply->str);
+        return -2;
+    }
     freeReplyObject(reply);
     free(buffer);
     return 0;
@@ -162,9 +166,36 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
         "GET %b",
         hash, SHA256_LENGTH
     );
+    if (reply == NULL) {
+        printf("Load error: null reply");
+        return -1;
+    }
+    else if (reply->type == REDIS_REPLY_ERROR) {
+        printf("Load error: %s", reply->str);
+        return -2;
+    }
     memcpy(buffer, reply->str, reply->len);
     parse_into_block_payload(buffer, ptrBlock);
     freeReplyObject(reply);
     free(buffer);
     return 0;
+}
+
+bool check_block_existence(Byte *hash) {
+    redisReply *reply = redisCommand(
+        global.ptrRedisContext,
+        "EXISTS %b",
+        hash, SHA256_LENGTH
+    );
+    if (reply == NULL) {
+        printf("Redis error: null reply");
+        return 0;
+    }
+    else if (reply->type == REDIS_REPLY_ERROR) {
+        printf("Redis error: %s", reply->str);
+        return 0;
+    }
+    int64_t result = reply->integer;
+    freeReplyObject(reply);
+    return (bool)result;
 }

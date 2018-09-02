@@ -6,6 +6,8 @@
 #include "util.h"
 #include "networking.h"
 #include "config.h"
+#include "persistent.h"
+#include "blockchain.h"
 
 GlobalState global;
 
@@ -115,4 +117,24 @@ bool is_peer(IP ip) {
         }
     }
     return false;
+}
+
+int8_t get_next_missing_block(Byte *hash) {
+    Byte *tip = global.mainChainTip;
+    do {
+        BlockIndex *index = hashmap_get(&global.blockIndices, tip, NULL);
+        if (index == NULL) {
+            return -2;
+        }
+        else if (!index->fullBlockAvailable) {
+            memcpy(hash, tip, SHA256_LENGTH);
+            return 0;
+        }
+        else if (memcmp(tip, global.genesisHash, SHA256_LENGTH) == 0) {
+            return -1;
+        }
+        else {
+            memcpy(tip, index->header.prev_block, SHA256_LENGTH);
+        }
+    } while (true);
 }

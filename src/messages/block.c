@@ -142,3 +142,7 @@ uint64_t load_block_message(
 
     return sizeof(ptrMessage->header)+payloadLength;
 }
+
+void print_block_message(Message *ptrMessage) {
+    print_message_header(ptrMessage->header);
+}

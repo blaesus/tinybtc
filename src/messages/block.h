@@ -65,3 +65,4 @@ uint64_t load_block_message(
     Message *ptrMessage
 );
 
+void print_block_message(Message *ptrMessage);

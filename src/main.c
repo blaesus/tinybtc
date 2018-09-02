@@ -56,6 +56,7 @@ void load_genesis() {
 
     // Save in global
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
+    memcpy(global.genesisHash, genesisHash, SHA256_LENGTH);
     global.mainChainHeight = mainnet.genesisHeight;
     memcpy(global.mainChainTip, genesisHash, SHA256_LENGTH);
     printf("Done.\n");

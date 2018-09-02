@@ -14,6 +14,7 @@
 #define CMD_TX "tx"
 #define CMD_BLOCK "block"
 #define CMD_GETHEADERS "getheaders"
+#define CMD_GETBLOCKS "getblocks"
 #define CMD_SENDHEADERS "sendheaders"
 #define CMD_REJECT "reject"
 #define CMD_PING "ping"

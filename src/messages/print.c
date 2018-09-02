@@ -40,6 +40,9 @@ void print_message(
     else if (strcmp(command, CMD_HEADERS) == 0) {
         print_headers_message(ptrMessage);
     }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        print_block_message(ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot print payload of unspecified COMMAND %s\n", command);
     }

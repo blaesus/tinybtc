@@ -28,6 +28,7 @@
 #include "messages/print.h"
 
 void send_getheaders(uv_tcp_t *socket);
+void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 
 bool peerHandShaken(Peer *ptrPeer) {
     return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
@@ -126,6 +127,17 @@ void send_getheaders(uv_tcp_t *socket) {
     send_message(socket, CMD_GETHEADERS, &payload);
 }
 
+void send_getdata_for_block(uv_tcp_t *socket, Byte *hash) {
+    GenericIVPayload payload = {
+        .count = 1,
+    };
+    InventoryVector iv = {
+        .type = IV_TYPE_MSG_BLOCK,
+    };
+    memcpy(iv.hash, hash, SHA256_LENGTH);
+    payload.inventory[0] = iv;
+    send_message(socket, CMD_GETDATA, &payload);
+}
 
 char *get_ip_from_context(void *data) {
     return convert_ipv4_readable(((SocketContext *)data)->peer->address.ip);
@@ -235,6 +247,11 @@ void send_message(
         make_blockreq_message(&message, ptrPayload, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
         dataSize = serialize_blockreq_message(&message, buffer);
     }
+    else if (strcmp(command, CMD_GETBLOCKS) == 0) {
+        BlockRequestPayload *ptrPayload = ptrData;
+        make_blockreq_message(&message, ptrPayload, CMD_GETBLOCKS, sizeof(CMD_GETBLOCKS));
+        dataSize = serialize_blockreq_message(&message, buffer);
+    }
     else if (strcmp(command, CMD_SENDHEADERS) == 0) {
         make_sendheaders_message(&message);
         dataSize = serialize_sendheaders_message(&message, buffer);
@@ -294,6 +311,15 @@ void on_handshake_success(
     }
 
     send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
+
+    if (ptrPeer->chain_height == global.mainChainHeight) {
+        SHA256_HASH nextMissing = {0};
+        int8_t error = get_next_missing_block(nextMissing);
+        if (!error) {
+            print_tip_with_description("next missing", nextMissing);
+            send_getdata_for_block(&ptrPeer->socket, nextMissing);
+        }
+    }
 }
 
 void handle_incoming_message(
@@ -419,13 +445,17 @@ void on_incoming_data(
     ptrCache->bufferIndex += nread;
 
     if (ptrCache->bufferIndex == ptrCache->expectedMessageLength) {
+        printf("Message reading finished\n");
         Message message = get_empty_message();
         if (!checksum_match(ptrCache->buffer)) {
             fprintf(stderr, "Payload checksum mismatch\n");
         }
         else {
             int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
-            if (!error) {
+            if (error) {
+                fprintf(stderr, "Cannot parse message (%i)...\n", error);
+            }
+            else {
                 handle_incoming_message(ptrContext->peer, message);
             }
         }
@@ -572,9 +602,6 @@ int32_t release_sockets() {
         struct Peer *peer = &global.peers[peerIndex];
         uv_handle_t* socket = (uv_handle_t*)&peer->socket;
         if (!uv_is_closing(socket)) {
-            if (socket->data) {
-                free(socket->data);
-            }
             uv_close(socket, NULL);
         }
     }
