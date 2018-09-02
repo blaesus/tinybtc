@@ -43,7 +43,13 @@ void load_genesis() {
 
     // Save in headers hashmap
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
-    hashmap_set(&global.headers, genesisHash, &ptrBlock->header, sizeof(BlockPayloadHeader));
+    BlockIndex index = {
+        .fullBlockAvailable = true,
+        .hash = {0},
+        .header = ptrBlock->header
+    };
+    hashmap_set(&global.blockIndices, genesisHash, &index, sizeof(index));
+
     global.mainChainTarget = ptrBlock->header.target;
 
     // Save in global
@@ -55,18 +61,17 @@ void load_genesis() {
 
 void init() {
     printf("Initializing...\n");
-    printf("Size of global state: %lu\n", sizeof(global.headers));
+    printf("Size of global state: %lu\n", sizeof(global.blockIndices));
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();
-    hashmap_init(&global.headers, (1UL << 25) - 1, SHA256_LENGTH);
-    hashmap_init(&global.headersPrevBlockToHash, (1UL << 25) - 1, SHA256_LENGTH);
+    hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+    hashmap_init(&global.blockPrevBlockToHash, (1UL << 25) - 1, SHA256_LENGTH);
+    init_db();
     load_genesis();
     load_headers();
     relocate_main_chain();
-    printf("X\n");
     load_peer_addresses();
-    init_db();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
     }
@@ -79,20 +84,6 @@ int32_t connect_to_peers() {
     // connect_to_local();
     connect_to_initial_peers();
     return 0;
-}
-
-void find() {
-    SHA256_HASH targetHash = {
-        0xcc,0xd6,0x64,0x6e,0x5f,0xf7,0x3a,0xe9,0x70,0x1a,0xa5,0xc3,0x57,0x5b,0x1a,0xbf,
-        0x66,0xf6,0x2d,0xd3,0x98,0xc9,0x37,0x5b,0x07,0x4c,0x07,0xde,0x00,0x00,0x00,0x00
-    };
-    BlockPayloadHeader *ptrHeader = hashmap_get(&global.headers, targetHash, NULL);
-    if (ptrHeader) {
-        printf("Found!");
-    }
-    else {
-        printf("NOT Found!");
-    }
 }
 
 int32_t main(/* int32_t argc, char **argv */) {

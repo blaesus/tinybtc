@@ -343,15 +343,19 @@ void handle_incoming_message(
             BlockPayloadHeader *ptrHeader = &ptrPayload->headers[i].header;
             SHA256_HASH headerHash = {0};
             dsha256(ptrHeader, sizeof(BlockPayloadHeader), headerHash);
-            if (!hashmap_get(&global.headers, headerHash, NULL)) {
+            if (!hashmap_get(&global.blockIndices, headerHash, NULL)) {
+                BlockIndex index;
+                memcpy(&index.hash, headerHash, sizeof(headerHash));
+                memcpy(&index.header, ptrHeader, sizeof(index.header));
+                index.fullBlockAvailable = false;
                 hashmap_set(
-                    &global.headers,
+                    &global.blockIndices,
                     headerHash,
-                    ptrHeader,
-                    sizeof(BlockPayloadHeader)
+                    &index,
+                    sizeof(index)
                 );
                 hashmap_set(
-                    &global.headersPrevBlockToHash,
+                    &global.blockPrevBlockToHash,
                     ptrHeader->prev_block,
                     headerHash,
                     sizeof(headerHash)

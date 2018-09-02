@@ -86,27 +86,27 @@ static void retarget() {
     );
     Byte *ptrRetargetPeriodStart = global.mainChainTip;
     for (uint32_t tracer = 0; ptrRetargetPeriodStart && tracer < mainnet.retargetLookBackPeriod; tracer++) {
-        BlockPayloadHeader *ptrBlockHeader = hashmap_get(
-            &global.headers, ptrRetargetPeriodStart, NULL
+        BlockIndex *ptrIndex = hashmap_get(
+            &global.blockIndices, ptrRetargetPeriodStart, NULL
         );
-        ptrRetargetPeriodStart = ptrBlockHeader->prev_block;
+        ptrRetargetPeriodStart = ptrIndex->header.prev_block;
     }
     print_tip_with_description(
         "Retarget period initial node tracked back to ", ptrRetargetPeriodStart
     );
-    BlockPayloadHeader *ptrRetargetStartNode = hashmap_get(
-        &global.headers, ptrRetargetPeriodStart, NULL
+    BlockIndex *ptrStartBlockIndex = hashmap_get(
+        &global.blockIndices, ptrRetargetPeriodStart, NULL
     );
-    BlockPayloadHeader *ptrRetargetEndNode = hashmap_get(
-        &global.headers, global.mainChainTip, NULL
+    BlockIndex *ptrEndBlockIndex = hashmap_get(
+        &global.blockIndices, global.mainChainTip, NULL
     );
-    uint32_t actualPeriod = ptrRetargetEndNode->timestamp - ptrRetargetStartNode->timestamp;
+    uint32_t actualPeriod = ptrEndBlockIndex->header.timestamp - ptrStartBlockIndex->header.timestamp;
     printf(
         "time difference in retarget period: %u seconds (%2.1f days) [from %u, to %u]\n",
         actualPeriod,
         1.0 * actualPeriod / DAY(1),
-        ptrRetargetEndNode->timestamp,
-        ptrRetargetStartNode->timestamp
+        ptrStartBlockIndex->header.timestamp,
+        ptrEndBlockIndex->header.timestamp
     );
     uint32_t multiplier = actualPeriod;
     if (multiplier < mainnet.desiredRetargetPeriod / 4) {
@@ -127,7 +127,7 @@ static void retarget() {
         long double difficulty = MAX_TARGET / nextTargetFloat;
         printf("retarget: %.3Le -> %.3Le (difficulty %.2Lf)\n", currentTargetFloat, nextTargetFloat, difficulty);
         BIGNUM *newTarget = BN_new();
-        targetCompactToBignum(ptrRetargetEndNode->target, newTarget);
+        targetCompactToBignum(ptrEndBlockIndex->header.target, newTarget);
         BN_mul_word(newTarget, multiplier);
         BN_div_word(newTarget, mainnet.desiredRetargetPeriod);
         global.mainChainTarget = targetBignumToCompact(newTarget);
@@ -148,24 +148,20 @@ static void update_target() {
 
 void relocate_main_chain() {
     printf("Relocating main chain...\n");
-    Byte *keys = calloc(1000000, SHA256_LENGTH);
-
     bool tipEverMoved = false;
     bool foundNewTip;
     do {
         foundNewTip = false;
         update_target();
-        Byte *ptrNextHash = hashmap_get(&global.headersPrevBlockToHash, global.mainChainTip, NULL);
+        Byte *ptrNextHash = hashmap_get(&global.blockPrevBlockToHash, global.mainChainTip, NULL);
         if (ptrNextHash) {
-            BlockPayloadHeader *ptrNextTip = hashmap_get(&global.headers, ptrNextHash, NULL);
+            BlockIndex *ptrNextTip = hashmap_get(&global.blockIndices, ptrNextHash, NULL);
             if (ptrNextTip) {
-                if (!is_block_header_legal_as_tip(ptrNextTip)) {
-                    printf("Illegal header (timestamped %u), skipping\n", ptrNextTip->timestamp);
+                if (!is_block_header_legal_as_tip(&ptrNextTip->header)) {
+                    printf("Illegal header (timestamped %u), skipping\n", ptrNextTip->header.timestamp);
                     continue;
                 }
-                SHA256_HASH hash = {0};
-                dsha256(ptrNextTip, sizeof(*ptrNextTip), hash);
-                memcpy(global.mainChainTip, hash, SHA256_LENGTH);
+                memcpy(global.mainChainTip, ptrNextTip->hash, SHA256_LENGTH);
                 tipEverMoved = true;
                 foundNewTip = true;
                 global.mainChainHeight += 1;
@@ -180,5 +176,4 @@ void relocate_main_chain() {
     }
     print_sha256_reverse(global.mainChainTip);
     printf(" (height=%u)\n", global.mainChainHeight);
-    free(keys);
 }

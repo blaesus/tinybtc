@@ -25,8 +25,8 @@ struct GlobalState {
     time_t start_time;
     NetworkAddress myAddress;
 
-    Hashmap headers;
-    Hashmap headersPrevBlockToHash;
+    Hashmap blockIndices;
+    Hashmap blockPrevBlockToHash;
 
     BlockPayload genesisBlock;
 

@@ -6,12 +6,13 @@
 
 #include "globalstate.h"
 #include "networking.h"
+#include "blockchain.h"
 #include "util.h"
 
 #define PEER_LIST_BINARY_FILENAME "peers.dat"
 #define PEER_LIST_CSV_FILENAME "peers.csv"
 
-#define BLOCK_HEADER_LIST_FILENAME "headers.dat"
+#define BLOCK_INDICES_FILENAME "block_indices.dat"
 
 int32_t save_peer_addresses_human() {
     FILE *file = fopen(PEER_LIST_CSV_FILENAME, "wb");
@@ -79,63 +80,60 @@ int32_t load_peer_addresses() {
 
 int32_t init_db() {
     printf("Connecting to redis database...");
-    redisContext *c;
+    redisContext *context;
     const char *hostname = "127.0.0.1";
     int port = 6379;
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    c = redisConnectWithTimeout(hostname, port, timeout);
-    if (c == NULL || c->err) {
-        if (c) {
-            printf("\nConnection error: %s\n", c->errstr);
-            redisFree(c);
+    context = redisConnectWithTimeout(hostname, port, timeout);
+    if (context == NULL || context->err) {
+        if (context) {
+            printf("\nConnection error: %s\n", context->errstr);
+            redisFree(context);
         } else {
             printf("\nConnection error: can't allocate redis context\n");
         }
         return 1;
     }
-    printf("Done\n");
+    printf("Done.\n");
     return 0;
 }
 
 int32_t save_headers(void) {
-    FILE *file = fopen(BLOCK_HEADER_LIST_FILENAME, "wb");
+    FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
     Byte *keys = calloc(1000000, SHA256_LENGTH);
-    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.headers, keys);
-    printf("Saving %u headers to %s...\n", keyCount, BLOCK_HEADER_LIST_FILENAME);
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    printf("Saving %u headers to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
     uint32_t actualCount = 0;
     for (uint32_t i = 0; i < keyCount; i++) {
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
-        BlockPayloadHeader *ptrData = hashmap_get(&global.headers, key, NULL);
-        if (ptrData) {
-            fwrite(ptrData, sizeof(BlockPayloadHeader), 1, file);
+        BlockIndex *ptrIndex = hashmap_get(&global.blockIndices, key, NULL);
+        if (ptrIndex) {
+            fwrite(ptrIndex, sizeof(BlockIndex), 1, file);
             actualCount += 1;
         }
         else {
             printf("Key not found\n");
         }
     }
-    printf("keyCount = %u, Actual export = %u\n", keyCount, actualCount);
+    printf("Exported %u block indices \n", actualCount);
     free(keys);
     fclose(file);
     return 0;
 }
 
 int32_t load_headers(void) {
-    FILE *file = fopen(BLOCK_HEADER_LIST_FILENAME, "rb");
+    FILE *file = fopen(BLOCK_INDICES_FILENAME, "rb");
     uint32_t headersCount = 0;
     fread(&headersCount, sizeof(headersCount), 1, file);
     for (uint32_t i = 0; i < headersCount; i++) {
-        BlockPayloadHeader header;
-        memset(&header, 0, sizeof(header));
-        fread(&header, sizeof(header), 1, file);
-
-        SHA256_HASH headerHash = {0};
-        dsha256(&header, sizeof(header), headerHash);
-        hashmap_set(&global.headers, headerHash, &header, sizeof(header));
-        hashmap_set(&global.headersPrevBlockToHash, header.prev_block, headerHash, sizeof(headerHash));
+        BlockIndex index;
+        memset(&index, 0, sizeof(index));
+        fread(&index, sizeof(index), 1, file);
+        hashmap_set(&global.blockIndices, index.hash, &index, sizeof(index));
+        hashmap_set(&global.blockPrevBlockToHash, index.header.prev_block, index.hash, sizeof(index.hash));
     }
     printf("Loaded %u headers\n", headersCount);
     return 0;

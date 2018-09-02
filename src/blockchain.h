@@ -5,6 +5,14 @@
 #include "datatypes.h"
 #include "messages/block.h"
 
+struct BlockIndex {
+    BlockPayloadHeader header;
+    SHA256_HASH hash;
+    bool fullBlockAvailable;
+};
+
+typedef struct BlockIndex BlockIndex;
+
 void target_4to32(TargetCompact targetBytes, Byte *bytes);
 long double targetQuodToRoughDouble(TargetCompact targetBytes);
 void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget);
