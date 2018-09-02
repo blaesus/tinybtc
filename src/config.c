@@ -10,6 +10,6 @@ const struct Config config = {
     .maxIncoming = 125,
     .maxOutgoing = 16,
     .addrLife = DAY(14),
-    .userAgent = "/Satoshi:0.16.2/diy-bitcoin:0.0.1/",
+    .userAgent = "/Satoshi:0.16.2/tinybtc:0.0.1/",
     .backlog = 32,
 };
