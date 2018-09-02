@@ -1,11 +1,11 @@
 #include <stdlib.h>
 
 #include "messages/shared.h"
-#include "getheaders.h"
+#include "blockreq.h"
 #include "util.h"
 
-uint64_t serialize_getheaders_payload(
-    GetheadersPayload *ptrPayload,
+uint64_t serialize_blockreq_payload(
+    BlockRequestPayload *ptrPayload,
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
@@ -18,9 +18,9 @@ uint64_t serialize_getheaders_payload(
     return p - ptrBuffer;
 }
 
-uint64_t parse_getheaders_payload(
+uint64_t parse_blockreq_payload(
     Byte *ptrBuffer,
-    GetheadersPayload *ptrPayload
+    BlockRequestPayload *ptrPayload
 ) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrPayload->version);
@@ -32,18 +32,20 @@ uint64_t parse_getheaders_payload(
     return p - ptrBuffer;
 }
 
-int32_t make_getheaders_message(
+int32_t make_blockreq_message(
     Message *ptrMessage,
-    GetheadersPayload *ptrPayload
+    BlockRequestPayload *ptrPayload,
+    char *command,
+    uint8_t commandSize
 ) {
     ptrMessage->header.magic = mainnet.magic;
-    memcpy(ptrMessage->header.command, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
+    memcpy(ptrMessage->header.command, command, commandSize);
 
-    ptrMessage->ptrPayload = malloc(sizeof(GetheadersPayload));
-    memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(GetheadersPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload));
+    memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(BlockRequestPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
-    uint64_t payloadLength = serialize_getheaders_payload(ptrPayload, buffer);
+    uint64_t payloadLength = serialize_blockreq_payload(ptrPayload, buffer);
     ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
@@ -53,20 +55,20 @@ int32_t make_getheaders_message(
     return 0;
 }
 
-uint64_t serialize_getheader_message(
+uint64_t serialize_blockreq_message(
     Message *ptrMessage,
     uint8_t *ptrBuffer
 ) {
     uint64_t messageHeaderSize = sizeof(ptrMessage->header);
     memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
-    serialize_getheaders_payload(
-        (GetheadersPayload *)ptrMessage->ptrPayload,
+    serialize_blockreq_payload(
+        (BlockRequestPayload *) ptrMessage->ptrPayload,
         ptrBuffer + messageHeaderSize
     );
     return messageHeaderSize + ptrMessage->header.length;
 }
 
-uint64_t load_getheaders_message(
+uint64_t load_blockreq_message(
     char *path,
     Message *ptrMessage
 ) {
@@ -78,8 +80,8 @@ uint64_t load_getheaders_message(
     Byte *buffer = malloc(payloadLength);
     fread(buffer, payloadLength, 1, file);
 
-    ptrMessage->ptrPayload = malloc(sizeof(GetheadersPayload));
-    parse_getheaders_payload(buffer, ptrMessage->ptrPayload);
+    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload));
+    parse_blockreq_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
 
     return sizeof(ptrMessage->header)+payloadLength;

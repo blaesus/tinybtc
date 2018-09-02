@@ -11,7 +11,7 @@
 #include "messages/shared.h"
 #include "messages/version.h"
 #include "messages/block.h"
-#include "messages/getheaders.h"
+#include "messages/blockreq.h"
 #include "test/test.h"
 #include "mine.h"
 #include "hashmap.h"
@@ -235,7 +235,7 @@ static void test_mine() {
 }
 
 void test_getheaders() {
-    GetheadersPayload payload = {
+    BlockRequestPayload payload = {
         .version = config.protocolVersion,
         .hashCount = 1,
         .hashStop = {0}
@@ -248,9 +248,9 @@ void test_getheaders() {
     memcpy(&payload.blockLocatorHash[0], genesisHash, SHA256_LENGTH);
 
     Message myMessage = get_empty_message();
-    make_getheaders_message(&myMessage, &payload);
+    make_blockreq_message(&myMessage, &payload, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
     Byte bufferGenerated[MESSAGE_BUFFER_LENGTH] = {0};
-    uint64_t w1 = serialize_getheader_message(&myMessage, bufferGenerated);
+    uint64_t w1 = serialize_blockreq_message(&myMessage, bufferGenerated);
 
     Byte bufferFixture[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t w2 = load_file("fixtures/getheaders_initial.dat", &bufferFixture[0]);

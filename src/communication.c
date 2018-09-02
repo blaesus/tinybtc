@@ -20,7 +20,7 @@
 #include "messages/inv.h"
 #include "messages/addr.h"
 #include "messages/getaddr.h"
-#include "messages/getheaders.h"
+#include "messages/blockreq.h"
 #include "messages/sendheaders.h"
 #include "messages/reject.h"
 #include "messages/pingpong.h"
@@ -116,7 +116,7 @@ uint32_t setup_main_event_loop() {
 void send_getheaders(uv_tcp_t *socket) {
     uint32_t hashCount = 1;
 
-    GetheadersPayload payload = {
+    BlockRequestPayload payload = {
         .version = config.protocolVersion,
         .hashCount = hashCount,
         .hashStop = {0}
@@ -231,9 +231,9 @@ void send_message(
         dataSize = serialize_iv_message(&message, buffer);
     }
     else if (strcmp(command, CMD_GETHEADERS) == 0) {
-        GetheadersPayload *ptrPayload = ptrData;
-        make_getheaders_message(&message, ptrPayload);
-        dataSize = serialize_getheader_message(&message, buffer);
+        BlockRequestPayload *ptrPayload = ptrData;
+        make_blockreq_message(&message, ptrPayload, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
+        dataSize = serialize_blockreq_message(&message, buffer);
     }
     else if (strcmp(command, CMD_SENDHEADERS) == 0) {
         make_sendheaders_message(&message);
