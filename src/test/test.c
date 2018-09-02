@@ -17,6 +17,7 @@
 #include "hashmap.h"
 #include "blockchain.h"
 #include "config.h"
+#include "persistent.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -361,13 +362,28 @@ void test_target_conversions() {
     printf("Regenerated genesis = %x", genesisReconstruct);
 }
 
+void test_redis() {
+    init_db();
+    SHA256_HASH genesisHash = {0};
+    Message genesis = get_empty_message();
+    load_block_message("genesis.dat", &genesis);
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    save_block(ptrBlock, genesisHash);
+
+    BlockPayload *ptrBlockLoaded = malloc(sizeof(BlockPayload));
+    load_block(genesisHash, ptrBlockLoaded);
+    print_block_payload(ptrBlockLoaded);
+}
+
 void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
     // test_block_parsing_and_serialization();
     // test_merkles();
-    test_mine();
+    // test_mine();
     // test_getheaders();
     // test_checksum();
     // test_hashmap();
@@ -375,4 +391,5 @@ void test() {
     // test_blockchain_validation();
     // test_print_hash();
     // test_target_conversions();
+    test_redis();
 }

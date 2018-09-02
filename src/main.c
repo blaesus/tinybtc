@@ -16,6 +16,7 @@ void cleanup() {
     release_sockets();
     save_peer_addresses();
     save_headers();
+    redisFree(global.ptrRedisContext);
     printf("\nGood byte!\n");
 }
 
@@ -49,6 +50,7 @@ void load_genesis() {
         .header = ptrBlock->header
     };
     hashmap_set(&global.blockIndices, genesisHash, &index, sizeof(index));
+    save_block(ptrBlock, genesisHash);
 
     global.mainChainTarget = ptrBlock->header.target;
 

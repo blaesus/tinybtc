@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uv/uv.h"
+#include "hiredis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
 #include "peer.h"
@@ -15,6 +16,7 @@
 struct GlobalState {
     uv_tcp_t listenSocket;
     uv_timer_t mainTimer;
+    redisContext *ptrRedisContext;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;

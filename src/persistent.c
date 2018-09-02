@@ -80,16 +80,15 @@ int32_t load_peer_addresses() {
 
 int32_t init_db() {
     printf("Connecting to redis database...");
-    redisContext *context;
     const char *hostname = "127.0.0.1";
     int port = 6379;
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    context = redisConnectWithTimeout(hostname, port, timeout);
-    if (context == NULL || context->err) {
-        if (context) {
-            printf("\nConnection error: %s\n", context->errstr);
-            redisFree(context);
+    global.ptrRedisContext = redisConnectWithTimeout(hostname, port, timeout);
+    if (global.ptrRedisContext == NULL || global.ptrRedisContext ->err) {
+        if (global.ptrRedisContext ) {
+            printf("\nConnection error: %s\n", global.ptrRedisContext->errstr);
+            redisFree(global.ptrRedisContext);
         } else {
             printf("\nConnection error: can't allocate redis context\n");
         }
@@ -136,5 +135,36 @@ int32_t load_headers(void) {
         hashmap_set(&global.blockPrevBlockToHash, index.header.prev_block, index.hash, sizeof(index.hash));
     }
     printf("Loaded %u headers\n", headersCount);
+    return 0;
+}
+
+int8_t save_block(BlockPayload *ptrBlock, Byte *hash) {
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    uint64_t width = serialize_block_payload(ptrBlock, buffer);
+    redisReply *reply = redisCommand(
+        global.ptrRedisContext,
+        "SET %b %b",
+        hash, SHA256_LENGTH,
+        buffer, width
+    );
+    if (reply == NULL) {
+        return -1;
+    }
+    freeReplyObject(reply);
+    free(buffer);
+    return 0;
+}
+
+int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    redisReply *reply = redisCommand(
+        global.ptrRedisContext,
+        "GET %b",
+        hash, SHA256_LENGTH
+    );
+    memcpy(buffer, reply->str, reply->len);
+    parse_into_block_payload(buffer, ptrBlock);
+    freeReplyObject(reply);
+    free(buffer);
     return 0;
 }
