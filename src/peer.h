@@ -1,16 +1,9 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
+#include "uv/uv.h"
 #include "datatypes.h"
-#include "parameters.h"
-
-struct MessageCache {
-    uint64_t bufferIndex;
-    Byte buffer[MESSAGE_BUFFER_LENGTH];
-    uint64_t expectedMessageLength;
-};
-
-typedef struct MessageCache MessageCache;
 
 struct HandshakeState {
     bool acceptThem : 1;
@@ -29,7 +22,6 @@ struct Peer {
 
     uint8_t relationship;
     NetworkAddress address;
-    MessageCache messageCache;
     uint32_t chain_height;
 };
 

@@ -411,7 +411,7 @@ bool checksum_match(Byte *ptrBuffer) {
     return memcmp(checksum, messageHeader.checksum, CHECKSUM_SIZE) == 0;
 }
 
-void on_incoming_data(
+void on_incoming_segment(
     uv_stream_t *socket,
     ssize_t nread,
     const uv_buf_t *buf
@@ -427,18 +427,34 @@ void on_incoming_data(
         return;
     }
     SocketContext *ptrContext = (SocketContext *)socket->data;
-    MessageCache *ptrCache = &(ptrContext->peer->messageCache);
+    MessageCache *ptrCache = &(ptrContext->messageCache);
 
     if (begins_with_header(buf->base)) {
+        if (ptrCache->bufferIndex) {
+            printf(
+                "Socket read: leftover data %llu bytes, expecting %llu bytes",
+                ptrCache->bufferIndex,
+                ptrCache->expectedMessageLength
+            );
+            Header messageHeader = {0};
+            parse_message_header(ptrCache->buffer, &messageHeader);
+            print_message_header(messageHeader);
+        }
+        else {
+            printf("Socket read: No remaining data; start from empty cache\n");
+        }
         reset_message_cache(ptrCache);
         Header header = get_empty_header();
         parse_message_header((Byte *)buf->base, &header);
         ptrCache->expectedMessageLength = sizeof(Header) + header.length;
         printf(
-            "Incoming message header: %s, %llu bytes in total\n",
+            "Incoming header: %s for %s, expecting %llu bytes in total, already read %lu bytes \n",
             header.command,
-            ptrCache->expectedMessageLength
+            convert_ipv4_readable(ptrContext->peer->address.ip),
+            ptrCache->expectedMessageLength,
+            nread
         );
+        print_object(buf->base, nread);
     }
 
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, nread);
@@ -461,6 +477,11 @@ void on_incoming_data(
         }
         reset_message_cache(ptrCache);
     }
+    else if (ptrCache->bufferIndex == ptrCache->expectedMessageLength) {
+        printf("Unexpected bytes! Reset cache...\n");
+        reset_message_cache(ptrCache);
+    }
+    free(buf->base);
 }
 
 void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -491,7 +512,7 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
         socketContext->peer = ptrContext->peer;
         connectRequest->handle->data = socketContext;
         send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
-        uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_data);
+        uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
     }
     free(connectRequest);
     free(ptrContext);
@@ -520,7 +541,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     // TCP socket
     uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
 
-    // Connection
+    // Connection request
     struct sockaddr_in remoteAddress = {0};
     uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
     uv_tcp_connect(
@@ -543,7 +564,7 @@ void on_incoming_connection(uv_stream_t *server, int status) {
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
-        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_data);
+        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_segment);
     } else {
         printf("Cannot accept\n");
         uv_close((uv_handle_t*) client, NULL);

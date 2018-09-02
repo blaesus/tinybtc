@@ -3,11 +3,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uv/uv.h"
+#include "datatypes.h"
+#include "parameters.h"
 
 #define PEER_CONNECTION_TIMEOUT_SEC 5
 
+struct MessageCache {
+    uint64_t bufferIndex;
+    Byte buffer[MESSAGE_BUFFER_LENGTH];
+    uint64_t expectedMessageLength;
+};
+
+typedef struct MessageCache MessageCache;
+
 struct SocketContext {
     struct Peer *peer;
+    MessageCache messageCache;
 };
 
 typedef struct SocketContext SocketContext;
