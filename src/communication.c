@@ -171,6 +171,9 @@ int32_t parse_buffer_into_message(
     else if (strcmp(command, CMD_HEADERS) == 0) {
         return parse_into_headers_message(ptrBuffer, ptrMessage);
     }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        return parse_into_block_message(ptrBuffer, ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot parse message with unknown command '%s'\n", command);
         return 1;
@@ -395,20 +398,58 @@ void handle_incoming_message(
     }
 }
 
-void reset_message_cache(
-    MessageCache *ptrCache
-) {
-    ptrCache->bufferIndex = 0;
-    ptrCache->expectedMessageLength = 0;
-    memset(ptrCache->buffer, 0, sizeof(ptrCache->buffer));
-}
-
 bool checksum_match(Byte *ptrBuffer) {
     Header messageHeader = {0};
     parse_message_header(ptrBuffer, &messageHeader);
     PayloadChecksum checksum = {0};
     calculate_data_checksum(ptrBuffer + sizeof(messageHeader), messageHeader.length, checksum);
     return memcmp(checksum, messageHeader.checksum, CHECKSUM_SIZE) == 0;
+}
+
+int64_t find_first_magic(Byte *data, uint64_t maxLength) {
+    Byte *p = data;
+    while ((p - data + sizeof(mainnet.magic)) < maxLength) {
+        if (starts_with_magic(p)) {
+            return (int64_t)(p - data);
+        }
+        p++;
+    }
+    return -1;
+}
+
+void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
+    printf("\nExtracting message for peer %s\n", convert_ipv4_readable(ptrPeer->address.ip));
+    int64_t magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
+    while (magicOffset >= 0) {
+        if (magicOffset != 0) {
+            memcpy(ptrCache->buffer, ptrCache->buffer + magicOffset, ptrCache->bufferIndex - magicOffset);
+            ptrCache->bufferIndex -= magicOffset;
+            printf("Trimmed preceding %llu non-magic bytes", magicOffset);
+        }
+        Header header;
+        parse_message_header(ptrCache->buffer, &header);
+        uint64_t messageSize = sizeof(Header) + header.length;
+        printf("message loading: (%llu/%llu)\n", ptrCache->bufferIndex, messageSize);
+        if (ptrCache->bufferIndex >= messageSize) {
+            Message message = get_empty_message();
+            if (!checksum_match(ptrCache->buffer)) {
+                printf("Payload checksum mismatch");
+                print_message_header(header);
+            }
+            else {
+                int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
+                if (!error) {
+                    handle_incoming_message(ptrPeer, message);
+                }
+            }
+            memcpy(ptrCache->buffer, ptrCache->buffer + messageSize, ptrCache->bufferIndex - messageSize);
+            ptrCache->bufferIndex -= messageSize;
+            magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
+        }
+        else {
+            break;
+        }
+    }
 }
 
 void on_incoming_segment(
@@ -427,61 +468,11 @@ void on_incoming_segment(
         return;
     }
     SocketContext *ptrContext = (SocketContext *)socket->data;
-    MessageCache *ptrCache = &(ptrContext->messageCache);
-
-    if (begins_with_header(buf->base)) {
-        if (ptrCache->bufferIndex) {
-            printf(
-                "Socket read: leftover data %llu bytes, expecting %llu bytes",
-                ptrCache->bufferIndex,
-                ptrCache->expectedMessageLength
-            );
-            Header messageHeader = {0};
-            parse_message_header(ptrCache->buffer, &messageHeader);
-            print_message_header(messageHeader);
-        }
-        else {
-            printf("Socket read: No remaining data; start from empty cache\n");
-        }
-        reset_message_cache(ptrCache);
-        Header header = get_empty_header();
-        parse_message_header((Byte *)buf->base, &header);
-        ptrCache->expectedMessageLength = sizeof(Header) + header.length;
-        printf(
-            "Incoming header: %s for %s, expecting %llu bytes in total, already read %lu bytes \n",
-            header.command,
-            convert_ipv4_readable(ptrContext->peer->address.ip),
-            ptrCache->expectedMessageLength,
-            nread
-        );
-        print_object(buf->base, nread);
-    }
-
-    memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, nread);
+    MessageCache *ptrCache = &(ptrContext->streamCache);
+    memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
-
-    if (ptrCache->bufferIndex == ptrCache->expectedMessageLength) {
-        printf("Message reading finished\n");
-        Message message = get_empty_message();
-        if (!checksum_match(ptrCache->buffer)) {
-            fprintf(stderr, "Payload checksum mismatch\n");
-        }
-        else {
-            int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
-            if (error) {
-                fprintf(stderr, "Cannot parse message (%i)...\n", error);
-            }
-            else {
-                handle_incoming_message(ptrContext->peer, message);
-            }
-        }
-        reset_message_cache(ptrCache);
-    }
-    else if (ptrCache->bufferIndex == ptrCache->expectedMessageLength) {
-        printf("Unexpected bytes! Reset cache...\n");
-        reset_message_cache(ptrCache);
-    }
     free(buf->base);
+    extract_message_from_stream_buffer(ptrCache, ptrContext->peer);
 }
 
 void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {

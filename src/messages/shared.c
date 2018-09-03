@@ -126,7 +126,7 @@ uint64_t parse_network_address(
     return p - ptrBuffer;
 }
 
-bool begins_with_header(void *p) {
+bool starts_with_magic(void *p) {
     return combine_uint32(p) == mainnet.magic;
 }
 

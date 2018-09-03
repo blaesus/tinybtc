@@ -146,3 +146,15 @@ uint64_t load_block_message(
 void print_block_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
 }
+
+
+int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
+    Header header = {0};
+    BlockPayload payload = {0};
+    parse_message_header(ptrBuffer, &header);
+    parse_into_block_payload(ptrBuffer + sizeof(header), &payload);
+    memcpy(ptrMessage, &header, sizeof(header));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
+    return 0;
+}

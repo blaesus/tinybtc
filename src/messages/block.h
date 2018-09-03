@@ -66,3 +66,4 @@ uint64_t load_block_message(
 );
 
 void print_block_message(Message *ptrMessage);
+int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage);

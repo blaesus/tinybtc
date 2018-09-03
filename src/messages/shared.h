@@ -85,7 +85,7 @@ struct Message {
 
 typedef struct Message Message;
 
-bool begins_with_header(void *p);
+bool starts_with_magic(void *p);
 
 uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,

@@ -112,10 +112,7 @@ static uint64_t parse_tx_witness(
     return p - ptrBuffer;
 }
 
-uint64_t parse_tx_payload(
-    Byte *ptrBuffer,
-    TxPayload *ptrTx
-) {
+uint64_t parse_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrTx->version);
 

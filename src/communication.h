@@ -11,14 +11,13 @@
 struct MessageCache {
     uint64_t bufferIndex;
     Byte buffer[MESSAGE_BUFFER_LENGTH];
-    uint64_t expectedMessageLength;
 };
 
 typedef struct MessageCache MessageCache;
 
 struct SocketContext {
     struct Peer *peer;
-    MessageCache messageCache;
+    MessageCache streamCache;
 };
 
 typedef struct SocketContext SocketContext;
