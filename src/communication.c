@@ -12,6 +12,7 @@
 #include "blockchain.h"
 #include "config.h"
 #include "peer.h"
+#include "persistent.h"
 
 #include "messages/common.h"
 #include "messages/shared.h"
@@ -393,6 +394,16 @@ void handle_incoming_message(
         }
         relocate_main_chain();
     }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        BlockPayload *ptrPayload = message.ptrPayload;
+        SHA256_HASH hash = {0};
+        dsha256(&ptrPayload->header, sizeof(ptrPayload->header), hash);
+        save_block(ptrPayload, hash);
+        BlockIndex *index = hashmap_get(&global.blockIndices, hash, NULL);
+        if (index) {
+            index->fullBlockAvailable = true;
+        }
+    }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
     }
@@ -418,7 +429,7 @@ int64_t find_first_magic(Byte *data, uint64_t maxLength) {
 }
 
 void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
-    printf("\nExtracting message for peer %s\n", convert_ipv4_readable(ptrPeer->address.ip));
+    printf("\nExtracting message from stream with peer %s\n", convert_ipv4_readable(ptrPeer->address.ip));
     int64_t magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
     while (magicOffset >= 0) {
         if (magicOffset != 0) {

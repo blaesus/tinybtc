@@ -145,8 +145,11 @@ uint64_t load_block_message(
 
 void print_block_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
+    BlockPayload *ptrPayload = ptrMessage->ptrPayload;
+    printf("payload: %llu transactions, the first being:\n", ptrPayload->txCount);
+    print_tx_payload(&ptrPayload->ptrFirstTxNode->tx);
+    printf("\n");
 }
-
 
 int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
     Header header = {0};

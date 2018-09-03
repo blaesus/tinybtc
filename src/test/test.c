@@ -130,14 +130,12 @@ static void test_block() {
 
 static void test_block_parsing_and_serialization() {
     Message message = get_empty_message();
-    load_block_message("fixtures/block_7323.dat", &message);
+    load_block_message("fixtures/block_2961.dat", &message);
 
-    // Byte messageBuffer[4096] = {0};
-    // serialize_block_message(&message, messageBuffer);
-    // print_object(messageBuffer, message.header.length + sizeof(message.header));
+    print_block_message(&message);
 
     Byte checksum[4] = {0};
-    Byte payloadBuffer[4096] = {0};
+    Byte payloadBuffer[MESSAGE_BUFFER_LENGTH] = {0};
     serialize_block_payload(message.ptrPayload, payloadBuffer);
     calculate_data_checksum(payloadBuffer, message.header.length, checksum);
     printf("Correct checksum:");
@@ -145,12 +143,6 @@ static void test_block_parsing_and_serialization() {
     printf("Calculated checksum from parsed-and-serialized:");
     print_object(checksum, 4);
     printf("Difference = %u (expecting 0)", memcmp(message.header.checksum, checksum, 4));
-
-    /**
-     * Expect checksum to be
-     * 0000 - a1 30 12 ed END
-     */
-
 }
 
 static void test_merkle_on_path(char *path) {
@@ -381,7 +373,7 @@ void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    // test_block_parsing_and_serialization();
+    test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
     // test_getheaders();
@@ -391,5 +383,5 @@ void test() {
     // test_blockchain_validation();
     // test_print_hash();
     // test_target_conversions();
-    test_redis();
+    // test_redis();
 }

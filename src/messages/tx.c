@@ -248,3 +248,12 @@ int32_t compute_merkle_root(
 
     return 0;
 }
+
+void print_tx_payload(TxPayload *ptrTx) {
+    printf(
+        "[tx]version=%u; %llu TxIns; %llu TxOuts.",
+        ptrTx->version,
+        ptrTx->txInputCount,
+        ptrTx->txOutputCount
+    );
+}

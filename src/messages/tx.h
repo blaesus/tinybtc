@@ -15,7 +15,7 @@
 #define MAX_PK_SCRIPT_LENGTH 4096
 #define MAX_WITNESS_DATA_LENGTH 4096
 
-#define MAX_TX_ITEM_PER_TX 128
+#define MAX_TX_ITEM_PER_TX 4096
 
 struct Outpoint {
     uint32_t index;
@@ -96,3 +96,5 @@ int32_t compute_merkle_root(
     TxNode *ptrFirstTxNode,
     SHA256_HASH result
 );
+
+void print_tx_payload(TxPayload *ptrTx);
