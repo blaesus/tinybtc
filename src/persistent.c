@@ -8,6 +8,7 @@
 #include "networking.h"
 #include "blockchain.h"
 #include "util.h"
+#include "config.h"
 
 #define PEER_LIST_BINARY_FILENAME "peers.dat"
 #define PEER_LIST_CSV_FILENAME "peers.csv"
@@ -78,14 +79,12 @@ int32_t load_peer_addresses() {
 }
 
 
-int32_t init_db() {
+int8_t init_db() {
     printf("Connecting to redis database...");
-    const char *hostname = "127.0.0.1";
-    int port = 6379;
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    global.ptrRedisContext = redisConnectWithTimeout(hostname, port, timeout);
-    if (global.ptrRedisContext == NULL || global.ptrRedisContext ->err) {
+    global.ptrRedisContext = redisConnectWithTimeout(config.redisHost, config.redisPort, timeout);
+    if (global.ptrRedisContext == NULL || global.ptrRedisContext->err) {
         if (global.ptrRedisContext ) {
             printf("\nConnection error: %s\n", global.ptrRedisContext->errstr);
             redisFree(global.ptrRedisContext);
@@ -102,7 +101,7 @@ int32_t save_headers(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
     Byte *keys = calloc(1000000, SHA256_LENGTH);
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    printf("Saving %u headers to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
+    printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
     uint32_t actualCount = 0;
     for (uint32_t i = 0; i < keyCount; i++) {

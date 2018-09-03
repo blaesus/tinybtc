@@ -20,6 +20,10 @@ struct Config {
     uint32_t maxOutgoing;
     uint32_t addrLife;
     uint8_t backlog;
+    uint16_t getaddrThreshold;
+    uint16_t peerDataRequestPeriod;
+    const char redisHost[64];
+    uint16_t redisPort;
 };
 
 extern const struct Config config;

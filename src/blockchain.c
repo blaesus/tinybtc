@@ -81,7 +81,7 @@ bool is_block_header_legal_as_tip(
 static void retarget() {
     printf("\n=== Retarget ===\n");
     printf("main height = %i \n", global.mainChainHeight);
-    print_tip_with_description(
+    print_hash_with_description(
         "Retargeting from tip ", global.mainChainTip
     );
     Byte *ptrRetargetPeriodStart = global.mainChainTip;
@@ -91,7 +91,7 @@ static void retarget() {
         );
         ptrRetargetPeriodStart = ptrIndex->header.prev_block;
     }
-    print_tip_with_description(
+    print_hash_with_description(
         "Retarget period initial node tracked back to ", ptrRetargetPeriodStart
     );
     BlockIndex *ptrStartBlockIndex = hashmap_get(

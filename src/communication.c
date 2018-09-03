@@ -69,6 +69,14 @@ void request_data_from_peers() {
         if (ptrPeer->chain_height > global.mainChainHeight) {
             send_getheaders(&ptrPeer->socket);
         }
+        if (ptrPeer->chain_height == global.mainChainHeight) {
+            SHA256_HASH nextMissingBlock = {0};
+            int8_t error = get_next_missing_block(nextMissingBlock);
+            if (!error) {
+                print_hash_with_description("next missing block: ", nextMissingBlock);
+                send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
+            }
+        }
     }
 }
 
@@ -93,11 +101,14 @@ uint16_t print_node_status() {
 }
 
 void on_interval(uv_timer_t *handle) {
-    timeout_peers();
-    request_data_from_peers();
-    print_node_status();
     time_t now = time(NULL);
-    if (config.autoExitPeriod && (now - global.start_time >= config.autoExitPeriod)) {
+    time_t deltaT = now - global.start_time;
+    timeout_peers();
+    if (deltaT % config.peerDataRequestPeriod == 0) {
+        request_data_from_peers();
+    }
+    print_node_status();
+    if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
         printf("Stopping main loop...\n");
         uv_timer_stop(handle);
         uv_stop(uv_default_loop());
@@ -307,8 +318,7 @@ void on_handshake_success(
         printf("Block headers synced with %s\n", convert_ipv4_readable(ptrPeer->address.ip));
     }
 
-    bool shouldSendGetaddr =
-        global.peerAddressCount < mainnet.getaddrThreshold;
+    bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
 
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
@@ -316,14 +326,6 @@ void on_handshake_success(
 
     send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
 
-    if (ptrPeer->chain_height == global.mainChainHeight) {
-        SHA256_HASH nextMissing = {0};
-        int8_t error = get_next_missing_block(nextMissing);
-        if (!error) {
-            print_tip_with_description("next missing", nextMissing);
-            send_getdata_for_block(&ptrPeer->socket, nextMissing);
-        }
-    }
 }
 
 void handle_incoming_message(
@@ -625,6 +627,7 @@ int32_t release_sockets() {
         struct Peer *peer = &global.peers[peerIndex];
         uv_handle_t* socket = (uv_handle_t*)&peer->socket;
         if (!uv_is_closing(socket)) {
+            uv_read_stop((uv_stream_t *)&peer->socket);
             uv_close(socket, NULL);
         }
     }

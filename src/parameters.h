@@ -22,7 +22,6 @@ struct ChainParameters {
     int32_t minimalPeerVersion;
     DomainName dnsSeeds[6];
     uint16_t port;
-    uint16_t getaddrThreshold;
     uint8_t genesisHeight;
     uint16_t retargetPeriod;
     uint16_t retargetLookBackPeriod;

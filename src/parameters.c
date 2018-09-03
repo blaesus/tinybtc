@@ -14,7 +14,6 @@ const struct ChainParameters mainnet = {
         "seed.bitcoin.jonasschnelli.ch",
         "seed.btc.petertodd.org",
     },
-    .getaddrThreshold = 1000,
     .genesisHeight = 0,
     .retargetPeriod = 2016,
     .retargetLookBackPeriod = 2015,

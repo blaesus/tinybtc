@@ -42,19 +42,18 @@ void load_genesis() {
     load_block_message("genesis.dat", &genesis);
     BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
 
-    // Save in headers hashmap
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
     BlockIndex index = {
         .fullBlockAvailable = true,
         .hash = {0},
         .header = ptrBlock->header
     };
+    memcpy(index.hash, genesisHash, SHA256_LENGTH);
     hashmap_set(&global.blockIndices, genesisHash, &index, sizeof(index));
     save_block(ptrBlock, genesisHash);
 
     global.mainChainTarget = ptrBlock->header.target;
 
-    // Save in global
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
     memcpy(global.genesisHash, genesisHash, SHA256_LENGTH);
     global.mainChainHeight = mainnet.genesisHeight;
@@ -62,7 +61,7 @@ void load_genesis() {
     printf("Done.\n");
 }
 
-void init() {
+int8_t init() {
     printf("Initializing...\n");
     printf("Size of global state: %lu\n", sizeof(global.blockIndices));
     global.start_time = time(NULL);
@@ -70,7 +69,10 @@ void init() {
     setup_cleanup();
     hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
     hashmap_init(&global.blockPrevBlockToHash, (1UL << 25) - 1, SHA256_LENGTH);
-    init_db();
+    int8_t dbError = init_db();
+    if (dbError) {
+        return -1;
+    }
     load_genesis();
     load_headers();
     relocate_main_chain();
@@ -80,6 +82,7 @@ void init() {
     }
     setup_main_event_loop();
     printf("Done initialization.\n");
+    return 0;
 }
 
 int32_t connect_to_peers() {
@@ -90,7 +93,11 @@ int32_t connect_to_peers() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
-    init();
+    int8_t initError = init();
+    if (initError) {
+        fprintf(stderr, "init error %i\n", initError);
+        return -1;
+    }
     connect_to_peers();
     run_main_loop();
 
