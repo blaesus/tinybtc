@@ -87,7 +87,6 @@ int8_t init_db() {
     if (global.ptrRedisContext == NULL || global.ptrRedisContext->err) {
         if (global.ptrRedisContext ) {
             printf("\nConnection error: %s\n", global.ptrRedisContext->errstr);
-            redisFree(global.ptrRedisContext);
         } else {
             printf("\nConnection error: can't allocate redis context\n");
         }

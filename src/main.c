@@ -13,10 +13,10 @@
 void cleanup() {
     printf("\nCleaning up\n");
     uv_loop_close(uv_default_loop());
-    release_sockets();
     save_peer_addresses();
     save_headers();
     redisFree(global.ptrRedisContext);
+    release_sockets();
     printf("\nGood byte!\n");
 }
 
