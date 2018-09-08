@@ -8,10 +8,12 @@
 #include "peer.h"
 #include "hashmap.h"
 #include "messages/block.h"
+#include "blockchain.h"
 
 #define MAX_PEERS 256
 #define MAX_ADDR_CACHE 65536
 #define PEER_ADDRESS_COUNT_WIDTH 4
+#define MAX_ORPHAN_COUNT 4096
 
 struct GlobalState {
     uv_tcp_t listenSocket;
@@ -28,14 +30,13 @@ struct GlobalState {
     NetworkAddress myAddress;
 
     Hashmap blockIndices;
-    Hashmap blockPrevBlockToHash;
+    SHA256_HASH orphans[MAX_ORPHAN_COUNT];
+    uint16_t orphanCount;
 
     BlockPayload genesisBlock;
     SHA256_HASH genesisHash;
 
-    SHA256_HASH mainChainTip;
-    uint32_t mainChainHeight;
-    TargetCompact mainChainTarget;
+    BlockIndex mainTip;
 };
 
 typedef struct GlobalState GlobalState;

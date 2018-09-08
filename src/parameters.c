@@ -19,4 +19,7 @@ const struct ChainParameters mainnet = {
     .retargetLookBackPeriod = 2015,
     .desiredRetargetPeriod = DAY(14),
     .blockMaxForwardTimestamp = HOUR(2),
+    .scriptSigSizeLower = 2,
+    .scriptSigSizeUpper = 100,
+    .retargetBound = 4,
 };

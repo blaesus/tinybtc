@@ -27,6 +27,9 @@ struct ChainParameters {
     uint16_t retargetLookBackPeriod;
     uint32_t desiredRetargetPeriod;
     int64_t blockMaxForwardTimestamp;
+    uint16_t scriptSigSizeUpper;
+    uint64_t scriptSigSizeLower;
+    uint16_t retargetBound;
 };
 
 extern const struct ChainParameters mainnet;

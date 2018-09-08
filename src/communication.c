@@ -66,15 +66,18 @@ void request_data_from_peers() {
         if (!peerHandShaken(ptrPeer)) {
             continue;
         }
-        if (ptrPeer->chain_height > global.mainChainHeight) {
+        if (ptrPeer->chain_height > global.mainTip.context.height) {
             send_getheaders(&ptrPeer->socket);
         }
-        if (ptrPeer->chain_height == global.mainChainHeight) {
+        if (ptrPeer->chain_height == global.mainTip.context.height) {
             SHA256_HASH nextMissingBlock = {0};
-            int8_t error = get_next_missing_block(nextMissingBlock);
-            if (!error) {
+            int8_t status = get_next_missing_block(nextMissingBlock);
+            if (!status) {
                 print_hash_with_description("next missing block: ", nextMissingBlock);
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
+            }
+            else {
+                printf("Block sync status %i\n", status);
             }
         }
     }
@@ -82,6 +85,7 @@ void request_data_from_peers() {
 
 uint16_t print_node_status() {
     printf("\n==== Node status ====\n");
+
     printf("peers handshake: ");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
@@ -95,7 +99,10 @@ uint16_t print_node_status() {
     }
     printf(" (%u/%u)\n", validPeers, global.peerCount);
     printf("%u addresses\n", global.peerAddressCount);
-    printf("main chain height %u\n", global.mainChainHeight);
+
+
+    printf("main chain height %u\n", global.mainTip.context.height);
+    print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
     return validPeers;
 }
@@ -106,6 +113,9 @@ void on_interval(uv_timer_t *handle) {
     timeout_peers();
     if (deltaT % config.peerDataRequestPeriod == 0) {
         request_data_from_peers();
+    }
+    if (deltaT % config.autoSavePeriod == 0) {
+        save_chain_data();
     }
     print_node_status();
     if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
@@ -134,7 +144,7 @@ void send_getheaders(uv_tcp_t *socket) {
         .hashCount = hashCount,
         .hashStop = {0}
     };
-    memcpy(&payload.blockLocatorHash[0], global.mainChainTip, SHA256_LENGTH);
+    memcpy(&payload.blockLocatorHash[0], global.mainTip.meta.hash, SHA256_LENGTH);
 
     send_message(socket, CMD_GETHEADERS, &payload);
 }
@@ -198,6 +208,7 @@ void on_message_sent(uv_write_t *writeRequest, int status) {
     char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
+        connect_to_random_addr_for_peer(ptrContext->peer->index);
         return;
     }
     else {
@@ -306,11 +317,12 @@ void send_message(
 void on_handshake_success(
     Peer *ptrPeer
 ) {
-    printf("Block headers height: us=%u, peer=%u\n", global.mainChainHeight, ptrPeer->chain_height);
-    if (ptrPeer->chain_height > global.mainChainHeight) {
+    uint32_t mainChainHeight = global.mainTip.context.height;
+    printf("Block headers height: us=%u, peer=%u\n", mainChainHeight, ptrPeer->chain_height);
+    if (ptrPeer->chain_height > mainChainHeight) {
         send_getheaders(&ptrPeer->socket);
     }
-    else if (ptrPeer->chain_height < global.mainChainHeight){
+    else if (ptrPeer->chain_height < mainChainHeight){
         // TODO: Tell them about new headers
         printf("Peer knows less headers than us\n");
     }
@@ -325,7 +337,6 @@ void on_handshake_success(
     }
 
     send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
-
 }
 
 void handle_incoming_message(
@@ -373,38 +384,15 @@ void handle_incoming_message(
         HeadersPayload *ptrPayload = message.ptrPayload;
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             BlockPayloadHeader *ptrHeader = &ptrPayload->headers[i].header;
-            SHA256_HASH headerHash = {0};
-            dsha256(ptrHeader, sizeof(BlockPayloadHeader), headerHash);
-            if (!hashmap_get(&global.blockIndices, headerHash, NULL)) {
-                BlockIndex index;
-                memcpy(&index.hash, headerHash, sizeof(headerHash));
-                memcpy(&index.header, ptrHeader, sizeof(index.header));
-                index.fullBlockAvailable = false;
-                hashmap_set(
-                    &global.blockIndices,
-                    headerHash,
-                    &index,
-                    sizeof(index)
-                );
-                hashmap_set(
-                    &global.blockPrevBlockToHash,
-                    ptrHeader->prev_block,
-                    headerHash,
-                    sizeof(headerHash)
-                );
+            int8_t status = process_incoming_block_header(ptrHeader);
+            if (status && status != HEADER_EXISTED) {
+                printf("new header status %i\n", status);
             }
         }
-        relocate_main_chain();
     }
     else if (strcmp(command, CMD_BLOCK) == 0) {
-        BlockPayload *ptrPayload = message.ptrPayload;
-        SHA256_HASH hash = {0};
-        dsha256(&ptrPayload->header, sizeof(ptrPayload->header), hash);
-        save_block(ptrPayload, hash);
-        BlockIndex *index = hashmap_get(&global.blockIndices, hash, NULL);
-        if (index) {
-            index->fullBlockAvailable = true;
-        }
+        BlockPayload *ptrBlock = message.ptrPayload;
+        process_incoming_block(ptrBlock);
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
@@ -431,7 +419,6 @@ int64_t find_first_magic(Byte *data, uint64_t maxLength) {
 }
 
 void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
-    printf("\nExtracting message from stream with peer %s\n", convert_ipv4_readable(ptrPeer->address.ip));
     int64_t magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
     while (magicOffset >= 0) {
         if (magicOffset != 0) {
@@ -442,7 +429,11 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
         Header header;
         parse_message_header(ptrCache->buffer, &header);
         uint64_t messageSize = sizeof(Header) + header.length;
-        printf("message loading: (%llu/%llu)\n", ptrCache->bufferIndex, messageSize);
+        printf("Message loading from %s: (%llu/%llu)\n",
+            convert_ipv4_readable(ptrPeer->address.ip),
+            ptrCache->bufferIndex,
+            messageSize
+        );
         if (ptrCache->bufferIndex >= messageSize) {
             Message message = get_empty_message();
             if (!checksum_match(ptrCache->buffer)) {

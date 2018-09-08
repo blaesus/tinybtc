@@ -12,6 +12,7 @@
 
 struct Config {
     int32_t autoExitPeriod;
+    int32_t autoSavePeriod;
     uint32_t mainTimerInterval;
     int32_t protocolVersion;
     uint8_t userAgent[128];

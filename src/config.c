@@ -3,7 +3,8 @@
 #include "parameters.h"
 
 const struct Config config = {
-    .autoExitPeriod = 120,
+    .autoExitPeriod = MINUTE(20),
+    .autoSavePeriod = 60,
     .mainTimerInterval = 1000,
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,

@@ -96,9 +96,16 @@ int8_t init_db() {
     return 0;
 }
 
-int32_t save_headers(void) {
+static bool file_exist(char *filename) {
+    struct stat buffer;
+    return stat(filename, &buffer) == 0;
+}
+
+int32_t save_block_indices(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
-    Byte *keys = calloc(1000000, SHA256_LENGTH);
+    fwrite(&global.mainTip, sizeof(global.mainTip), 1, file);
+
+    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH);
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
@@ -121,22 +128,28 @@ int32_t save_headers(void) {
     return 0;
 }
 
-int32_t load_headers(void) {
+int32_t load_block_indices(void) {
+    if (!file_exist(BLOCK_INDICES_FILENAME)) {
+        fprintf(stderr, "block index file does not exist; skipping import\n");
+        return -1;
+    }
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "rb");
+    fread(&global.mainTip, sizeof(global.mainTip), 1, file);
     uint32_t headersCount = 0;
     fread(&headersCount, sizeof(headersCount), 1, file);
     for (uint32_t i = 0; i < headersCount; i++) {
         BlockIndex index;
         memset(&index, 0, sizeof(index));
         fread(&index, sizeof(index), 1, file);
-        hashmap_set(&global.blockIndices, index.hash, &index, sizeof(index));
-        hashmap_set(&global.blockPrevBlockToHash, index.header.prev_block, index.hash, sizeof(index.hash));
+        hashmap_set(&global.blockIndices, index.meta.hash, &index, sizeof(index));
     }
     printf("Loaded %u headers\n", headersCount);
     return 0;
 }
 
-int8_t save_block(BlockPayload *ptrBlock, Byte *hash) {
+int8_t save_block(BlockPayload *ptrBlock) {
+    SHA256_HASH hash = {0};
+    hash_block_header(&ptrBlock->header, hash);
     Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
     redisReply *reply = redisCommand(
@@ -179,6 +192,30 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     return 0;
 }
 
+
+int8_t save_tx(TxPayload *ptrTx) {
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    uint64_t width = serialize_tx_payload(ptrTx, buffer);
+    SHA256_HASH hash = {0};
+    dsha256(buffer, (uint32_t)width, hash);
+    redisReply *reply = redisCommand(
+        global.ptrRedisContext,
+        "SET %b %b",
+        hash, SHA256_LENGTH,
+        buffer, width
+    );
+    if (reply == NULL) {
+        return -1;
+    }
+    else if (reply->type == REDIS_REPLY_ERROR) {
+        printf("Save error: %s", reply->str);
+        return -2;
+    }
+    freeReplyObject(reply);
+    free(buffer);
+    return 0;
+}
+
 bool check_block_existence(Byte *hash) {
     redisReply *reply = redisCommand(
         global.ptrRedisContext,
@@ -196,4 +233,12 @@ bool check_block_existence(Byte *hash) {
     int64_t result = reply->integer;
     freeReplyObject(reply);
     return (bool)result;
+}
+
+
+void save_chain_data() {
+    printf("Saving chain data...\n");
+    save_peer_addresses();
+    save_block_indices();
+    printf("Done.");
 }

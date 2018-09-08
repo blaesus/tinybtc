@@ -18,8 +18,6 @@ uint32_t mine_block_header(
     header.nonce = initialNonce;
     struct timeval timer;
     gettimeofday(&timer, NULL);
-    SHA256_HASH targethash = {0};
-    target_4to32(header.target, targethash);
     while (true) {
         header.nonce++;
         dsha256(&header, sizeof(header), hash);
@@ -33,7 +31,7 @@ uint32_t mine_block_header(
 
             printf("%s: trying nonce %u (%1.3lfs)\n", processLabel, header.nonce, delta);
         }
-        if ((hash_satisfies_target(hash, targethash))) {
+        if ((hash_satisfies_target_compact(hash, header.target))) {
             printf("Found nonce=%u", header.nonce);
             print_object(hash, SHA256_LENGTH);
             break;

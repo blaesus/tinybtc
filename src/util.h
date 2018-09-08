@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include "datatypes.h"
 
+#define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
+#define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
+
 int segment_uint32(uint32_t number, uint8_t *chars);
 uint16_t combine_uint16(const uint8_t *chars);
 uint32_t combine_uint32(const uint8_t *chars);

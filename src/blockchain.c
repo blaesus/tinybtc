@@ -7,22 +7,16 @@
 #include "hash.h"
 #include "util.h"
 #include "units.h"
+#include "persistent.h"
 
-void target_4to32(uint32_t targetBytes, Byte *bytes) {
-    int32_t exponentWidth = (targetBytes >> 24) - 3;
-    memset(bytes, 0, SHA256_LENGTH);
-    memcpy(bytes + exponentWidth, &targetBytes, TARGET_BITS_MANTISSA_WIDTH);
+
+static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
+
+double pow256(double x) {
+    return pow(2, x * 8);
 }
 
-long double pow256(long double x) {
-    return powl(2, x * 8);
-}
-
-long double log256(long double x) {
-    return log2l(x) / 8;
-}
-
-long double targetQuodToRoughDouble(TargetCompact targetBytes) {
+double target_compact_to_float(TargetCompact targetBytes) {
     uint32_t exponentWidth = targetBytes >> 24;
     exponentWidth -= 3;
     uint32_t mantissa =
@@ -34,7 +28,7 @@ long double targetQuodToRoughDouble(TargetCompact targetBytes) {
 
 // Compact-Bignum conversion adapted from Bitcoin 0.0.1 by Satoshi
 
-void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget) {
+void target_compact_to_bignum(TargetCompact targetBytes, BIGNUM *ptrTarget) {
     uint32_t size = targetBytes >> 24;
     Byte inputBytes[64] = {0};
     inputBytes[3] = (Byte)size;
@@ -44,7 +38,7 @@ void targetCompactToBignum(TargetCompact targetBytes, BIGNUM *ptrTarget) {
     BN_mpi2bn(&inputBytes[0], 4 + size, ptrTarget);
 }
 
-uint32_t targetBignumToCompact(BIGNUM *ptrTarget) {
+uint32_t target_bignum_to_compact(BIGNUM *ptrTarget) {
     uint32_t size = (uint32_t)BN_bn2mpi(ptrTarget, NULL);
     Byte outputBytes[64] = {0};
     size -= 4;
@@ -56,50 +50,158 @@ uint32_t targetBignumToCompact(BIGNUM *ptrTarget) {
     return result;
 }
 
-bool hash_satisfies_target(
-    const Byte *hash,
-    const Byte *target
-) {
-    return bytescmp(hash, target, SHA256_LENGTH) < 0;
-}
-
-bool is_block_header_legal_as_tip(
-    BlockPayloadHeader *ptrHeader
-) {
-    bool timestampLegal =
-        (int64_t)ptrHeader->timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
-
+bool is_block_header_valid(BlockIndex *index) {
+    bool headerValid;
     SHA256_HASH hash = {0};
-    dsha256(ptrHeader, sizeof(*ptrHeader), hash);
-    ByteArray32 target = {0};
-    target_4to32(global.mainChainTarget, target);
-    bool hashLegal = hash_satisfies_target(hash, target);
-
-    return timestampLegal && hashLegal;
+    TargetCompact maxTarget;
+    int8_t targetCalculationError = get_maximal_target(index, &maxTarget);
+    if (targetCalculationError) {
+        return -50;
+    }
+    headerValid = hash_satisfies_target_compact(hash, maxTarget);
+    return headerValid;
 }
 
-static void retarget() {
-    printf("\n=== Retarget ===\n");
-    printf("main height = %i \n", global.mainChainHeight);
-    print_hash_with_description(
-        "Retargeting from tip ", global.mainChainTip
-    );
-    Byte *ptrRetargetPeriodStart = global.mainChainTip;
-    for (uint32_t tracer = 0; ptrRetargetPeriodStart && tracer < mainnet.retargetLookBackPeriod; tracer++) {
-        BlockIndex *ptrIndex = hashmap_get(
-            &global.blockIndices, ptrRetargetPeriodStart, NULL
-        );
+bool is_tx_valid(TxNode *ptrNode) {
+    printf("validating tx of flag %u\n", ptrNode->tx.flag);
+    // TODO: Implement script
+    return true;
+}
+
+bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
+    bool allTxValid = true;
+    TxNode *p = ptrCandidate->ptrFirstTxNode;
+    while (p) {
+        if (!is_tx_valid(p)) {
+            allTxValid = false;
+            break;
+        }
+        p = p->next;
+    }
+    return allTxValid;
+}
+
+
+int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
+    if (!is_block_header_legal(ptrHeader)) {
+        fprintf(stderr, "Received illegal header\n");
+        return -2;
+    }
+    SHA256_HASH hash = {0};
+    dsha256(ptrHeader, sizeof(BlockPayloadHeader), hash);
+    BlockIndex *savedHeader = hashmap_get(&global.blockIndices, hash, NULL);
+    if (savedHeader) {
+        return HEADER_EXISTED;
+    }
+
+    BlockIndex index;
+    memset(&index, 0, sizeof(index));
+
+    // Header data
+    memcpy(&index.header, ptrHeader, sizeof(index.header));
+
+    // Meta
+    memcpy(&index.meta.hash, hash, SHA256_LENGTH);
+
+    // Context
+    BlockIndex *parent = hashmap_get(&global.blockIndices, ptrHeader->prev_block, NULL);
+    if (parent) {
+        index.context.height = parent->context.height + 1;
+        index.context.chainPOW = parent->context.chainPOW + calc_block_pow(index.header.target);
+        switch (parent->context.chainStatus) {
+            case CHAIN_STATUS_MAINCHAIN: {
+                if (parent->context.children.length == 0) {
+                    index.context.chainStatus = CHAIN_STATUS_MAINCHAIN;
+                }
+                else {
+                    index.context.chainStatus = CHAIN_STATUS_SIDECHAIN;
+                }
+                break;
+            }
+            case CHAIN_STATUS_SIDECHAIN: {
+                index.context.chainStatus = CHAIN_STATUS_SIDECHAIN;
+                break;
+            }
+            case CHAIN_STATUS_ORPHAN: {
+                index.context.chainStatus = CHAIN_STATUS_ORPHAN;
+                break;
+            }
+            default: {
+                fprintf(stderr, "Cannot recognize parent status of %u", parent->context.chainStatus);
+            }
+        }
+
+        if (index.context.chainStatus == CHAIN_STATUS_SIDECHAIN) {
+            if (global.mainTip.context.chainPOW < index.context.chainPOW) {
+                printf("Side chain overtaking main chain: should reorg...\n");
+            }
+            // TODO: Handle reorg
+        }
+    }
+    else {
+        // We don't know new block's parent
+        memcpy(global.orphans[global.orphanCount], hash, SHA256_LENGTH);
+        global.orphanCount++;
+        index.context.chainPOW = calc_block_pow(index.header.target);
+    }
+
+    // Validation
+    bool headerValid = is_block_header_valid(&index);
+    if (!headerValid) {
+        fprintf(stderr, "Invalid header\n");
+        return -100;
+    }
+
+    // Update parent's context (if header is valid)
+    if (parent) {
+        memcpy(parent->context.children.hashes[parent->context.children.length], hash, SHA256_LENGTH);
+        parent->context.children.length += 1;
+    }
+
+    if (index.context.chainStatus == CHAIN_STATUS_MAINCHAIN) {
+        print_hash_with_description("Updating tip to ", index.meta.hash);
+        memcpy(&global.mainTip, &index, sizeof(index));
+    }
+
+    int8_t setError = SET_BLOCK_INDEX(hash, index);
+    if (setError) {
+        return -4;
+    }
+    return 0;
+}
+
+int8_t get_maximal_target(BlockIndex *index, TargetCompact *result) {
+    *result = 0;
+    if (index->context.height < mainnet.retargetPeriod) {
+        *result = global.genesisBlock.header.target;
+        return 0;
+    }
+    else if ((index->context.height % mainnet.retargetPeriod) != 0) {
+        BlockIndex *parent = GET_BLOCK_INDEX(index->header.prev_block);
+        if (!parent) {
+            print_hash_with_description("get_maximal_target: Cannot find parent for index ", index->meta.hash);
+            return -1;
+        }
+        *result = parent->header.target;
+        return 0;
+    }
+
+    printf("\n=== Retargeting at height %u ===\n", index->context.height);
+    print_hash_with_description("Retargeting from tip ", index->meta.hash);
+
+    Byte *ptrRetargetPeriodStart = index->header.prev_block;
+    for (uint32_t counter = 0; counter < mainnet.retargetLookBackPeriod; counter++) {
+        BlockIndex *ptrIndex = GET_BLOCK_INDEX(ptrRetargetPeriodStart);
+        if (!ptrIndex) {
+            print_hash_with_description("get_maximal_target: Cannot find index", ptrRetargetPeriodStart);
+            return -2;
+        }
         ptrRetargetPeriodStart = ptrIndex->header.prev_block;
     }
-    print_hash_with_description(
-        "Retarget period initial node tracked back to ", ptrRetargetPeriodStart
-    );
-    BlockIndex *ptrStartBlockIndex = hashmap_get(
-        &global.blockIndices, ptrRetargetPeriodStart, NULL
-    );
-    BlockIndex *ptrEndBlockIndex = hashmap_get(
-        &global.blockIndices, global.mainChainTip, NULL
-    );
+    print_hash_with_description("Retarget period initial node tracked back to ", ptrRetargetPeriodStart);
+
+    BlockIndex *ptrStartBlockIndex = GET_BLOCK_INDEX(ptrRetargetPeriodStart);
+    BlockIndex *ptrEndBlockIndex = GET_BLOCK_INDEX(index->header.prev_block);
     uint32_t actualPeriod = ptrEndBlockIndex->header.timestamp - ptrStartBlockIndex->header.timestamp;
     printf(
         "time difference in retarget period: %u seconds (%2.1f days) [from %u, to %u]\n",
@@ -108,72 +210,103 @@ static void retarget() {
         ptrStartBlockIndex->header.timestamp,
         ptrEndBlockIndex->header.timestamp
     );
-    uint32_t multiplier = actualPeriod;
-    if (multiplier < mainnet.desiredRetargetPeriod / 4) {
-        multiplier = mainnet.desiredRetargetPeriod / 4;
-    }
-    if (multiplier > mainnet.desiredRetargetPeriod * 4) {
-        multiplier = mainnet.desiredRetargetPeriod * 4;
-    }
-    long double ratio = (double)actualPeriod / (double)mainnet.desiredRetargetPeriod;
-    const long double MAX_TARGET = targetQuodToRoughDouble(global.genesisBlock.header.target);
-    long double currentTargetFloat = targetQuodToRoughDouble(global.mainChainTarget);
-    long double nextTargetFloat = currentTargetFloat * ratio;
+
+    double ratio = (double)actualPeriod / (double)mainnet.desiredRetargetPeriod;
+    double MAX_TARGET = target_compact_to_float(global.genesisBlock.header.target);
+    double currentTargetFloat = target_compact_to_float(ptrEndBlockIndex->header.target);
+    double nextTargetFloat = currentTargetFloat * ratio;
     if (nextTargetFloat > MAX_TARGET) {
         printf("Next target hitting ceiling, using ceiling instead\n");
-        global.mainChainTarget = global.genesisBlock.header.target;
+        *result = global.genesisBlock.header.target;
     }
     else {
-        long double difficulty = MAX_TARGET / nextTargetFloat;
-        printf("retarget: %.3Le -> %.3Le (difficulty %.2Lf)\n", currentTargetFloat, nextTargetFloat, difficulty);
+        double difficulty = MAX_TARGET / nextTargetFloat;
+        printf("retarget: %.3e -> %.3e (difficulty %.2f)\n", currentTargetFloat, nextTargetFloat, difficulty);
         BIGNUM *newTarget = BN_new();
-        targetCompactToBignum(ptrEndBlockIndex->header.target, newTarget);
-        BN_mul_word(newTarget, multiplier);
-        BN_div_word(newTarget, mainnet.desiredRetargetPeriod);
-        global.mainChainTarget = targetBignumToCompact(newTarget);
-    }
-    printf("New target %u (%x)\n", global.mainChainTarget, global.mainChainTarget);
-    printf("=============\n");
-}
-
-static void update_target() {
-    // e.g. Retarget after block 2015 is made, i.e. adjusting target for
-    // the incoming 2016 block
-    bool shouldRetarget =
-        (global.mainChainHeight + 1) % mainnet.retargetPeriod == 0;
-    if (shouldRetarget) {
-        retarget();
-    }
-}
-
-void relocate_main_chain() {
-    printf("Relocating main chain...\n");
-    bool tipEverMoved = false;
-    bool foundNewTip;
-    do {
-        foundNewTip = false;
-        update_target();
-        Byte *ptrNextHash = hashmap_get(&global.blockPrevBlockToHash, global.mainChainTip, NULL);
-        if (ptrNextHash) {
-            BlockIndex *ptrNextTip = hashmap_get(&global.blockIndices, ptrNextHash, NULL);
-            if (ptrNextTip) {
-                if (!is_block_header_legal_as_tip(&ptrNextTip->header)) {
-                    printf("Illegal header (timestamped %u), skipping\n", ptrNextTip->header.timestamp);
-                    continue;
-                }
-                memcpy(global.mainChainTip, ptrNextTip->hash, SHA256_LENGTH);
-                tipEverMoved = true;
-                foundNewTip = true;
-                global.mainChainHeight += 1;
-            }
+        target_compact_to_bignum(ptrEndBlockIndex->header.target, newTarget);
+        if (actualPeriod > mainnet.desiredRetargetPeriod * mainnet.retargetBound) {
+            BN_mul_word(newTarget, mainnet.retargetBound);
         }
-    } while (foundNewTip);
-    if (tipEverMoved) {
-        printf("Main chain tip moved to ");
+        else if (actualPeriod * mainnet.retargetBound < mainnet.desiredRetargetPeriod) {
+            BN_div_word(newTarget, mainnet.retargetBound);
+        }
+        else {
+            BN_mul_word(newTarget, actualPeriod);
+            BN_div_word(newTarget, mainnet.desiredRetargetPeriod);
+        }
+        *result = target_bignum_to_compact(newTarget);
+    }
+    printf("New target %u (%x)\n", *result, *result);
+    printf("=============\n");
+    return 0;
+}
+
+// @see GetBlockProof() in Bitcoin Core's 'chain.cpp'
+
+double calc_block_pow(TargetCompact targetBytes) {
+    if (targetBytes == 0) {
+        return 0;
+    }
+    double targetFloat = target_compact_to_float(targetBytes);
+    return pow(2, 256) / (targetFloat + 1);
+}
+
+int8_t process_incoming_block(BlockPayload *ptrBlock) {
+    if (!is_block_legal(ptrBlock)) {
+        fprintf(stderr, "Illegal block\n");
+        return -1;
+    }
+
+    // Index
+    int8_t status = process_incoming_block_header(&ptrBlock->header);
+    if (status != 0 && status != HEADER_EXISTED) {
+        fprintf(stderr, "header error status %i\n", status);
+        return status;
+    }
+    SHA256_HASH hash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), hash);
+
+    BlockIndex *index = GET_BLOCK_INDEX(hash);
+    if (!index) {
+        fprintf(stderr, "process_incoming_block: cannot find block index\n");
+        return -30;
+    }
+    bool valid = is_block_valid(ptrBlock, index);
+    if (!valid) {
+        print_hash_with_description("Invalid block ", hash);
+    }
+    int8_t saveError = save_block(ptrBlock);
+    if (saveError) {
+        fprintf(stderr, "save block error\n");
+        return -5;
     }
     else {
-        printf("Main chain tip remained at ");
+        print_hash_with_description("Block saved: ", hash);
     }
-    print_sha256_reverse(global.mainChainTip);
-    printf(" (height=%u)\n", global.mainChainHeight);
+    index->meta.fullBlockAvailable = true;
+    TxNode *p =  ptrBlock->ptrFirstTxNode;
+    while (p) {
+        save_tx(&p->tx);
+        p = p->next;
+    }
+    return 0;
+}
+
+void recalculate_block_indices() {
+    printf("Reindexing block indices...");
+    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH);
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    for (uint32_t i = 0; i < keyCount; i++) {
+        printf("reindexing %u/%u\n", i, keyCount);
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockIndex *ptrIndex = hashmap_get(&global.blockIndices, key, NULL);
+        if (!ptrIndex) {
+            printf("Key not found\n");
+            continue;
+        }
+        dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
+        ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+    }
+    printf("Done.");
 }

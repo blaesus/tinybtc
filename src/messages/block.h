@@ -30,40 +30,17 @@ struct BlockPayload {
 
 typedef struct BlockPayload BlockPayload;
 
-uint64_t serialize_block_payload(
-    BlockPayload *ptrPayload,
-    Byte *ptrBuffer
-);
-
-int32_t make_block_message(
-    Message *ptrMessage,
-    BlockPayload *ptrPayload
-);
-
-uint64_t serialize_block_message(
-    Message *ptrMessage,
-    uint8_t *ptrBuffer
-);
-
-uint64_t parse_block_payload_header(
-    Byte *ptrBuffer,
-    BlockPayloadHeader *ptrHeader
-);
-
-uint64_t serialize_block_payload_header(
-    BlockPayloadHeader *ptrHeader,
-    Byte *ptrBuffer
-);
-
-int32_t parse_into_block_payload(
-    Byte *ptrBuffer,
-    BlockPayload *ptrBlock
-);
-
-uint64_t load_block_message(
-    char *path,
-    Message *ptrMessage
-);
-
+uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer);
+int32_t make_block_message(Message *ptrMessage, BlockPayload *ptrPayload);
+uint64_t serialize_block_message(Message *ptrMessage, uint8_t *ptrBuffer);
+uint64_t parse_block_payload_header(Byte *ptrBuffer, BlockPayloadHeader *ptrHeader);
+uint64_t serialize_block_payload_header(BlockPayloadHeader *ptrHeader, Byte *ptrBuffer);
+int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock);
+uint64_t load_block_message(char *path, Message *ptrMessage);
 void print_block_message(Message *ptrMessage);
 int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage);
+bool is_block_legal(BlockPayload *ptrBlock);
+bool is_block_header_legal(BlockPayloadHeader *ptrHeader);
+bool hash_satisfies_target_compact(const Byte *hash, TargetCompact target);
+void target_4to32(TargetCompact targetBytes, Byte *bytes);
+void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash);

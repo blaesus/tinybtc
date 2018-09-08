@@ -320,17 +320,14 @@ void test_hashmap() {
 }
 
 void test_difficulty() {
-    SHA256_HASH hash1 = {0};
-    uint32_t target1 = 0x1d00ffff;
-    target_4to32(target1, hash1);
-    print_object(hash1, SHA256_LENGTH);
+    uint32_t target = 0x1d00ffff;
 
     SHA256_HASH hash2 = {0};
     uint32_t target2 = 0x18009645;
     target_4to32(target2, hash2);
     print_object(hash2, SHA256_LENGTH);
 
-    printf("%i", hash_satisfies_target(hash2, hash1));
+    printf("%i", hash_satisfies_target_compact(hash2, target));
 }
 
 void test_print_hash() {
@@ -344,26 +341,26 @@ void test_print_hash() {
 void test_target_conversions() {
     // TargetQuodBytes genesisQuod = {0x1a, 0xb9, 0x08, 0x18};
     TargetCompact genesisQuod = 0x1d00ffff;
-    printf("%Lf\n", targetQuodToRoughDouble(genesisQuod));
+    printf("%f\n", target_compact_to_float(genesisQuod));
     BIGNUM *genesisBN = BN_new();
-    targetCompactToBignum(genesisQuod, genesisBN);
+    target_compact_to_bignum(genesisQuod, genesisBN);
     BN_add_word(genesisBN, 1);
     printf("genesisBN=%s\n", BN_bn2dec(genesisBN));
 
-    TargetCompact genesisReconstruct = targetBignumToCompact(genesisBN);
+    TargetCompact genesisReconstruct = target_bignum_to_compact(genesisBN);
     printf("Regenerated genesis = %x", genesisReconstruct);
 }
 
 void test_redis() {
     init_db();
-    SHA256_HASH genesisHash = {0};
     Message genesis = get_empty_message();
     load_block_message("genesis.dat", &genesis);
     BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
 
-    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
-    save_block(ptrBlock, genesisHash);
+    save_block(ptrBlock);
 
+    SHA256_HASH genesisHash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
     BlockPayload *ptrBlockLoaded = malloc(sizeof(BlockPayload));
     load_block(genesisHash, ptrBlockLoaded);
     print_block_payload(ptrBlockLoaded);

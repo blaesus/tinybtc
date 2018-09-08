@@ -4,10 +4,12 @@
 
 int32_t save_peer_addresses(void);
 int32_t load_peer_addresses(void);
-int32_t save_headers(void);
-int32_t load_headers(void);
+int32_t save_block_indices(void);
+int32_t load_block_indices(void);
 int8_t init_db();
 void init_genesis(void);
-int8_t save_block(BlockPayload *ptrBlock, Byte *hash);
+int8_t save_block(BlockPayload *ptrBlock);
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock);
 bool check_block_existence(Byte *hash);
+void save_chain_data();
+int8_t save_tx(TxPayload *ptrTx);

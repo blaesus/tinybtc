@@ -120,21 +120,24 @@ bool is_peer(IP ip) {
 }
 
 int8_t get_next_missing_block(Byte *hash) {
-    Byte *tip = global.mainChainTip;
+    SHA256_HASH finderHash = {0xcc};
+    memcpy(finderHash, global.genesisHash, SHA256_LENGTH);
     do {
-        BlockIndex *index = hashmap_get(&global.blockIndices, tip, NULL);
+        BlockIndex *index = hashmap_get(&global.blockIndices, finderHash, NULL);
         if (index == NULL) {
-            return -2;
-        }
-        else if (!index->fullBlockAvailable) {
-            memcpy(hash, tip, SHA256_LENGTH);
-            return 0;
-        }
-        else if (memcmp(tip, global.genesisHash, SHA256_LENGTH) == 0) {
             return -1;
         }
+        else if (!index->meta.fullBlockAvailable) {
+            memcpy(hash, finderHash, SHA256_LENGTH);
+            return 0;
+        }
+        else if (index->context.children.length == 0) {
+            // Obtained all blocks
+            return 1;
+        }
         else {
-            memcpy(tip, index->header.prev_block, SHA256_LENGTH);
+            // TODO: Handle side chains
+            memcpy(finderHash, index->context.children.hashes[0], SHA256_LENGTH);
         }
     } while (true);
 }

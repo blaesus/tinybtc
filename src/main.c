@@ -13,8 +13,7 @@
 void cleanup() {
     printf("\nCleaning up\n");
     uv_loop_close(uv_default_loop());
-    save_peer_addresses();
-    save_headers();
+    save_chain_data();
     redisFree(global.ptrRedisContext);
     release_sockets();
     printf("\nGood byte!\n");
@@ -36,28 +35,14 @@ void setup_cleanup() {
 }
 
 void load_genesis() {
-    printf("Loading genesis block...");
-    SHA256_HASH genesisHash = {0};
+    printf("Loading genesis block...\n");
     Message genesis = get_empty_message();
     load_block_message("genesis.dat", &genesis);
     BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
-
-    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
-    BlockIndex index = {
-        .fullBlockAvailable = true,
-        .hash = {0},
-        .header = ptrBlock->header
-    };
-    memcpy(index.hash, genesisHash, SHA256_LENGTH);
-    hashmap_set(&global.blockIndices, genesisHash, &index, sizeof(index));
-    save_block(ptrBlock, genesisHash);
-
-    global.mainChainTarget = ptrBlock->header.target;
-
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
-    memcpy(global.genesisHash, genesisHash, SHA256_LENGTH);
-    global.mainChainHeight = mainnet.genesisHeight;
-    memcpy(global.mainChainTip, genesisHash, SHA256_LENGTH);
+    hash_block_header(&ptrBlock->header, global.genesisHash);
+    free(genesis.ptrPayload);
+    process_incoming_block(ptrBlock);
     printf("Done.\n");
 }
 
@@ -68,14 +53,13 @@ int8_t init() {
     srand((unsigned int)global.start_time);
     setup_cleanup();
     hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
-    hashmap_init(&global.blockPrevBlockToHash, (1UL << 25) - 1, SHA256_LENGTH);
     int8_t dbError = init_db();
     if (dbError) {
         return -1;
     }
     load_genesis();
-    load_headers();
-    relocate_main_chain();
+    load_block_indices();
+    // recalculate_block_indices();
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
