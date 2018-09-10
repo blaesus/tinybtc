@@ -5,7 +5,7 @@
 #include "util.h"
 #include "datatypes.h"
 
-int segment_int32(uint32_t number, uint8_t chars[4]) {
+int segment_uint32(uint32_t number, uint8_t *chars) {
     chars[0] = (uint8_t)(number & 0xFF);
     chars[1] = (uint8_t)((number >> 1 * BITS_IN_BYTE) & 0xFF);
     chars[2] = (uint8_t)((number >> 2 * BITS_IN_BYTE) & 0xFF);
@@ -71,7 +71,7 @@ int32_t uint_to_str(uint32_t data, char *output) {
     return 0;
 }
 
-void randomBytes(uint32_t count, uint8_t *data) {
+void random_bytes(uint32_t count, uint8_t *data) {
     for (uint32_t i = 0; i < count; i++) {
         data[i] = (uint8_t)(rand() & 0xFF);
     }
@@ -79,7 +79,7 @@ void randomBytes(uint32_t count, uint8_t *data) {
 
 uint64_t random_uint64() {
     uint8_t nonceBytes[8] = {0};
-    randomBytes(8, nonceBytes);
+    random_bytes(8, nonceBytes);
     return combine_uint64(nonceBytes);
 }
 
@@ -123,3 +123,35 @@ uint32_t min(uint32_t a, uint32_t b) {
 bool ips_equal(IP ipA, IP ipB) {
     return memcmp(ipA, ipB, sizeof(IP)) == 0;
 }
+
+int64_t getFileSize(FILE *file) {
+    fseek(file, 0L, SEEK_END);
+    int64_t filesize = ftell(file);
+    fseek(file, 0L, SEEK_SET);
+    return filesize;
+}
+
+void reverse_endian(Byte *data, uint32_t width) {
+    for (uint32_t i = 0; i < width / 2; i++) {
+        Byte temp = data[i];
+        data[i] = data[width - i - 1];
+        data[width - i - 1] = temp;
+    }
+}
+
+int8_t bytescmp(
+    const Byte *bytesA,
+    const Byte *bytesB,
+    uint32_t width
+) {
+    for (uint32_t i = width - 1; i >= 0; i--) {
+        if (bytesA[i] < bytesB[i]) {
+            return -1;
+        }
+        if (bytesA[i] > bytesB[i]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+

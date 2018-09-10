@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include "shared.h"
 #include "util.h"
 
@@ -125,8 +126,8 @@ uint64_t parse_network_address(
     return p - ptrBuffer;
 }
 
-bool begins_with_header(void *p) {
-    return combine_uint32(p) == parameters.magic;
+bool starts_with_magic(void *p) {
+    return combine_uint32(p) == mainnet.magic;
 }
 
 Message get_empty_message() {
@@ -135,4 +136,12 @@ Message get_empty_message() {
         .ptrPayload = NULL
     };
     return message;
+}
+
+uint64_t load_file(char *path, Byte *buffer) {
+    FILE *file = fopen(path, "rb");
+    int64_t filesize = getFileSize(file);
+    fread(buffer, (size_t)filesize, 1, file);
+    fclose(file);
+    return (uint64_t) filesize;
 }

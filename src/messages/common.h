@@ -3,11 +3,17 @@
 #include <stdint.h>
 #include "messages/shared.h"
 
+#define MSG_WITNESS_FLAG (1 << 30);
+#define MSG_TYPE_MASK    (0xffffffff >> 2);
+
 #define IV_TYPE_ERROR 0
 #define IV_TYPE_MSG_TX 1
 #define IV_TYPE_MSG_BLOCK 2
 #define IV_TYPE_MSG_FILTERED_BLOCK 3
 #define IV_TYPE_MSG_CMPCT_BLOCK 4
+#define IV_TYPE_WITNESS_BLOCK (IV_TYPE_MSG_BLOCK | MSG_WITNESS_FLAG)
+#define IV_TYPE_WITNESS_TX (MSG_TX | MSG_WITNESS_FLAG)
+#define IV_TYPE_FILTERED_WITNESS_BLOCK (MSG_FILTERED_BLOCK | MSG_WITNESS_FLAG)
 
 int32_t make_header_only_message(
     Message *ptrMessage,

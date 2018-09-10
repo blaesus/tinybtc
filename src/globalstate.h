@@ -2,17 +2,23 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "uv/uv.h"
+#include "hiredis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
 #include "peer.h"
+#include "hashmap.h"
+#include "messages/block.h"
+#include "blockchain.h"
 
-#define MAX_PEERS 1024
+#define MAX_PEERS 256
 #define MAX_ADDR_CACHE 65536
 #define PEER_ADDRESS_COUNT_WIDTH 4
+#define MAX_ORPHAN_COUNT 4096
 
 struct GlobalState {
     uv_tcp_t listenSocket;
     uv_timer_t mainTimer;
+    redisContext *ptrRedisContext;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;
@@ -22,7 +28,15 @@ struct GlobalState {
 
     time_t start_time;
     NetworkAddress myAddress;
-    uint32_t blockchainHeight;
+
+    Hashmap blockIndices;
+    SHA256_HASH orphans[MAX_ORPHAN_COUNT];
+    uint16_t orphanCount;
+
+    BlockPayload genesisBlock;
+    SHA256_HASH genesisHash;
+
+    BlockIndex mainTip;
 };
 
 typedef struct GlobalState GlobalState;
@@ -40,3 +54,4 @@ int32_t set_addr_services(IP ip, ServiceBits bits);
 int32_t disable_ip(IP ip);
 
 bool is_peer(IP ip);
+int8_t get_next_missing_block(Byte *hash);

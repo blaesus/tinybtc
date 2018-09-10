@@ -7,12 +7,15 @@
 #include "messages/verack.h"
 #include "messages/inv.h"
 #include "messages/addr.h"
+#include "messages/reject.h"
+#include "messages/pingpong.h"
+#include "messages/headers.h"
 
 void print_message(
     Message *ptrMessage
 ) {
-    printf("\n>=========  Incoming  ===========");
     char *command = (char *)ptrMessage->header.command;
+    printf("\n>=========  Incoming %s ===========", command);
     if (strcmp(command, CMD_VERSION) == 0) {
         print_version_message(ptrMessage);
     }
@@ -25,8 +28,23 @@ void print_message(
     else if (strcmp(command, CMD_ADDR) == 0) {
         print_addr_message(ptrMessage);
     }
-    else {
-        fprintf(stderr, "Cannot print payload for COMMAND %s\n", command);
+    else if (strcmp(command, CMD_REJECT) == 0) {
+        print_reject_message(ptrMessage);
     }
-    printf("================================<\n");
+    else if (strcmp(command, CMD_PING) == 0) {
+        print_pingpong_message(ptrMessage);
+    }
+    else if (strcmp(command, CMD_PONG) == 0) {
+        print_pingpong_message(ptrMessage);
+    }
+    else if (strcmp(command, CMD_HEADERS) == 0) {
+        print_headers_message(ptrMessage);
+    }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        print_block_message(ptrMessage);
+    }
+    else {
+        fprintf(stderr, "Cannot print payload of unspecified COMMAND %s\n", command);
+    }
+    printf("=======================================<\n");
 }

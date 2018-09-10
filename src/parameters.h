@@ -11,35 +11,25 @@
 #define MAIN_NET_PORT 8333
 #define TEST_NET_PORT 18333
 
-#define SERVICE_NODE_NETWORK (1 << 0)
-#define SERVICE_NODE_GETUTXO (1 << 1)
-#define SERVICE_NODE_BLOOM (1 << 2)
-#define SERVICE_NODE_WITNESS (1 << 3)
-#define SERVICE_NODE_XTHIN (1 << 4)
-#define SERVICE_NODE_NETWORK_LIMITED (1 << 10)
-
-#define MAX_MESSAGE_LENGTH 65536
+#define MESSAGE_BUFFER_LENGTH 4 * 1024 * 1024
 
 #define MAX_INV_SIZE 50000
 
-#define MAIN_TIMER_INTERVAL_MSEC 2000
-#define PROGRAM_EXIT_TIME_SEC 20
-
 #define CLEAR_OLD_ADDR_THRESHOLD 1000
 
-struct Parameters {
+struct ChainParameters {
     uint32_t magic;
-    ServiceBits services;
-    int32_t protocolVersion;
     int32_t minimalPeerVersion;
     DomainName dnsSeeds[6];
     uint16_t port;
-    uint8_t backlog;
-    uint32_t maxIncoming;
-    uint32_t maxOutgoing;
-    uint8_t userAgent[128];
-    uint32_t addrLife;
-    uint16_t getaddrThreshold;
+    uint8_t genesisHeight;
+    uint16_t retargetPeriod;
+    uint16_t retargetLookBackPeriod;
+    uint32_t desiredRetargetPeriod;
+    int64_t blockMaxForwardTimestamp;
+    uint16_t scriptSigSizeUpper;
+    uint64_t scriptSigSizeLower;
+    uint16_t retargetBound;
 };
 
-extern const struct Parameters parameters;
+extern const struct ChainParameters mainnet;

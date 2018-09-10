@@ -9,7 +9,7 @@ int32_t make_header_only_message(
     char* command,
     uint16_t commandSize
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
     ptrMessage->header.length = 0;
     calculate_data_checksum(
@@ -127,11 +127,13 @@ void print_iv_message(Message *ptrMessage) {
     printf("payload: count=%llu\n",
            ptrPayload->count
     );
+    /*
     for (uint8_t i = 0; i < ptrPayload->count; i++) {
         InventoryVector iv = ptrPayload->inventory[i];
         char *typeString = get_iv_type(iv.type);
-        printf("Inventory of type %s(%u)\n", typeString, iv.type);
+        printf("IV type: %s(%u)\n", typeString, iv.type);
     }
+    */
 }
 
 int32_t make_iv_message(
@@ -140,19 +142,19 @@ int32_t make_iv_message(
     Byte *command,
     uint32_t commandSize
 ) {
-    ptrMessage->header.magic = parameters.magic;
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
 
     ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(GenericIVPayload));
 
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t payloadLength = serialize_iv_payload(ptrPayload, buffer);
+    ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
-    ptrMessage->header.length = (uint32_t)payloadLength;
     return 0;
 }

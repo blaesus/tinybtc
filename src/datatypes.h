@@ -49,3 +49,4 @@ struct AddrRecord {
 
 typedef struct AddrRecord AddrRecord;
 
+typedef Byte ByteArray32[32];

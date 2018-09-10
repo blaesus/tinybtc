@@ -1,13 +1,22 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <units.h>
 
 #include "messages/block.h"
 #include "util.h"
 
-uint64_t serialize_block_payload_header(
-    BlockPayloadHeader *ptrHeader,
-    Byte *ptrBuffer
-) {
+uint64_t parse_block_payload_header(Byte *ptrBuffer, BlockPayloadHeader *ptrHeader) {
+    Byte *p = ptrBuffer;
+    p += PARSE_INTO(p, &ptrHeader->version);
+    p += PARSE_INTO(p, &ptrHeader->prev_block);
+    p += PARSE_INTO(p, &ptrHeader->merkle_root);
+    p += PARSE_INTO(p, &ptrHeader->timestamp);
+    p += PARSE_INTO(p, &ptrHeader->target);
+    p += PARSE_INTO(p, &ptrHeader->nonce);
+    return p - ptrBuffer;
+}
+
+uint64_t serialize_block_payload_header(BlockPayloadHeader *ptrHeader, Byte *ptrBuffer) {
     Byte *p = ptrBuffer;
 
     memcpy(p, &ptrHeader->version, sizeof(ptrHeader->version));
@@ -22,8 +31,8 @@ uint64_t serialize_block_payload_header(
     memcpy(p, &ptrHeader->timestamp, sizeof(ptrHeader->timestamp));
     p += sizeof(ptrHeader->timestamp);
 
-    memcpy(p, &ptrHeader->bits, sizeof(ptrHeader->bits));
-    p += sizeof(ptrHeader->bits);
+    memcpy(p, &ptrHeader->target, sizeof(ptrHeader->target));
+    p += sizeof(ptrHeader->target);
 
     memcpy(p, &ptrHeader->nonce, sizeof(ptrHeader->nonce));
     p += sizeof(ptrHeader->nonce);
@@ -31,10 +40,7 @@ uint64_t serialize_block_payload_header(
     return p - ptrBuffer;
 }
 
-int32_t parse_into_block_payload(
-    Byte *ptrBuffer,
-    BlockPayload *ptrBlock
-) {
+int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     Byte *p = ptrBuffer;
 
     p += PARSE_INTO(p, &ptrBlock->header);
@@ -55,10 +61,7 @@ int32_t parse_into_block_payload(
     return 0;
 }
 
-uint64_t serialize_block_payload(
-    BlockPayload *ptrPayload,
-    Byte *ptrBuffer
-) {
+uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer) {
     Byte *p = ptrBuffer;
 
     BlockPayloadHeader *ptrHeader = &ptrPayload->header;
@@ -75,31 +78,25 @@ uint64_t serialize_block_payload(
     return p - ptrBuffer;
 }
 
-int32_t make_block_message(
-    Message *ptrMessage,
-    BlockPayload *ptrPayload
-) {
-    ptrMessage->header.magic = parameters.magic;
+int32_t make_block_message(Message *ptrMessage, BlockPayload *ptrPayload) {
+    ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_BLOCK, sizeof(CMD_BLOCK));
 
     ptrMessage->ptrPayload = malloc(sizeof(BlockPayload));
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(BlockPayload));
 
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
     uint64_t payloadLength = serialize_block_payload(ptrPayload, buffer);
+    ptrMessage->header.length = (uint32_t)payloadLength;
     calculate_data_checksum(
         &buffer,
         ptrMessage->header.length,
         ptrMessage->header.checksum
     );
-    ptrMessage->header.length = (uint32_t)payloadLength;
     return 0;
 }
 
-uint64_t serialize_block_message(
-    Message *ptrMessage,
-    uint8_t *ptrBuffer
-) {
+uint64_t serialize_block_message(Message *ptrMessage, uint8_t *ptrBuffer) {
     uint64_t messageHeaderSize = sizeof(ptrMessage->header);
     memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
     serialize_block_payload(
@@ -109,19 +106,124 @@ uint64_t serialize_block_message(
     return messageHeaderSize + ptrMessage->header.length;
 }
 
-void load_block_message(
-    char *path,
-    Message *ptrMessage
-) {
+uint64_t load_block_message(char *path, Message *ptrMessage) {
     FILE *file = fopen(path, "rb");
 
     fread(ptrMessage, sizeof(ptrMessage->header), 1, file);
 
     uint64_t payloadLength = ptrMessage->header.length;
-    Byte *buffer = calloc(1, payloadLength);
+    Byte *buffer = malloc(payloadLength);
     fread(buffer, payloadLength, 1, file);
 
     ptrMessage->ptrPayload = calloc(1, sizeof(BlockPayload));
     parse_into_block_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
+    free(buffer);
+
+    return sizeof(ptrMessage->header)+payloadLength;
+}
+
+void print_block_message(Message *ptrMessage) {
+    print_message_header(ptrMessage->header);
+    BlockPayload *ptrPayload = ptrMessage->ptrPayload;
+    SHA256_HASH hash = {0};
+    hash_block_header(&ptrPayload->header, hash);
+    print_hash_with_description("hash = ", hash);
+    printf("payload: %llu transactions, the first being:\n", ptrPayload->txCount);
+    print_tx_payload(&ptrPayload->ptrFirstTxNode->tx);
+    printf("\n");
+}
+
+int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
+    Header header = {0};
+    BlockPayload payload = {0};
+    parse_message_header(ptrBuffer, &header);
+    parse_into_block_payload(ptrBuffer + sizeof(header), &payload);
+    memcpy(ptrMessage, &header, sizeof(header));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockPayload));
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
+    return 0;
+}
+
+// @see https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
+
+bool is_block_legal(BlockPayload *ptrBlock) {
+
+    bool nonEmptyTxList = ptrBlock->txCount > 0;
+
+    bool timestampLegal = ptrBlock->header.timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
+
+    bool firstTxIsCoinbase = is_coinbase(&ptrBlock->ptrFirstTxNode->tx);
+
+    bool onlyOneCoinbase = true;
+    TxNode *p = ptrBlock->ptrFirstTxNode->next;
+    while (p) {
+        if (is_coinbase(&p->tx)) {
+            onlyOneCoinbase = false;
+            break;
+        }
+        p = p->next;
+    }
+
+    bool allTxLegal = true;
+    p = ptrBlock->ptrFirstTxNode;
+    while (p) {
+        if (!is_tx_legal(&p->tx)) {
+            allTxLegal = false;
+            break;
+        }
+        p = p->next;
+    }
+
+    bool hashSatisfiesTarget;
+    SHA256_HASH headerHash = {0};
+    hash_block_header(&ptrBlock->header, headerHash);
+    hashSatisfiesTarget = hash_satisfies_target_compact(headerHash, ptrBlock->header.target);
+
+    bool merkleMatch;
+    SHA256_HASH computedMerkle = {0};
+    compute_merkle_root(ptrBlock->ptrFirstTxNode, computedMerkle);
+    merkleMatch = memcmp(computedMerkle, ptrBlock->header.merkle_root, SHA256_LENGTH) == 0;
+
+    /*
+    printf("block legality: %u %u %u %u %u %u %u\n",
+           nonEmptyTxList,
+           timestampLegal,
+           firstTxIsCoinbase,
+           onlyOneCoinbase,
+           allTxLegal,
+           hashSatisfiesTarget,
+           merkleMatch
+    );
+    */
+
+    return nonEmptyTxList
+           && timestampLegal
+           && firstTxIsCoinbase
+           && onlyOneCoinbase
+           && allTxLegal
+           && hashSatisfiesTarget
+           && merkleMatch;
+}
+
+bool hash_satisfies_target_compact(const Byte *hash, TargetCompact target) {
+    ByteArray32 targetExpanded = {0};
+    target_4to32(target, targetExpanded);
+    return bytescmp(hash, targetExpanded, SHA256_LENGTH) <= 0;
+}
+
+void target_4to32(uint32_t targetBytes, Byte *bytes) {
+    int32_t exponentWidth = (targetBytes >> 24) - 3;
+    memset(bytes, 0, 32);
+    memcpy(bytes + exponentWidth, &targetBytes, TARGET_BITS_MANTISSA_WIDTH);
+}
+
+bool is_block_header_legal(BlockPayloadHeader *ptrHeader) {
+    bool timestampLegal =
+        (int64_t)ptrHeader->timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
+    return timestampLegal;
+}
+
+void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash) {
+    dsha256(ptrHeader, sizeof(BlockPayloadHeader), hash);
 }

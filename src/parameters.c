@@ -2,21 +2,10 @@
 #include "parameters.h"
 #include "units.h"
 
-const struct Parameters parameters = {
-
+const struct ChainParameters mainnet = {
     .magic = MAIN_NET_MAGIC,
-
-    // see Satoshi's version.h
-    .protocolVersion = 70015,
-
     .minimalPeerVersion = 31800,
-
     .port = MAIN_NET_PORT,
-
-    .services = SERVICE_NODE_NETWORK & SERVICE_NODE_WITNESS,
-
-    // For node Discovery
-    // See https://en.bitcoin.it/wiki/Satoshi_Client_Node_Discovery
     .dnsSeeds = {
         "seed.bitcoin.sipa.be",
         "dnsseed.bluematt.me",
@@ -25,16 +14,12 @@ const struct Parameters parameters = {
         "seed.bitcoin.jonasschnelli.ch",
         "seed.btc.petertodd.org",
     },
-
-    .userAgent = "/Satoshi:0.16.2/diy-bitcoin:0.0.1/",
-
-    .maxIncoming = 125,
-
-    .maxOutgoing = 8,
-
-    .backlog = 32,
-
-    .addrLife = DAY(14),
-
-    .getaddrThreshold = 1000,
+    .genesisHeight = 0,
+    .retargetPeriod = 2016,
+    .retargetLookBackPeriod = 2015,
+    .desiredRetargetPeriod = DAY(14),
+    .blockMaxForwardTimestamp = HOUR(2),
+    .scriptSigSizeLower = 2,
+    .scriptSigSizeUpper = 100,
+    .retargetBound = 4,
 };

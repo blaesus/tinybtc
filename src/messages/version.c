@@ -8,6 +8,7 @@
 #include "globalstate.h"
 #include "peer.h"
 #include "util.h"
+#include "config.h"
 
 uint64_t serialize_version_payload(
     struct VersionPayload *ptrPayload,
@@ -42,8 +43,8 @@ uint64_t serialize_version_payload(
     uint64_t varStrLength = serialize_varstr(&ptrPayload->user_agent, p);
     p += varStrLength;
 
-    memcpy(p, &global.blockchainHeight, sizeof(global.blockchainHeight));
-    p += sizeof(global.blockchainHeight);
+    memcpy(p, &global.mainTip.context.height, sizeof(global.mainTip.context.height));
+    p += sizeof(global.mainTip.context.height);
 
     bool relay = ptrPayload->relay;
     memcpy(p, &relay, sizeof(relay));
@@ -60,16 +61,17 @@ uint32_t make_version_payload(
     struct NetworkAddress recipientAddress = ptrPeer->address;
     uint64_t nonce = random_uint64();
 
-    uint32_t userAgentDataLength = (uint32_t)strlen((char *)parameters.userAgent);
+    uint32_t userAgentDataLength = (uint32_t)strlen((char *)config.userAgent);
 
-    ptrPayload->version = parameters.protocolVersion;
-    ptrPayload->services = parameters.services;
+    ptrPayload->version = config.protocolVersion;
+    ptrPayload->services = config.services;
     ptrPayload->timestamp = time(NULL);
     ptrPayload->addr_recv = recipientAddress;
     ptrPayload->addr_from = global.myAddress;
     ptrPayload->nonce = nonce;
     ptrPayload->user_agent.length = userAgentDataLength;
-    strcpy((char *)ptrPayload->user_agent.string, (char *)parameters.userAgent);
+    ptrPayload->start_height = global.mainTip.context.height;
+    strcpy((char *)ptrPayload->user_agent.string, (char *)config.userAgent);
     ptrPayload->relay = true;
 
     uint8_t userAgentLengthWidth = calc_number_varint_width(userAgentDataLength);
@@ -83,9 +85,9 @@ int32_t make_version_message(
 ) {
     struct VersionPayload payload = {0};
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
-    uint8_t checksumCalculationBuffer[MAX_MESSAGE_LENGTH] = {0};
-    serialize_version_payload(&payload, checksumCalculationBuffer, MAX_MESSAGE_LENGTH);
-    ptrMessage->header.magic = parameters.magic;
+    uint8_t checksumCalculationBuffer[MESSAGE_BUFFER_LENGTH] = {0};
+    serialize_version_payload(&payload, checksumCalculationBuffer, MESSAGE_BUFFER_LENGTH);
+    ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
     ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));

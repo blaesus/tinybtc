@@ -9,6 +9,10 @@
 #include "networking.h"
 #include "util.h"
 #include "units.h"
+#include "blockchain.h"
+#include "config.h"
+#include "peer.h"
+#include "persistent.h"
 
 #include "messages/common.h"
 #include "messages/shared.h"
@@ -17,31 +21,72 @@
 #include "messages/inv.h"
 #include "messages/addr.h"
 #include "messages/getaddr.h"
+#include "messages/blockreq.h"
+#include "messages/sendheaders.h"
+#include "messages/reject.h"
+#include "messages/pingpong.h"
+#include "messages/headers.h"
 #include "messages/print.h"
+
+void send_getheaders(uv_tcp_t *socket);
+void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 
 bool peerHandShaken(Peer *ptrPeer) {
     return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
 }
 
+void on_handle_close(uv_handle_t *handle) {
+    SocketContext *data = (SocketContext *)handle->data;
+    connect_to_random_addr_for_peer(data->peer->index);
+}
+
 void timeout_peers() {
+    time_t now = time(NULL);
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        time_t now = time(NULL);
         if (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC) {
             if (!peerHandShaken(ptrPeer)) {
                 printf("Timeout peer %u\n", i);
                 disable_ip(ptrPeer->address.ip);
-                uv_handle_t *ptrHandle = (uv_handle_t *)ptrPeer->connection->handle;
-                if (!uv_is_closing(ptrHandle)) {
-                    uv_close(ptrHandle, NULL);
+                uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
+                if (ptrHandle && !uv_is_closing(ptrHandle)) {
+                    SocketContext *ptrData = calloc(1, sizeof(SocketContext));
+                    ptrData->peer = ptrPeer;
+                    ptrHandle->data = ptrData;
+                    uv_close(ptrHandle, on_handle_close);
                 }
-                connect_to_random_addr_for_peer(i);
             }
         }
     }
 }
 
-uint16_t print_peer_status() {
+void request_data_from_peers() {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (!peerHandShaken(ptrPeer)) {
+            continue;
+        }
+        if (ptrPeer->chain_height > global.mainTip.context.height) {
+            send_getheaders(&ptrPeer->socket);
+        }
+        if (ptrPeer->chain_height == global.mainTip.context.height) {
+            SHA256_HASH nextMissingBlock = {0};
+            int8_t status = get_next_missing_block(nextMissingBlock);
+            if (!status) {
+                print_hash_with_description("next missing block: ", nextMissingBlock);
+                send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
+            }
+            else {
+                printf("Block sync status %i\n", status);
+            }
+        }
+    }
+}
+
+uint16_t print_node_status() {
+    printf("\n==== Node status ====\n");
+
+    printf("peers handshake: ");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (peerHandShaken(&global.peers[i])) {
@@ -53,15 +98,27 @@ uint16_t print_peer_status() {
         }
     }
     printf(" (%u/%u)\n", validPeers, global.peerCount);
+    printf("%u addresses\n", global.peerAddressCount);
+
+
+    printf("main chain height %u\n", global.mainTip.context.height);
+    print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
+    printf("=====================\n");
     return validPeers;
 }
 
 void on_interval(uv_timer_t *handle) {
-    timeout_peers();
-    print_peer_status();
-    printf("%u addresses\n", global.peerAddressCount);
     time_t now = time(NULL);
-    if (now - global.start_time >= PROGRAM_EXIT_TIME_SEC) {
+    time_t deltaT = now - global.start_time;
+    timeout_peers();
+    if (deltaT % config.peerDataRequestPeriod == 0) {
+        request_data_from_peers();
+    }
+    if (deltaT % config.autoSavePeriod == 0) {
+        save_chain_data();
+    }
+    print_node_status();
+    if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
         printf("Stopping main loop...\n");
         uv_timer_stop(handle);
         uv_stop(uv_default_loop());
@@ -74,20 +131,38 @@ uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
     uv_timer_init(uv_default_loop(), &global.mainTimer);
-    uv_timer_start(&global.mainTimer, &on_interval, 0, MAIN_TIMER_INTERVAL_MSEC);
+    uv_timer_start(&global.mainTimer, &on_interval, 0, config.mainTimerInterval);
     printf("Done.\n");
     return 0;
 }
 
-struct ContextData {
-    struct Peer *peer;
-};
+void send_getheaders(uv_tcp_t *socket) {
+    uint32_t hashCount = 1;
 
-typedef struct ContextData ContextData;
+    BlockRequestPayload payload = {
+        .version = config.protocolVersion,
+        .hashCount = hashCount,
+        .hashStop = {0}
+    };
+    memcpy(&payload.blockLocatorHash[0], global.mainTip.meta.hash, SHA256_LENGTH);
 
-char *get_peer_ip(uv_connect_t *req) {
-    ContextData *data = (ContextData *)req->data;
-    return convert_ipv4_readable(data->peer->address.ip);
+    send_message(socket, CMD_GETHEADERS, &payload);
+}
+
+void send_getdata_for_block(uv_tcp_t *socket, Byte *hash) {
+    GenericIVPayload payload = {
+        .count = 1,
+    };
+    InventoryVector iv = {
+        .type = IV_TYPE_MSG_BLOCK,
+    };
+    memcpy(iv.hash, hash, SHA256_LENGTH);
+    payload.inventory[0] = iv;
+    send_message(socket, CMD_GETDATA, &payload);
+}
+
+char *get_ip_from_context(void *data) {
+    return convert_ipv4_readable(((SocketContext *)data)->peer->address.ip);
 }
 
 int32_t parse_buffer_into_message(
@@ -109,49 +184,70 @@ int32_t parse_buffer_into_message(
     else if (strcmp(command, CMD_ADDR) == 0) {
         return parse_into_addr_message(ptrBuffer, ptrMessage);
     }
+    else if (strcmp(command, CMD_REJECT) == 0) {
+        return parse_into_reject_message(ptrBuffer, ptrMessage);
+    }
+    else if (strcmp(command, CMD_PING) == 0) {
+        return parse_into_pingpong_message(ptrBuffer, ptrMessage);
+    }
+    else if (strcmp(command, CMD_HEADERS) == 0) {
+        return parse_into_headers_message(ptrBuffer, ptrMessage);
+    }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        return parse_into_block_message(ptrBuffer, ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot parse message with unknown command '%s'\n", command);
         return 1;
     }
 }
 
-void on_message_sent(uv_write_t *req, int status) {
-    char *ipString = get_peer_ip((uv_connect_t *)req);
+void on_message_sent(uv_write_t *writeRequest, int status) {
+    struct WriteContext *ptrContext = writeRequest->data;
+
+    char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
+        connect_to_random_addr_for_peer(ptrContext->peer->index);
         return;
     }
     else {
         printf("message sent to %s\n", ipString);
     }
+    free(ptrContext->ptrBufferBase);
+    free(ptrContext);
+    free(writeRequest);
 }
 
-void write_buffer(
-        uv_connect_t *req,
-        uv_buf_t *ptrUvBuffer
+void write_buffer_to_socket(
+    uv_buf_t *ptrUvBuffer,
+    uv_tcp_t *socket
 ) {
-    uv_stream_t* tcp = req->handle;
-    uv_write_t *ptrWriteReq = (uv_write_t*)malloc(sizeof(uv_write_t));
+    SocketContext *ptrSocketContext = socket->data;
+    struct WriteContext *ptrWriteContext = calloc(1, sizeof(*ptrWriteContext));
+    ptrWriteContext->peer = ptrSocketContext->peer;
+    ptrWriteContext->ptrBufferBase = ptrUvBuffer->base;
+    uv_write_t *ptrWriteReq = calloc(1, sizeof(uv_write_t));
     uint8_t bufferCount = 1;
-    ptrWriteReq->data = req->data;
-    uv_write(ptrWriteReq, tcp, ptrUvBuffer, bufferCount, &on_message_sent);
+    ptrWriteReq->data = ptrWriteContext;
+    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_sent);
 }
 
 void send_message(
-    uv_connect_t *req,
+    uv_tcp_t *socket,
     char *command,
     void *ptrData
 ) {
     Message message = get_empty_message();
-    Byte buffer[MAX_MESSAGE_LENGTH] = {0};
+    SocketContext *ptrContext = (SocketContext *)socket->data;
+    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH);
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
     uint64_t dataSize = 0;
 
     if (strcmp(command, CMD_VERSION) == 0) {
-        Peer *ptrPeer = ((ContextData *)(req->data))->peer;
-        make_version_message(&message, ptrPeer);
+        make_version_message(&message, ptrContext->peer);
         dataSize = serialize_version_message(&message, buffer);
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
@@ -172,40 +268,99 @@ void send_message(
         );
         dataSize = serialize_iv_message(&message, buffer);
     }
+    else if (strcmp(command, CMD_GETHEADERS) == 0) {
+        BlockRequestPayload *ptrPayload = ptrData;
+        make_blockreq_message(&message, ptrPayload, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
+        dataSize = serialize_blockreq_message(&message, buffer);
+    }
+    else if (strcmp(command, CMD_GETBLOCKS) == 0) {
+        BlockRequestPayload *ptrPayload = ptrData;
+        make_blockreq_message(&message, ptrPayload, CMD_GETBLOCKS, sizeof(CMD_GETBLOCKS));
+        dataSize = serialize_blockreq_message(&message, buffer);
+    }
+    else if (strcmp(command, CMD_SENDHEADERS) == 0) {
+        make_sendheaders_message(&message);
+        dataSize = serialize_sendheaders_message(&message, buffer);
+    }
+    else if (strcmp(command, CMD_PONG) == 0) {
+        PingpongPayload *ptrPayload = ptrData;
+        make_pong_message(&message, ptrPayload);
+        dataSize = serialize_pingpong_message(&message, buffer);
+    }
+    else if (strcmp(command, XCMD_BINARY) == 0) {
+        struct VariableLengthString *ptrPayload = ptrData;
+        dataSize = ptrPayload->length;
+        memcpy(buffer, ptrPayload->string, dataSize);
+    }
     else {
         fprintf(stderr, "send_message: Cannot recognize command %s", command);
         return;
     }
     uvBuffer.len = dataSize;
 
-    char *ipString = get_peer_ip(req);
-    printf(
-        "Sending %s to peer %s\n",
-        message.header.command,
-        ipString
-    );
-    write_buffer(req, &uvBuffer);
+    char *ipString = get_ip_from_context(socket->data);
+    if (strcmp(command, XCMD_BINARY) == 0) {
+        printf("Sending binary to peer %s\n", ipString);
+        print_object((Byte *)uvBuffer.base, uvBuffer.len);
+    }
+    else {
+        printf(
+            "Sending message %s to peer %s\n",
+            message.header.command,
+            ipString
+        );
+    }
+    write_buffer_to_socket(&uvBuffer, socket);
+    free(message.ptrPayload);
 }
 
+void on_handshake_success(
+    Peer *ptrPeer
+) {
+    uint32_t mainChainHeight = global.mainTip.context.height;
+    printf("Block headers height: us=%u, peer=%u\n", mainChainHeight, ptrPeer->chain_height);
+    if (ptrPeer->chain_height > mainChainHeight) {
+        send_getheaders(&ptrPeer->socket);
+    }
+    else if (ptrPeer->chain_height < mainChainHeight){
+        // TODO: Tell them about new headers
+        printf("Peer knows less headers than us\n");
+    }
+    else {
+        printf("Block headers synced with %s\n", convert_ipv4_readable(ptrPeer->address.ip));
+    }
 
-void on_incoming_message(
+    bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
+
+    if (shouldSendGetaddr) {
+        send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
+    }
+
+    send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
+}
+
+void handle_incoming_message(
     Peer *ptrPeer,
     Message message
 ) {
     print_message(&message);
+    uint32_t now = (uint32_t)time(NULL);
+    set_addr_timestamp(ptrPeer->address.ip, now);
 
     char *command = (char *)message.header.command;
 
     if (strcmp(command, CMD_VERSION) == 0) {
         VersionPayload *ptrPayloadTyped = message.ptrPayload;
-        if (ptrPayloadTyped->version >= parameters.minimalPeerVersion) {
+        if (ptrPayloadTyped->version >= mainnet.minimalPeerVersion) {
             ptrPeer->handshake.acceptThem = true;
         }
+        ptrPeer->chain_height = ptrPayloadTyped->start_height;
         set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
-        send_message(ptrPeer->connection, CMD_VERACK, NULL);
+        send_message(&ptrPeer->socket, CMD_VERACK, NULL);
+        on_handshake_success(ptrPeer);
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
         AddrPayload *ptrPayload = message.ptrPayload;
@@ -221,131 +376,175 @@ void on_incoming_message(
             }
         }
         printf("Skipped %llu IPs\n", skipped);
-        // dedupe_global_addr_cache();
+    }
+    else if (strcmp(command, CMD_PING) == 0) {
+        send_message(&ptrPeer->socket, CMD_PONG, message.ptrPayload);
+    }
+    else if (strcmp(command, CMD_HEADERS) == 0) {
+        HeadersPayload *ptrPayload = message.ptrPayload;
+        for (uint64_t i = 0; i < ptrPayload->count; i++) {
+            BlockPayloadHeader *ptrHeader = &ptrPayload->headers[i].header;
+            int8_t status = process_incoming_block_header(ptrHeader);
+            if (status && status != HEADER_EXISTED) {
+                printf("new header status %i\n", status);
+            }
+        }
+    }
+    else if (strcmp(command, CMD_BLOCK) == 0) {
+        BlockPayload *ptrBlock = message.ptrPayload;
+        process_incoming_block(ptrBlock);
     }
     else if (strcmp(command, CMD_INV) == 0) {
-        InvPayload *ptrPayload = message.ptrPayload;
-        send_message(ptrPeer->connection, CMD_GETDATA, ptrPayload);
+        // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
     }
-
-    bool shouldSendGetaddr =
-        global.peerAddressCount < parameters.getaddrThreshold
-        && ptrPeer->handshake.acceptUs
-        && ptrPeer->handshake.acceptThem
-        && !ptrPeer->flags.attemptedGetaddr
-    ;
-
-    if (shouldSendGetaddr) {
-        send_message(ptrPeer->connection, CMD_GETADDR, NULL);
-        ptrPeer->flags.attemptedGetaddr = true;
-    }
-
-    uint32_t now = (uint32_t)time(NULL);
-    set_addr_timestamp(ptrPeer->address.ip, now);
 }
 
-void reset_message_cache(
-    MessageCache *ptrCache
-) {
-    ptrCache->bufferIndex = 0;
-    ptrCache->expectedLength = 0;
-    memset(ptrCache->buffer, 0, sizeof(ptrCache->buffer));
+bool checksum_match(Byte *ptrBuffer) {
+    Header messageHeader = {0};
+    parse_message_header(ptrBuffer, &messageHeader);
+    PayloadChecksum checksum = {0};
+    calculate_data_checksum(ptrBuffer + sizeof(messageHeader), messageHeader.length, checksum);
+    return memcmp(checksum, messageHeader.checksum, CHECKSUM_SIZE) == 0;
 }
 
-void on_incoming_data(
-    uv_stream_t *client,
+int64_t find_first_magic(Byte *data, uint64_t maxLength) {
+    Byte *p = data;
+    while ((p - data + sizeof(mainnet.magic)) < maxLength) {
+        if (starts_with_magic(p)) {
+            return (int64_t)(p - data);
+        }
+        p++;
+    }
+    return -1;
+}
+
+void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
+    int64_t magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
+    while (magicOffset >= 0) {
+        if (magicOffset != 0) {
+            memcpy(ptrCache->buffer, ptrCache->buffer + magicOffset, ptrCache->bufferIndex - magicOffset);
+            ptrCache->bufferIndex -= magicOffset;
+            printf("Trimmed preceding %llu non-magic bytes", magicOffset);
+        }
+        Header header;
+        parse_message_header(ptrCache->buffer, &header);
+        uint64_t messageSize = sizeof(Header) + header.length;
+        printf("Message loading from %s: (%llu/%llu)\n",
+            convert_ipv4_readable(ptrPeer->address.ip),
+            ptrCache->bufferIndex,
+            messageSize
+        );
+        if (ptrCache->bufferIndex >= messageSize) {
+            Message message = get_empty_message();
+            if (!checksum_match(ptrCache->buffer)) {
+                printf("Payload checksum mismatch");
+                print_message_header(header);
+            }
+            else {
+                int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
+                if (!error) {
+                    handle_incoming_message(ptrPeer, message);
+                }
+            }
+            memcpy(ptrCache->buffer, ptrCache->buffer + messageSize, ptrCache->bufferIndex - messageSize);
+            ptrCache->bufferIndex -= messageSize;
+            magicOffset = find_first_magic(ptrCache->buffer, ptrCache->bufferIndex);
+        }
+        else {
+            break;
+        }
+    }
+}
+
+void on_incoming_segment(
+    uv_stream_t *socket,
     ssize_t nread,
     const uv_buf_t *buf
 ) {
-    ContextData *data = (ContextData *)client->data;
-    MessageCache *ptrCache = &(data->peer->messageCache);
     if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
-            uv_close((uv_handle_t*) client, NULL);
+            uv_close((uv_handle_t*) socket, NULL);
         }
         else {
             // file ended; noop
         }
-    } else {
-        if (begins_with_header(buf->base)) {
-            reset_message_cache(ptrCache);
-            Header header = get_empty_header();
-            parse_message_header((Byte *)buf->base, &header);
-            ptrCache->expectedLength = sizeof(Header) + header.length;
-        }
-        memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, nread);
-        ptrCache->bufferIndex += nread;
-
-        if (ptrCache->bufferIndex == ptrCache->expectedLength) {
-            Message message = get_empty_message();
-            int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
-            if (!error) {
-                on_incoming_message(data->peer, message);
-            }
-            reset_message_cache(ptrCache);
-        }
+        return;
     }
+    SocketContext *ptrContext = (SocketContext *)socket->data;
+    MessageCache *ptrCache = &(ptrContext->streamCache);
+    memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
+    ptrCache->bufferIndex += nread;
+    free(buf->base);
+    extract_message_from_stream_buffer(ptrCache, ptrContext->peer);
 }
 
-void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     buf->base = (char*)malloc(suggested_size);
     buf->len = suggested_size;
 }
 
-void on_peer_connect(uv_connect_t* req, int32_t status) {
-    ContextData *data = (ContextData *)req->data;
-    char *ipString = convert_ipv4_readable(data->peer->address.ip);
-    if (status) {
+void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
+    struct ConnectContext *ptrContext = (struct ConnectContext *)connectRequest->data;
+    char *ipString = convert_ipv4_readable(ptrContext->peer->address.ip);
+    if (error) {
         fprintf(
             stderr,
             "connection failed with peer %s: %s(%i) \n",
             ipString,
-            uv_strerror(status),
-            status
+            uv_strerror(error),
+            error
         );
-        if (data->peer->relationship == REL_MY_SERVER) {
-            disable_ip(data->peer->address.ip);
-            connect_to_random_addr_for_peer(data->peer->index);
+        if (ptrContext->peer->relationship == REL_MY_SERVER) {
+            disable_ip(ptrContext->peer->address.ip);
+            connect_to_random_addr_for_peer(ptrContext->peer->index);
         }
     }
     else {
         printf("connected with peer %s \n", ipString);
-        req->handle->data = req->data;
-        send_message(req, CMD_VERSION, NULL);
-        uv_read_start(req->handle, alloc_buffer, on_incoming_data);
+
+        SocketContext *socketContext = calloc(1, sizeof(*socketContext));
+        socketContext->peer = ptrContext->peer;
+        connectRequest->handle->data = socketContext;
+        send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
+        uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
     }
+    free(connectRequest);
+    free(ptrContext);
 }
 
-int32_t connect_to_address_as_peer(NetworkAddress addr, uint32_t peerIndex) {
-    char *ipString = convert_ipv4_readable(addr.ip);
-    printf("connecting with peer %s for peer %u\n", ipString, peerIndex);
+int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
+    printf(
+        "Initializing peer %u with IP %s \n",
+        peerIndex,
+        convert_ipv4_readable(addr.ip)
+    );
 
     Peer *ptrPeer = &global.peers[peerIndex];
-    memset(ptrPeer, 0, sizeof(Peer));
 
+    reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
     ptrPeer->connectionStart = time(NULL);
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
-    ptrPeer->socket = malloc(sizeof(uv_tcp_t));
-    uv_tcp_init(uv_default_loop(), ptrPeer->socket);
 
-    uv_connect_t* connection = (uv_connect_t*)malloc(sizeof(uv_connect_t));
-    ContextData *data = malloc(sizeof(ContextData)); //TODO: Free me somewhere
-    memset(data, 0, sizeof(ContextData));
-    data->peer = ptrPeer;
-    connection->data = data;
+    // Connection request
+    struct ConnectContext *ptrContext = calloc(1, sizeof(*ptrContext));
+    ptrContext->peer = ptrPeer;
+    uv_connect_t *ptrConnectRequest = calloc(1, sizeof(uv_connect_t));
+    ptrConnectRequest->data = ptrContext;
 
+    // TCP socket
+    uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
+
+    // Connection request
     struct sockaddr_in remoteAddress = {0};
-    uv_ip4_addr(ipString, htons(addr.port), &remoteAddress);
+    uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
     uv_tcp_connect(
-            connection,
-            ptrPeer->socket,
-            (const struct sockaddr*)&remoteAddress,
-            &on_peer_connect
+        ptrConnectRequest,
+        &ptrPeer->socket,
+        (const struct sockaddr*)&remoteAddress,
+        &on_peer_connect
     );
-
-    ptrPeer->connection = connection;
     return 0;
 }
 
@@ -360,7 +559,7 @@ void on_incoming_connection(uv_stream_t *server, int status) {
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
-        uv_read_start((uv_stream_t *) client, alloc_buffer, on_incoming_data);
+        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_segment);
     } else {
         printf("Cannot accept\n");
         uv_close((uv_handle_t*) client, NULL);
@@ -371,12 +570,12 @@ void on_incoming_connection(uv_stream_t *server, int status) {
 int32_t setup_listen_socket() {
     printf("Setting up listen socket...");
     struct sockaddr_in localAddress = {0};
-    uv_ip4_addr("0.0.0.0", parameters.port, &localAddress);
+    uv_ip4_addr("0.0.0.0", mainnet.port, &localAddress);
     uv_tcp_init(uv_default_loop(), &global.listenSocket);
     uv_tcp_bind(&global.listenSocket, (const struct sockaddr*) &localAddress, 0);
     int32_t listenError = uv_listen(
             (uv_stream_t*) &global.listenSocket,
-            parameters.backlog,
+            config.backlog,
             on_incoming_connection);
     if (listenError) {
         fprintf(stderr, "Listen error %s\n", uv_strerror(listenError));
@@ -401,11 +600,11 @@ static NetworkAddress pick_random_nonpeer_addr() {
 
 void connect_to_random_addr_for_peer(uint32_t peerIndex) {
     NetworkAddress addr = pick_random_nonpeer_addr();
-    connect_to_address_as_peer(addr, peerIndex);
+    initialize_peer(peerIndex, addr);
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoing = min(parameters.maxOutgoing, global.peerAddressCount);
+    uint32_t outgoing = min(config.maxOutgoing, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);
         global.peerCount += 1;
@@ -413,16 +612,16 @@ int32_t connect_to_initial_peers() {
     return 0;
 }
 
-int32_t free_networking_resources() {
-    printf("Freeing networking resources...");
+int32_t release_sockets() {
+    printf("Closing sockets...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = &global.peers[peerIndex];
-        uv_handle_t* ptrHandle = (uv_handle_t*)peer->connection->handle;
-        if (!uv_is_closing(ptrHandle)) {
-            uv_close(ptrHandle, NULL);
+        uv_handle_t* socket = (uv_handle_t*)&peer->socket;
+        if (!uv_is_closing(socket)) {
+            uv_read_stop((uv_stream_t *)&peer->socket);
+            uv_close(socket, NULL);
         }
     }
-    uv_loop_close(uv_default_loop());
     printf("Done.\n");
     return 0;
 }

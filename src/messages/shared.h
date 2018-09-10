@@ -13,6 +13,15 @@
 #define CMD_GETDATA "getdata"
 #define CMD_TX "tx"
 #define CMD_BLOCK "block"
+#define CMD_GETHEADERS "getheaders"
+#define CMD_GETBLOCKS "getblocks"
+#define CMD_SENDHEADERS "sendheaders"
+#define CMD_REJECT "reject"
+#define CMD_PING "ping"
+#define CMD_PONG "pong"
+#define CMD_HEADERS "headers"
+
+#define XCMD_BINARY "BINARY"
 
 #define VAR_INT_CHECKPOINT_8  0xFD
 #define VAR_INT_PREFIX_16  0xFD
@@ -76,7 +85,7 @@ struct Message {
 
 typedef struct Message Message;
 
-bool begins_with_header(void *p);
+bool starts_with_magic(void *p);
 
 uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,
@@ -96,3 +105,4 @@ uint64_t parse_as_varstr(
     struct VariableLengthString *ptrResult
 );
 
+uint64_t load_file(char *path, Byte *buffer);

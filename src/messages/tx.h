@@ -15,11 +15,11 @@
 #define MAX_PK_SCRIPT_LENGTH 4096
 #define MAX_WITNESS_DATA_LENGTH 4096
 
-#define MAX_TX_ITEM_PER_TX 128
+#define MAX_TX_ITEM_PER_TX 4096
 
 struct Outpoint {
-    uint32_t index;
     SHA256_HASH hash;
+    uint32_t index;
 };
 
 typedef struct Outpoint Outpoint;
@@ -58,7 +58,6 @@ struct TxPayload {
     TxIn txInputs[MAX_TX_ITEM_PER_TX];
     VarIntMem txOutputCount;
     TxOut txOutputs[MAX_TX_ITEM_PER_TX];
-    VarIntMem txWitnessCount;
     TxWitness txWitnesses[MAX_TX_ITEM_PER_TX];
     uint32_t lockTime;
 };
@@ -72,27 +71,11 @@ struct TxNode {
 
 typedef struct TxNode TxNode;
 
-uint64_t serialize_tx_payload(
-    TxPayload *ptrPayload,
-    Byte *ptrBuffer
-);
-
-uint64_t parse_tx_payload(
-    Byte *ptrBuffer,
-    TxPayload *ptrTx
-);
-
-uint64_t serialize_tx_message(
-    Message *ptrPayload,
-    Byte *ptrBuffer
-);
-
-int32_t make_tx_message(
-    Message *ptrMessage,
-    TxPayload *ptrPayload
-);
-
-int32_t compute_merkle_root(
-    TxNode *ptrFirstTxNode,
-    SHA256_HASH result
-);
+uint64_t serialize_tx_payload(TxPayload *ptrPayload, Byte *ptrBuffer);
+uint64_t parse_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx);
+uint64_t serialize_tx_message(Message *ptrPayload, Byte *ptrBuffer);
+int32_t make_tx_message(Message *ptrMessage, TxPayload *ptrPayload);
+int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result);
+void print_tx_payload(TxPayload *ptrTx);
+bool is_coinbase(TxPayload *ptrTx);
+bool is_tx_legal(TxPayload *ptrTx);

@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "bn.h"
 #include "datatypes.h"
 #include "networking.h"
 #include "peer.h"
@@ -10,8 +11,13 @@
 #include "messages/shared.h"
 #include "messages/version.h"
 #include "messages/block.h"
+#include "messages/blockreq.h"
 #include "test/test.h"
 #include "mine.h"
+#include "hashmap.h"
+#include "blockchain.h"
+#include "config.h"
+#include "persistent.h"
 
 static int32_t test_version_messages() {
     Message message = get_empty_message();
@@ -20,7 +26,7 @@ static int32_t test_version_messages() {
     IP fixtureMyIp = {0};
     IP fixturePeerIp = {0};
 
-    uv_ip4_addr("", parameters.port, &fixtureAddr);
+    uv_ip4_addr("", mainnet.port, &fixtureAddr);
     convert_ipv4_address_to_ip_array(
         fixtureAddr.sin_addr.s_addr,
         fixtureMyIp
@@ -33,7 +39,7 @@ static int32_t test_version_messages() {
     memcpy(myAddress.ip, fixtureMyIp, sizeof(IP));
     global.myAddress = myAddress;
 
-    uv_ip4_addr("138.68.93.0", parameters.port, &fixtureAddr);
+    uv_ip4_addr("138.68.93.0", mainnet.port, &fixtureAddr);
     convert_ipv4_address_to_ip_array(
         fixtureAddr.sin_addr.s_addr,
         fixturePeerIp
@@ -53,7 +59,7 @@ static int32_t test_version_messages() {
     };
     memcpy(fixturePeer.address.ip, fixturePeerIp, sizeof(IP));
 
-    uint8_t messageBuffer[MAX_MESSAGE_LENGTH] = {0};
+    uint8_t messageBuffer[MESSAGE_BUFFER_LENGTH] = {0};
 
     make_version_message(&message, &fixturePeer);
     uint64_t dataSize = serialize_version_message(&message, messageBuffer);
@@ -124,14 +130,12 @@ static void test_block() {
 
 static void test_block_parsing_and_serialization() {
     Message message = get_empty_message();
-    load_block_message("fixtures/block_7323.dat", &message);
+    load_block_message("fixtures/block_2961.dat", &message);
 
-    // Byte messageBuffer[4096] = {0};
-    // serialize_block_message(&message, messageBuffer);
-    // print_object(messageBuffer, message.header.length + sizeof(message.header));
+    print_block_message(&message);
 
     Byte checksum[4] = {0};
-    Byte payloadBuffer[4096] = {0};
+    Byte payloadBuffer[MESSAGE_BUFFER_LENGTH] = {0};
     serialize_block_payload(message.ptrPayload, payloadBuffer);
     calculate_data_checksum(payloadBuffer, message.header.length, checksum);
     printf("Correct checksum:");
@@ -139,12 +143,6 @@ static void test_block_parsing_and_serialization() {
     printf("Calculated checksum from parsed-and-serialized:");
     print_object(checksum, 4);
     printf("Difference = %u (expecting 0)", memcmp(message.header.checksum, checksum, 4));
-
-    /**
-     * Expect checksum to be
-     * 0000 - a1 30 12 ed END
-     */
-
 }
 
 static void test_merkle_on_path(char *path) {
@@ -226,9 +224,147 @@ static void test_mine() {
             }
         }
     }
-    mine_header(ptrPayload->header, nonce, label);
+    mine_block_header(ptrPayload->header, nonce, label);
 }
 
+void test_getheaders() {
+    BlockRequestPayload payload = {
+        .version = config.protocolVersion,
+        .hashCount = 1,
+        .hashStop = {0}
+    };
+    Message genesisMessage = get_empty_message();
+    load_block_message("genesis.dat", &genesisMessage);
+    BlockPayload *ptrBlock = (BlockPayload*) genesisMessage.ptrPayload;
+    SHA256_HASH genesisHash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    memcpy(&payload.blockLocatorHash[0], genesisHash, SHA256_LENGTH);
+
+    Message myMessage = get_empty_message();
+    make_blockreq_message(&myMessage, &payload, CMD_GETHEADERS, sizeof(CMD_GETHEADERS));
+    Byte bufferGenerated[MESSAGE_BUFFER_LENGTH] = {0};
+    uint64_t w1 = serialize_blockreq_message(&myMessage, bufferGenerated);
+
+    Byte bufferFixture[MESSAGE_BUFFER_LENGTH] = {0};
+    uint64_t w2 = load_file("fixtures/getheaders_initial.dat", &bufferFixture[0]);
+
+    print_object(&bufferGenerated, w1);
+    print_object(&bufferFixture, w2);
+    printf("\ndiff = %x (expecting 0)", memcmp(bufferGenerated, bufferFixture, w1));
+    printf("\npayload diff = %u (expecting 0)",
+        memcmp(bufferGenerated + 5, bufferFixture + 5, w1 - sizeof(Header))
+    );
+}
+
+void test_checksum() {
+    Byte payload[] = {
+        0x7f ,0x11 ,0x01 ,0x00 ,0x01 ,0x6f ,0xe2 ,0x8c
+        ,0x0a ,0xb6 ,0xf1 ,0xb3 ,0x72 ,0xc1 ,0xa6 ,0xa2 ,0x46 ,0xae ,0x63 ,0xf7 ,0x4f ,0x93 ,0x1e ,0x83
+        ,0x65 ,0xe1 ,0x5a ,0x08 ,0x9c ,0x68 ,0xd6 ,0x19 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00
+    };
+    Byte buffer[4] = {0};
+    calculate_data_checksum(&payload, 69, buffer);
+    print_object(buffer, 4);
+    /*
+     * Expect:
+     * 0000 - 84 f4 95 8d END
+     */
+}
+
+#define KEY_COUNT 4096
+#define KEY_WIDTH 32
+#define VALUE_WIDTH 100
+
+void test_hashmap() {
+    Hashmap *ptrHashmap = malloc(sizeof(Hashmap));
+    hashmap_init(ptrHashmap, (2 << 24) - 1, KEY_WIDTH);
+
+    Byte keys[KEY_COUNT][KEY_WIDTH];
+    memset(&keys, 0, sizeof(keys));
+    for (uint16_t i = 0; i < KEY_COUNT; i++) {
+        random_bytes(KEY_WIDTH, keys[i]);
+    }
+
+    for (uint32_t i = 0; i < KEY_COUNT; i++) {
+        Byte valueIn[VALUE_WIDTH] = {0};
+        Byte *key = keys[i];
+        sprintf(valueIn, "data->%u", combine_uint32(key));
+        hashmap_set(ptrHashmap, key, &valueIn, VALUE_WIDTH);
+    }
+    puts("");
+
+    for (uint32_t i = 0; i < KEY_COUNT; i++) {
+        Byte valueIn[VALUE_WIDTH] = {0};
+        Byte *key = keys[i];
+        sprintf(valueIn, "data->%u", combine_uint32(key));
+        uint32_t valueLength = 0;
+        Byte valueOut[VALUE_WIDTH];
+        Byte *ptr = hashmap_get(ptrHashmap, key, &valueLength);
+        if (ptr == NULL) {
+            printf("in = %s, out NOT FOUND\n", valueIn);
+        }
+        else {
+            memcpy(valueOut, ptr, valueLength);
+            uint32_t diff = memcmp(valueIn, valueOut, 100);
+            if (diff) {
+                fprintf(stderr, "MISMATCH: in = %s, out = %s, diff = %u\n", valueIn, valueOut, memcmp(valueIn, valueOut, 100));
+            }
+            else {
+                printf("OK ");
+            }
+        }
+    }
+    free(ptrHashmap);
+}
+
+void test_difficulty() {
+    uint32_t target = 0x1d00ffff;
+
+    SHA256_HASH hash2 = {0};
+    uint32_t target2 = 0x18009645;
+    target_4to32(target2, hash2);
+    print_object(hash2, SHA256_LENGTH);
+
+    printf("%i", hash_satisfies_target_compact(hash2, target));
+}
+
+void test_print_hash() {
+    SHA256_HASH hash = {0};
+    Byte data[1] = {""};
+    sha256(data, 0, hash);
+    print_object(hash, SHA256_LENGTH);
+    print_sha256_short(hash);
+}
+
+void test_target_conversions() {
+    // TargetQuodBytes genesisQuod = {0x1a, 0xb9, 0x08, 0x18};
+    TargetCompact genesisQuod = 0x1d00ffff;
+    printf("%f\n", target_compact_to_float(genesisQuod));
+    BIGNUM *genesisBN = BN_new();
+    target_compact_to_bignum(genesisQuod, genesisBN);
+    BN_add_word(genesisBN, 1);
+    printf("genesisBN=%s\n", BN_bn2dec(genesisBN));
+
+    TargetCompact genesisReconstruct = target_bignum_to_compact(genesisBN);
+    printf("Regenerated genesis = %x", genesisReconstruct);
+}
+
+void test_redis() {
+    init_db();
+    Message genesis = get_empty_message();
+    load_block_message("genesis.dat", &genesis);
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+
+    save_block(ptrBlock);
+
+    SHA256_HASH genesisHash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    BlockPayload *ptrBlockLoaded = malloc(sizeof(BlockPayload));
+    load_block(genesisHash, ptrBlockLoaded);
+    print_block_payload(ptrBlockLoaded);
+}
 
 void test() {
     // test_version_messages()
@@ -237,4 +373,12 @@ void test() {
     test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
+    // test_getheaders();
+    // test_checksum();
+    // test_hashmap();
+    // test_difficulty();
+    // test_blockchain_validation();
+    // test_print_hash();
+    // test_target_conversions();
+    // test_redis();
 }

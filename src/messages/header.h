@@ -15,7 +15,7 @@ struct Header {
 
 typedef struct Header Header;
 
-void calculate_data_checksum(void *ptrBuffer, uint32_t count, uint8_t *ptrResult);
+void calculate_data_checksum(void *ptrInput, uint32_t count, uint8_t *ptrResult);
 
 uint64_t parse_message_header(
     uint8_t *buffer,

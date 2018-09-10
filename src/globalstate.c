@@ -5,6 +5,9 @@
 #include "globalstate.h"
 #include "util.h"
 #include "networking.h"
+#include "config.h"
+#include "persistent.h"
+#include "blockchain.h"
 
 GlobalState global;
 
@@ -17,7 +20,7 @@ void add_peer_address(NetworkAddress addr, uint32_t timestamp) {
 }
 
 void dedupe_global_addr_cache() {
-    printf("Duplicating address cache...\n");
+    printf("Deduplicating address cache...\n");
     struct AddrRecord buffer[MAX_ADDR_CACHE];
     memset(buffer, 0, sizeof(buffer));
 
@@ -58,7 +61,7 @@ void clear_old_addr() {
 
     uint32_t newLength = 0;
     for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        bool shouldRemove = (now - global.peerAddresses[index].timestamp > parameters.addrLife);
+        bool shouldRemove = (now - global.peerAddresses[index].timestamp > config.addrLife);
 
         if (!shouldRemove) {
             memcpy(
@@ -85,7 +88,7 @@ int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
         if (ips_equal(ipAtIndex, ip)) {
             global.peerAddresses[index].timestamp = timestamp;
             char *ipString = convert_ipv4_readable(ip);
-            printf("Updated timestamp of ip %s to %u\n", ipString, timestamp);
+            printf("Set timestamp of ip %s to %u\n", ipString, timestamp);
         }
     }
     return 0;
@@ -114,4 +117,27 @@ bool is_peer(IP ip) {
         }
     }
     return false;
+}
+
+int8_t get_next_missing_block(Byte *hash) {
+    SHA256_HASH finderHash = {0xcc};
+    memcpy(finderHash, global.genesisHash, SHA256_LENGTH);
+    do {
+        BlockIndex *index = hashmap_get(&global.blockIndices, finderHash, NULL);
+        if (index == NULL) {
+            return -1;
+        }
+        else if (!index->meta.fullBlockAvailable) {
+            memcpy(hash, finderHash, SHA256_LENGTH);
+            return 0;
+        }
+        else if (index->context.children.length == 0) {
+            // Obtained all blocks
+            return 1;
+        }
+        else {
+            // TODO: Handle side chains
+            memcpy(finderHash, index->context.children.hashes[0], SHA256_LENGTH);
+        }
+    } while (true);
 }
