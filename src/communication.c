@@ -50,13 +50,16 @@ void timeout_peers() {
 
         time_t ping = ptrPeer->requests.ping.pingSent;
         time_t pong = ptrPeer->requests.ping.pongReceived;
+        bool neverReceivedPong = pong == 0;
         bool timeoutForLatePong = ping && (
-            pong == 0 ? now - ping > config.maxPingLatency : pong - ping > config.maxPingLatency
+            neverReceivedPong ? now - ping > config.maxPingLatency : pong - ping > config.maxPingLatency
         );
 
         if (timeoutForLateHandshake || timeoutForLatePong) {
             printf("Timeout peer %u (reason: handshake=%u, pong=%u)\n", i, timeoutForLateHandshake, timeoutForLatePong);
-            disable_ip(ptrPeer->address.ip);
+            if (timeoutForLateHandshake || neverReceivedPong) {
+                disable_ip(ptrPeer->address.ip);
+            }
             uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
             if (ptrHandle && !uv_is_closing(ptrHandle)) {
                 SocketContext *ptrData = calloc(1, sizeof(SocketContext));
