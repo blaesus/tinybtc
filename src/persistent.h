@@ -13,3 +13,4 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock);
 bool check_block_existence(Byte *hash);
 void save_chain_data();
 int8_t save_tx(TxPayload *ptrTx);
+void load_genesis();

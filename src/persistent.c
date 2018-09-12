@@ -242,3 +242,15 @@ void save_chain_data() {
     save_block_indices();
     printf("Done.");
 }
+
+void load_genesis() {
+    printf("Loading genesis block...\n");
+    Message genesis = get_empty_message();
+    load_block_message("genesis.dat", &genesis);
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+    memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
+    hash_block_header(&ptrBlock->header, global.genesisHash);
+    process_incoming_block(ptrBlock);
+    printf("Done.\n");
+}
+
