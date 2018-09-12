@@ -271,10 +271,6 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         fprintf(stderr, "process_incoming_block: cannot find block index\n");
         return -30;
     }
-    bool valid = is_block_valid(ptrBlock, index);
-    if (!valid) {
-        print_hash_with_description("Invalid block ", hash);
-    }
     int8_t saveError = save_block(ptrBlock);
     if (saveError) {
         fprintf(stderr, "save block error\n");
