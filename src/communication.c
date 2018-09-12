@@ -76,16 +76,21 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     if (ptrPeer->chain_height > global.mainTip.context.height) {
         send_getheaders(&ptrPeer->socket);
     }
-    else if (ptrPeer->chain_height == global.mainTip.context.height && is_hash_empty(ptrPeer->requests.block)) {
-        SHA256_HASH nextMissingBlock = {0};
-        int8_t status = get_next_missing_block(nextMissingBlock);
-        if (!status) {
-            print_hash_with_description("requesting block: ", nextMissingBlock);
-            send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-            memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
+    else if (ptrPeer->chain_height == global.mainTip.context.height) {
+        if (is_hash_empty(ptrPeer->requests.block)) {
+            SHA256_HASH nextMissingBlock = {0};
+            int8_t status = get_next_missing_block(nextMissingBlock);
+            if (!status) {
+                print_hash_with_description("requesting block: ", nextMissingBlock);
+                send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
+                memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
+            }
+            else {
+                printf("Block sync status %i\n", status);
+            }
         }
         else {
-            printf("Block sync status %i\n", status);
+            print_hash_with_description("Skipped block request because already requesting ", ptrPeer->requests.block);
         }
     }
     else {
