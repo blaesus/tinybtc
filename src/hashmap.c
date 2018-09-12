@@ -29,14 +29,14 @@ uint64_t calculate_index(Byte *key, uint32_t keyWidth, uint64_t bucketCount) {
 int8_t hashmap_set(Hashmap *ptrHashmap, Byte *key, void *ptrValue, uint32_t valueLength) {
     HashmapNode *ptrNewNode = calloc(1, sizeof(*ptrNewNode));
     if (ptrNewNode == NULL) {
-        printf("FAILRE!\n");
+        printf("Failed to allocate for hashmap node!\n");
         return -1;
     }
     memcpy(ptrNewNode->key, key, ptrHashmap->keyWidth);
     ptrNewNode->valueLength = valueLength;
     ptrNewNode->ptrValue = calloc(1, valueLength);
     if (ptrNewNode->ptrValue == NULL) {
-        printf("FAILRE!\n");
+        printf("Failed to allocate for hashmap value!\n");
         return -2;
     }
     memcpy(ptrNewNode->ptrValue, ptrValue, valueLength);
