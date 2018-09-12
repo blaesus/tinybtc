@@ -11,8 +11,15 @@ struct HandshakeState {
     bool acceptUs : 1;
 };
 
+struct PingState {
+    time_t pingSent;
+    time_t pongReceived;
+    uint64_t nonce;
+};
+
 struct RequestsState {
     SHA256_HASH block;
+    struct PingState ping;
 };
 
 #define REL_MY_SERVER 0

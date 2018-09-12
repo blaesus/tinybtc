@@ -44,17 +44,25 @@ void timeout_peers() {
     time_t now = time(NULL);
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        if (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC) {
-            if (!peerHandShaken(ptrPeer)) {
-                printf("Timeout peer %u\n", i);
-                disable_ip(ptrPeer->address.ip);
-                uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
-                if (ptrHandle && !uv_is_closing(ptrHandle)) {
-                    SocketContext *ptrData = calloc(1, sizeof(SocketContext));
-                    ptrData->peer = ptrPeer;
-                    ptrHandle->data = ptrData;
-                    uv_close(ptrHandle, on_handle_close);
-                }
+        bool timeoutForLateHandshake =
+            (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
+            && !peerHandShaken(ptrPeer);
+
+        time_t ping = ptrPeer->requests.ping.pingSent;
+        time_t pong = ptrPeer->requests.ping.pongReceived;
+        bool timeoutForLatePong = ping && (
+            pong == 0 ? now - ping > config.maxPingLatency : pong - ping > config.maxPingLatency
+        );
+
+        if (timeoutForLateHandshake || timeoutForLatePong) {
+            printf("Timeout peer %u (reason: handshake=%u, pong=%u)\n", i, timeoutForLateHandshake, timeoutForLatePong);
+            disable_ip(ptrPeer->address.ip);
+            uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
+            if (ptrHandle && !uv_is_closing(ptrHandle)) {
+                SocketContext *ptrData = calloc(1, sizeof(SocketContext));
+                ptrData->peer = ptrPeer;
+                ptrHandle->data = ptrData;
+                uv_close(ptrHandle, on_handle_close);
             }
         }
     }
@@ -117,6 +125,25 @@ uint16_t print_node_status() {
     return validPeers;
 }
 
+void ping_peers() {
+    printf("Pinging peers\n");
+    // TODO: Use at least milliseconds. Seconds are too crude.
+    time_t now = time(NULL);
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (!peerHandShaken(ptrPeer)) {
+            continue;
+        }
+        ptrPeer->requests.ping.nonce = random_uint64();
+        ptrPeer->requests.ping.pingSent = now;
+        ptrPeer->requests.ping.pongReceived = 0;
+        PingpongPayload ptrPayload = {
+            .nonce = ptrPeer->requests.ping.nonce
+        };
+        send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
+    }
+}
+
 void on_interval(uv_timer_t *handle) {
     time_t now = time(NULL);
     time_t deltaT = now - global.start_time;
@@ -126,6 +153,9 @@ void on_interval(uv_timer_t *handle) {
     }
     if (deltaT % config.autoSavePeriod == 0) {
         save_chain_data();
+    }
+    if (deltaT % config.pingPeriod == 0) {
+        ping_peers();
     }
     print_node_status();
     if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
@@ -200,6 +230,9 @@ int32_t parse_buffer_into_message(
     else if (strcmp(command, CMD_PING) == 0) {
         return parse_into_pingpong_message(ptrBuffer, ptrMessage);
     }
+    else if (strcmp(command, CMD_PONG) == 0) {
+        return parse_into_pingpong_message(ptrBuffer, ptrMessage);
+    }
     else if (strcmp(command, CMD_HEADERS) == 0) {
         return parse_into_headers_message(ptrBuffer, ptrMessage);
     }
@@ -243,11 +276,7 @@ void write_buffer_to_socket(
     uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_sent);
 }
 
-void send_message(
-    uv_tcp_t *socket,
-    char *command,
-    void *ptrData
-) {
+void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
     Message message = get_empty_message();
     SocketContext *ptrContext = (SocketContext *)socket->data;
     Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH);
@@ -291,6 +320,11 @@ void send_message(
     else if (strcmp(command, CMD_SENDHEADERS) == 0) {
         make_sendheaders_message(&message);
         dataSize = serialize_sendheaders_message(&message, buffer);
+    }
+    else if (strcmp(command, CMD_PING) == 0) {
+        PingpongPayload *ptrPayload = ptrData;
+        make_ping_message(&message, ptrPayload);
+        dataSize = serialize_pingpong_message(&message, buffer);
     }
     else if (strcmp(command, CMD_PONG) == 0) {
         PingpongPayload *ptrPayload = ptrData;
@@ -372,6 +406,16 @@ void handle_incoming_message(
     }
     else if (strcmp(command, CMD_PING) == 0) {
         send_message(&ptrPeer->socket, CMD_PONG, message.ptrPayload);
+    }
+    else if (strcmp(command, CMD_PONG) == 0) {
+        PingpongPayload *ptrPayload = message.ptrPayload;
+        if (ptrPayload->nonce == ptrPeer->requests.ping.nonce) {
+            ptrPeer->requests.ping.pongReceived = now;
+        }
+        else {
+            printf("Unexpected pong nonce: received %llu, expecting %llu\n",
+                ptrPayload->nonce, ptrPeer->requests.ping.nonce);
+        }
     }
     else if (strcmp(command, CMD_HEADERS) == 0) {
         HeadersPayload *ptrPayload = message.ptrPayload;

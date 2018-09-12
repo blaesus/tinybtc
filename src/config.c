@@ -5,6 +5,8 @@
 const struct Config config = {
     .autoExitPeriod = MINUTE(20),
     .autoSavePeriod = 60,
+    .pingPeriod = 59,
+    .maxPingLatency = 2,
     .mainTimerInterval = 1000,
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
