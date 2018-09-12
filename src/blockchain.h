@@ -48,4 +48,4 @@ uint32_t target_bignum_to_compact(BIGNUM *ptrTarget);
 double calc_block_pow(TargetCompact targetFloat);
 int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader);
 int8_t process_incoming_block(BlockPayload *ptrBlock);
-void recalculate_block_indices();
+void recalculate_block_index_meta();

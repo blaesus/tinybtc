@@ -62,9 +62,22 @@ bool is_block_header_valid(BlockIndex *index) {
     return headerValid;
 }
 
-bool is_tx_valid(TxNode *ptrNode) {
-    printf("validating tx of flag %u\n", ptrNode->tx.flag);
+bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
+    printf("validating ");
+    print_tx_payload(&ptrNode->tx);
+    printf("\n");
+
     // TODO: Implement script
+
+    if (is_coinbase(&ptrNode->tx)) {
+        int64_t subsidy = COIN(50) >> (blockIndex->context.height / 210000);
+        printf("Actual output %lli, correct output %lli\n", ptrNode->tx.txOutputs->value, subsidy);
+        if (ptrNode->tx.txOutputs->value > subsidy) {
+            return false;
+        }
+    }
+    else {
+    }
     return true;
 }
 
@@ -72,7 +85,7 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
     bool allTxValid = true;
     TxNode *p = ptrCandidate->ptrFirstTxNode;
     while (p) {
-        if (!is_tx_valid(p)) {
+        if (!is_tx_valid(p, ptrIndex)) {
             allTxValid = false;
             break;
         }
@@ -288,12 +301,15 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-void recalculate_block_indices() {
-    printf("Reindexing block indices...");
+void recalculate_block_index_meta() {
+    printf("Reindexing block indices...\n");
     Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
-    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    for (uint32_t i = 0; i < keyCount; i++) {
-        printf("reindexing %u/%u\n", i, keyCount);
+    uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    uint32_t fullBlockAvailable = 0;
+    for (uint32_t i = 0; i < indexCount; i++) {
+        if (i % 1000 == 0) {
+            printf("checking block index meta %u/%u\n", i, indexCount);
+        }
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
         BlockIndex *ptrIndex = hashmap_get(&global.blockIndices, key, NULL);
@@ -303,7 +319,11 @@ void recalculate_block_indices() {
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
         ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        if (ptrIndex->meta.fullBlockAvailable) {
+            fullBlockAvailable++;
+        }
     }
     free(keys); // recalculate_block_indices:keys
-    printf("Done.");
+    printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
+    printf("Done.\n");
 }

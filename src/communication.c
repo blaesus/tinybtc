@@ -31,10 +31,6 @@
 void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 
-bool peerHandShaken(Peer *ptrPeer) {
-    return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
-}
-
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
     connect_to_random_addr_for_peer(data->peer->index);
@@ -47,7 +43,7 @@ void timeout_peers() {
         Peer *ptrPeer = &global.peers[i];
         bool timeoutForLateHandshake =
             (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
-            && !peerHandShaken(ptrPeer);
+            && !peer_hand_shaken(ptrPeer);
 
         time_t ping = ptrPeer->requests.ping.pingSent;
         time_t pong = ptrPeer->requests.ping.pongReceived;
@@ -59,18 +55,17 @@ void timeout_peers() {
         if (timeoutForLateHandshake || timeoutForLatePong) {
             printf("Timeout peer %u (reason: handshake=%u, pong=%u)\n", i, timeoutForLateHandshake, timeoutForLatePong);
             if (timeoutForLateHandshake || neverReceivedPong) {
-                disable_ip(ptrPeer->address.ip);
-            }
-            uv_handle_t *ptrHandle = (uv_handle_t *)&ptrPeer->socket;
-            if (ptrHandle && !uv_is_closing(ptrHandle)) {
-                if (ptrHandle->data) {
-                    free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
-                    ptrHandle->data = NULL;
+                uv_handle_t *ptrHandle = (uv_handle_t *) &ptrPeer->socket;
+                if (ptrHandle && !uv_is_closing(ptrHandle)) {
+                    if (ptrHandle->data) {
+                        free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
+                        ptrHandle->data = NULL;
+                    }
+                    SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
+                    ptrData->peer = ptrPeer;
+                    ptrHandle->data = ptrData;
+                    uv_close(ptrHandle, on_handle_close);
                 }
-                SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
-                ptrData->peer = ptrPeer;
-                ptrHandle->data = ptrData;
-                uv_close(ptrHandle, on_handle_close);
             }
         }
     }
@@ -107,7 +102,7 @@ void request_data_from_peers() {
     printf("Requesting data from peers...\n");
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        if (!peerHandShaken(ptrPeer)) {
+        if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
         data_exchange_with_peer(ptrPeer);
@@ -120,7 +115,7 @@ uint16_t print_node_status() {
     printf("peers handshake: ");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (peerHandShaken(&global.peers[i])) {
+        if (peer_hand_shaken(&global.peers[i])) {
             validPeers++;
             printf("O ");
         }
@@ -144,7 +139,7 @@ void ping_peers() {
     time_t now = time(NULL);
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        if (!peerHandShaken(ptrPeer)) {
+        if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
         ptrPeer->requests.ping.nonce = random_uint64();

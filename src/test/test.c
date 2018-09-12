@@ -367,11 +367,23 @@ void test_redis() {
     free(ptrBlockLoaded); // test_redis:payload
 }
 
+void test_ripe() {
+    char *input = "hello";
+    RIPEMD_HASH hash = {0};
+    sharipe(input, strlen(input), hash);
+    print_object(hash, RIPEMD_LENGTH);
+    /*
+     * Should be:
+        0000 - b6 a9 c8 c2 30 72 2b 7c 74 83 31 a8 b4 50 f0 55
+        0010 - 66 dc 7d 0f END
+     */
+}
+
 void test() {
     // test_version_messages()
     // test_genesis();
     // test_block();
-    test_block_parsing_and_serialization();
+    // test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
     // test_getheaders();
@@ -382,4 +394,5 @@ void test() {
     // test_print_hash();
     // test_target_conversions();
     // test_redis();
+    test_ripe();
 }
