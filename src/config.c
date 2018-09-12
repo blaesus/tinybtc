@@ -14,7 +14,7 @@ const struct Config config = {
     .userAgent = "/Satoshi:0.16.2/tinybtc:0.0.1/",
     .backlog = 32,
     .getaddrThreshold = 1000,
-    .peerDataRequestPeriod = 10,
+    .peerDataRequestPeriod = 1,
     .redisHost = "127.0.0.1",
     .redisPort = 6379,
 };

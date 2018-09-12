@@ -127,7 +127,7 @@ int8_t get_next_missing_block(Byte *hash) {
         if (index == NULL) {
             return -1;
         }
-        else if (!index->meta.fullBlockAvailable) {
+        else if (!index->meta.fullBlockAvailable && !is_block_being_requested(finderHash)) {
             memcpy(hash, finderHash, SHA256_LENGTH);
             return 0;
         }
@@ -140,4 +140,14 @@ int8_t get_next_missing_block(Byte *hash) {
             memcpy(finderHash, index->context.children.hashes[0], SHA256_LENGTH);
         }
     } while (true);
+}
+
+bool is_block_being_requested(Byte *hash) {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Byte *requesting = global.peers[i].requests.block;
+        if (memcmp(requesting, hash, SHA256_LENGTH) == 0) {
+            return true;
+        }
+    }
+    return false;
 }

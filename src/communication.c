@@ -60,26 +60,36 @@ void timeout_peers() {
     }
 }
 
+void data_exchange_with_peer(Peer *ptrPeer) {
+    printf("Executing data exchange with peer %u (%s)\n", ptrPeer->index, convert_ipv4_readable(ptrPeer->address.ip));
+    if (ptrPeer->chain_height > global.mainTip.context.height) {
+        send_getheaders(&ptrPeer->socket);
+    }
+    else if (ptrPeer->chain_height == global.mainTip.context.height && is_hash_empty(ptrPeer->requests.block)) {
+        SHA256_HASH nextMissingBlock = {0};
+        int8_t status = get_next_missing_block(nextMissingBlock);
+        if (!status) {
+            print_hash_with_description("requesting block: ", nextMissingBlock);
+            send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
+            memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
+        }
+        else {
+            printf("Block sync status %i\n", status);
+        }
+    }
+    else {
+        // Peers has less data
+    }
+}
+
 void request_data_from_peers() {
+    printf("Requesting data from peers...\n");
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peerHandShaken(ptrPeer)) {
             continue;
         }
-        if (ptrPeer->chain_height > global.mainTip.context.height) {
-            send_getheaders(&ptrPeer->socket);
-        }
-        if (ptrPeer->chain_height == global.mainTip.context.height) {
-            SHA256_HASH nextMissingBlock = {0};
-            int8_t status = get_next_missing_block(nextMissingBlock);
-            if (!status) {
-                print_hash_with_description("next missing block: ", nextMissingBlock);
-                send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-            }
-            else {
-                printf("Block sync status %i\n", status);
-            }
-        }
+        data_exchange_with_peer(ptrPeer);
     }
 }
 
@@ -314,29 +324,12 @@ void send_message(
     free(message.ptrPayload);
 }
 
-void on_handshake_success(
-    Peer *ptrPeer
-) {
-    uint32_t mainChainHeight = global.mainTip.context.height;
-    printf("Block headers height: us=%u, peer=%u\n", mainChainHeight, ptrPeer->chain_height);
-    if (ptrPeer->chain_height > mainChainHeight) {
-        send_getheaders(&ptrPeer->socket);
-    }
-    else if (ptrPeer->chain_height < mainChainHeight){
-        // TODO: Tell them about new headers
-        printf("Peer knows less headers than us\n");
-    }
-    else {
-        printf("Block headers synced with %s\n", convert_ipv4_readable(ptrPeer->address.ip));
-    }
-
+void on_handshake_success(Peer *ptrPeer) {
+    data_exchange_with_peer(ptrPeer);
     bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
-
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
     }
-
-    send_message(&ptrPeer->socket, CMD_SENDHEADERS, NULL);
 }
 
 void handle_incoming_message(
@@ -393,6 +386,7 @@ void handle_incoming_message(
     else if (strcmp(command, CMD_BLOCK) == 0) {
         BlockPayload *ptrBlock = message.ptrPayload;
         process_incoming_block(ptrBlock);
+        memset(ptrPeer->requests.block, 0, SHA256_LENGTH);
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);

@@ -89,5 +89,5 @@ uint64_t serialize_pingpong_message(
 void print_pingpong_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
     PingpongPayload *ptrPayload = (PingpongPayload *)ptrMessage->ptrPayload;
-    printf("payload: count=%llu\n", ptrPayload->nonce);
+    printf("payload: nonce=%llu\n", ptrPayload->nonce);
 }

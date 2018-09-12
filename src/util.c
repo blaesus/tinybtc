@@ -155,3 +155,9 @@ int8_t bytescmp(
     return 0;
 }
 
+char *date_string(time_t time) {
+    static char text[100];
+    struct tm *timeInfo = localtime(&time);
+    strftime(text, sizeof(text)-1, "%Y-%m-%d %H:%M:%S", timeInfo);
+    return text;
+}

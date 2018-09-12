@@ -4,10 +4,15 @@
 #include <stdint.h>
 #include "uv/uv.h"
 #include "datatypes.h"
+#include "hash.h"
 
 struct HandshakeState {
     bool acceptThem : 1;
     bool acceptUs : 1;
+};
+
+struct RequestsState {
+    SHA256_HASH block;
 };
 
 #define REL_MY_SERVER 0
@@ -16,6 +21,7 @@ struct HandshakeState {
 struct Peer {
     uint32_t index;
     struct HandshakeState handshake;
+    struct RequestsState requests;
 
     uv_tcp_t socket;
     time_t connectionStart;

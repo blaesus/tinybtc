@@ -129,7 +129,10 @@ void print_block_message(Message *ptrMessage) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrPayload->header, hash);
     print_hash_with_description("hash = ", hash);
-    printf("payload: %llu transactions, the first being:\n", ptrPayload->txCount);
+    printf("payload: %s; %llu transactions, the first being:\n",
+           date_string(ptrPayload->header.timestamp),
+           ptrPayload->txCount
+    );
     print_tx_payload(&ptrPayload->ptrFirstTxNode->tx);
     printf("\n");
 }

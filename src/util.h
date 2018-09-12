@@ -22,3 +22,4 @@ bool ips_equal(IP ipA, IP ipB);
 int64_t getFileSize(FILE *file);
 void reverse_endian(Byte *data, uint32_t width);
 int8_t bytescmp(const Byte *bytesA, const Byte *bytesB, uint32_t width);
+char *date_string(time_t time);

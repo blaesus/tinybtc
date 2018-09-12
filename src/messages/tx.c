@@ -258,11 +258,6 @@ void print_tx_payload(TxPayload *ptrTx) {
     );
 }
 
-bool is_hash_empty(Byte *hash) {
-    SHA256_HASH empty = {0};
-    return memcmp(hash, empty, SHA256_LENGTH) == 0;
-}
-
 bool is_outpoint_empty(Outpoint *ptrOutpoint) {
     return (ptrOutpoint->index == UINT32_MAX) && is_hash_empty(ptrOutpoint->hash);
 }
