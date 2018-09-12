@@ -41,7 +41,6 @@ void load_genesis() {
     BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
     memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
     hash_block_header(&ptrBlock->header, global.genesisHash);
-    free(genesis.ptrPayload);
     process_incoming_block(ptrBlock);
     printf("Done.\n");
 }
