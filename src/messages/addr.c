@@ -36,7 +36,7 @@ int32_t parse_into_addr_message(
 
     AddrPayload payload = {0};
     parse_addr_payload(ptrBuffer + sizeof(header), &payload);
-    ptrMessage->ptrPayload = malloc(sizeof(AddrPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(AddrPayload)); // parse_message:payload
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

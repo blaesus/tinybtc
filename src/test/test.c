@@ -278,7 +278,7 @@ void test_checksum() {
 #define VALUE_WIDTH 100
 
 void test_hashmap() {
-    Hashmap *ptrHashmap = malloc(sizeof(Hashmap));
+    Hashmap *ptrHashmap = malloc(sizeof(Hashmap)); // test_hashmap_hashmap
     hashmap_init(ptrHashmap, (2 << 24) - 1, KEY_WIDTH);
 
     Byte keys[KEY_COUNT][KEY_WIDTH];
@@ -316,7 +316,7 @@ void test_hashmap() {
             }
         }
     }
-    free(ptrHashmap);
+    free(ptrHashmap); // test_hashmap_hashmap
 }
 
 void test_difficulty() {
@@ -361,9 +361,10 @@ void test_redis() {
 
     SHA256_HASH genesisHash = {0};
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
-    BlockPayload *ptrBlockLoaded = malloc(sizeof(BlockPayload));
+    BlockPayload *ptrBlockLoaded = malloc(sizeof(BlockPayload)); // test_redis:payload
     load_block(genesisHash, ptrBlockLoaded);
     print_block_payload(ptrBlockLoaded);
+    free(ptrBlockLoaded); // test_redis:payload
 }
 
 void test() {

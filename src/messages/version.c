@@ -83,15 +83,15 @@ int32_t make_version_message(
     struct Message *ptrMessage,
     Peer *ptrPeer
 ) {
-    struct VersionPayload payload = {0};
+    VersionPayload payload = {0};
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
     uint8_t checksumCalculationBuffer[MESSAGE_BUFFER_LENGTH] = {0};
     serialize_version_payload(&payload, checksumCalculationBuffer, MESSAGE_BUFFER_LENGTH);
     ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
-    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));
-    memcpy(ptrMessage->ptrPayload, &payload, sizeof(struct VersionPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(VersionPayload)); // make_message_payload
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(VersionPayload));
     calculate_data_checksum(
         checksumCalculationBuffer,
         ptrMessage->header.length,
@@ -169,7 +169,7 @@ int32_t parse_into_version_message(
     parse_message_header(ptrBuffer, &header);
     parse_version_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload)); // parse_message:payload
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

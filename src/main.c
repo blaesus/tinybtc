@@ -59,7 +59,7 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
-    // recalculate_block_indices();
+    recalculate_block_indices();
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();

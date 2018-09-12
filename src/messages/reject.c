@@ -25,7 +25,7 @@ int32_t parse_into_reject_message(
 
     RejectPayload payload = {0};
     parse_reject_payload(ptrBuffer + sizeof(header), &payload);
-    ptrMessage->ptrPayload = malloc(sizeof(RejectPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(RejectPayload)); // parse_message:payload
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

@@ -41,7 +41,7 @@ int32_t make_blockreq_message(
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
 
-    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // make_message:payload
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(BlockRequestPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -68,21 +68,19 @@ uint64_t serialize_blockreq_message(
     return messageHeaderSize + ptrMessage->header.length;
 }
 
-uint64_t load_blockreq_message(
-    char *path,
-    Message *ptrMessage
-) {
+uint64_t load_blockreq_message(char *path, Message *ptrMessage) {
     FILE *file = fopen(path, "rb");
 
     fread(ptrMessage, sizeof(ptrMessage->header), 1, file);
 
     uint64_t payloadLength = ptrMessage->header.length;
-    Byte *buffer = malloc(payloadLength);
+    Byte *buffer = malloc(payloadLength); // load_blockreq_message:buffer
     fread(buffer, payloadLength, 1, file);
 
-    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // load_blockreq_message:payload
     parse_blockreq_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
+    free(buffer); // load_blockreq_message:buffer
 
     return sizeof(ptrMessage->header)+payloadLength;
 }

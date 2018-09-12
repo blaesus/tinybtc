@@ -290,7 +290,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
 
 void recalculate_block_indices() {
     printf("Reindexing block indices...");
-    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH);
+    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     for (uint32_t i = 0; i < keyCount; i++) {
         printf("reindexing %u/%u\n", i, keyCount);
@@ -304,5 +304,6 @@ void recalculate_block_indices() {
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
         ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
     }
+    free(keys); // recalculate_block_indices:keys
     printf("Done.");
 }
