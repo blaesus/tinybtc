@@ -13,6 +13,8 @@
 struct Config {
     int32_t autoExitPeriod;
     int32_t autoSavePeriod;
+    int32_t pingPeriod;
+    int32_t maxPingLatency;
     uint32_t mainTimerInterval;
     int32_t protocolVersion;
     uint8_t userAgent[128];

@@ -55,3 +55,4 @@ int32_t disable_ip(IP ip);
 
 bool is_peer(IP ip);
 int8_t get_next_missing_block(Byte *hash);
+bool is_block_being_requested(Byte *hash);

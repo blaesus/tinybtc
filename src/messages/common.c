@@ -86,7 +86,7 @@ int32_t parse_into_iv_message(
     parse_message_header(ptrBuffer, &header);
     parse_iv_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(GenericIVPayload)); // parse_message:payload
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

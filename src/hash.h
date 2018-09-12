@@ -13,3 +13,4 @@ void print_sha256(Byte *hash);
 void print_sha256_reverse(Byte *hash);
 void print_sha256_short(Byte *hash);
 void print_hash_with_description(char *description, Byte *hash);
+bool is_hash_empty(Byte *hash);

@@ -105,7 +105,7 @@ int32_t save_block_indices(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
     fwrite(&global.mainTip, sizeof(global.mainTip), 1, file);
 
-    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH);
+    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // save_block_indices:keys
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
@@ -123,7 +123,7 @@ int32_t save_block_indices(void) {
         }
     }
     printf("Exported %u block indices \n", actualCount);
-    free(keys);
+    free(keys); // [FREE] save_block_indices:keys
     fclose(file);
     return 0;
 }
@@ -150,7 +150,7 @@ int32_t load_block_indices(void) {
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_block:buffer
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
     redisReply *reply = redisCommand(
         global.ptrRedisContext,
@@ -166,12 +166,12 @@ int8_t save_block(BlockPayload *ptrBlock) {
         return -2;
     }
     freeReplyObject(reply);
-    free(buffer);
+    free(buffer); // [FREE] save_block:buffer
     return 0;
 }
 
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_block:buffer
     redisReply *reply = redisCommand(
         global.ptrRedisContext,
         "GET %b",
@@ -188,13 +188,13 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     memcpy(buffer, reply->str, reply->len);
     parse_into_block_payload(buffer, ptrBlock);
     freeReplyObject(reply);
-    free(buffer);
+    free(buffer); // [FREE] load_block:buffer
     return 0;
 }
 
 
 int8_t save_tx(TxPayload *ptrTx) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_tx:buffer
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
     SHA256_HASH hash = {0};
     dsha256(buffer, (uint32_t)width, hash);
@@ -212,7 +212,7 @@ int8_t save_tx(TxPayload *ptrTx) {
         return -2;
     }
     freeReplyObject(reply);
-    free(buffer);
+    free(buffer); // [FREE] save_tx:buffer
     return 0;
 }
 

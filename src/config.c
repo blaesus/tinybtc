@@ -5,6 +5,8 @@
 const struct Config config = {
     .autoExitPeriod = MINUTE(20),
     .autoSavePeriod = 60,
+    .pingPeriod = 59,
+    .maxPingLatency = 2,
     .mainTimerInterval = 1000,
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
@@ -14,7 +16,7 @@ const struct Config config = {
     .userAgent = "/Satoshi:0.16.2/tinybtc:0.0.1/",
     .backlog = 32,
     .getaddrThreshold = 1000,
-    .peerDataRequestPeriod = 10,
+    .peerDataRequestPeriod = 1,
     .redisHost = "127.0.0.1",
     .redisPort = 6379,
 };

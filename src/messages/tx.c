@@ -159,7 +159,7 @@ int32_t make_tx_message(
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_TX, sizeof(CMD_TX));
 
-    ptrMessage->ptrPayload = malloc(sizeof(TxPayload));
+    ptrMessage->ptrPayload = malloc(sizeof(TxPayload)); // make_message:payload
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(TxPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -214,7 +214,7 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
     HashNode *ptrPreviousHashNode = NULL;
     TxNode *ptrTxNode = ptrFirstTxNode;
     while (ptrTxNode) {
-        HashNode *newHashNode = calloc(1, sizeof(HashNode));
+        HashNode *newHashNode = calloc(1, sizeof(HashNode)); // compute_merkle_root:HashNode
         hash_tx(&ptrTxNode->tx, newHashNode->hash);
         if (!ptrFirstHashNode) {
             ptrFirstHashNode = newHashNode;
@@ -246,6 +246,14 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
     }
     memcpy(result, ptrFirstHashNode->hash, SHA256_LENGTH);
 
+    // Free
+    HashNode *p = ptrFirstHashNode;
+    while (p) {
+        HashNode *freeTarget = p;
+        p = p->next;
+        free(freeTarget); // [FREE] compute_merkle_root:HashNode
+    }
+
     return 0;
 }
 
@@ -256,11 +264,6 @@ void print_tx_payload(TxPayload *ptrTx) {
         ptrTx->txInputCount,
         ptrTx->txOutputCount
     );
-}
-
-bool is_hash_empty(Byte *hash) {
-    SHA256_HASH empty = {0};
-    return memcmp(hash, empty, SHA256_LENGTH) == 0;
 }
 
 bool is_outpoint_empty(Outpoint *ptrOutpoint) {

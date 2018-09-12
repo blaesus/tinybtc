@@ -23,6 +23,7 @@ struct BlockChildren {
 struct BlockMeta {
     SHA256_HASH hash;
     bool fullBlockAvailable;
+    bool fullBlockValidated;
 };
 
 struct BlockContext {

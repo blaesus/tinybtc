@@ -47,3 +47,8 @@ void print_hash_with_description(char *description, Byte *hash) {
 void print_sha256_short(Byte *hash) {
     print_hex_of_width(hash, 8);
 }
+
+bool is_hash_empty(Byte *hash) {
+    SHA256_HASH empty = {0};
+    return memcmp(hash, empty, SHA256_LENGTH) == 0;
+}
