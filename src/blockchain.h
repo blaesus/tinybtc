@@ -49,3 +49,4 @@ double calc_block_pow(TargetCompact targetFloat);
 int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader);
 int8_t process_incoming_block(BlockPayload *ptrBlock);
 void recalculate_block_index_meta();
+bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex);

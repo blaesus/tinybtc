@@ -19,6 +19,7 @@
 #include "config.h"
 #include "persistent.h"
 
+
 static int32_t test_version_messages() {
     Message message = get_empty_message();
 
@@ -379,6 +380,24 @@ void test_ripe() {
      */
 }
 
+void test_script() {
+    global.start_time = time(NULL);
+    srand((unsigned int)global.start_time);
+    hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+    init_db();
+    load_genesis();
+    load_block_indices();
+
+    char *targetBlock = "84025f51f4510feaa820ee0aee32e9e7480a309cceea40ccff69450000000000";
+    SHA256_HASH targetHash = {0};
+    sha256_string_to_array(targetBlock, targetHash);
+
+    BlockIndex *index = GET_BLOCK_INDEX(targetHash);
+    BlockPayload block = {0};
+    load_block(targetHash, &block);
+    printf("block validity=%u\n", is_block_valid(&block, index));
+}
+
 void test() {
     // test_version_messages()
     // test_genesis();
@@ -394,5 +413,6 @@ void test() {
     // test_print_hash();
     // test_target_conversions();
     // test_redis();
-    test_ripe();
+    // test_ripe();
+    test_script();
 }

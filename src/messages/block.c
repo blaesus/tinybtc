@@ -49,7 +49,7 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     TxNode *ptrPreviousNode = NULL;
     for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
         TxNode *ptrNewNode = calloc(1, sizeof(TxNode)); // parse_block:TxNode
-        p += parse_tx_payload(p, &ptrNewNode->tx);
+        p += parse_into_tx_payload(p, &ptrNewNode->tx);
         if (!ptrBlock->ptrFirstTxNode) {
             ptrBlock->ptrFirstTxNode = ptrNewNode;
         }

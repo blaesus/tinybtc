@@ -27,8 +27,8 @@ static uint64_t serialize_tx_in(
 ) {
     Byte *p = ptrBuffer;
     p += serialize_outpoint(&ptrTxIn->previous_output, p);
-    p += serialize_to_varint(ptrTxIn->script_length, p);
-    p += SERIALIZE_TO_OF_LENGTH(ptrTxIn->signature_script, p, ptrTxIn->script_length);
+    p += serialize_to_varint(ptrTxIn->signature_script_length, p);
+    p += SERIALIZE_TO_OF_LENGTH(ptrTxIn->signature_script, p, ptrTxIn->signature_script_length);
     p += SERIALIZE_TO(ptrTxIn->sequence, p);
     return p - ptrBuffer;
 }
@@ -39,8 +39,8 @@ static uint64_t serialize_tx_out(
 ) {
     Byte *p = ptrBuffer;
     p += SERIALIZE_TO(ptrTxOut->value, p);
-    p += serialize_to_varint(ptrTxOut->pk_script_length, p);
-    p += SERIALIZE_TO_OF_LENGTH(ptrTxOut->pk_script, p, ptrTxOut->pk_script_length);
+    p += serialize_to_varint(ptrTxOut->public_key_script_length, p);
+    p += SERIALIZE_TO_OF_LENGTH(ptrTxOut->public_key_script, p, ptrTxOut->public_key_script_length);
     return p - ptrBuffer;
 }
 
@@ -92,8 +92,8 @@ static uint64_t parse_tx_in(
 ) {
     Byte *p = ptrBuffer;
     p += parse_outpoint(p, &ptrTxIn->previous_output);
-    p += parse_varint(p, &ptrTxIn->script_length);
-    p += PARSE_INTO_OF_LENGTH(p, &ptrTxIn->signature_script, ptrTxIn->script_length);
+    p += parse_varint(p, &ptrTxIn->signature_script_length);
+    p += PARSE_INTO_OF_LENGTH(p, &ptrTxIn->signature_script, ptrTxIn->signature_script_length);
     p += PARSE_INTO(p, &ptrTxIn->sequence);
     return p - ptrBuffer;
 }
@@ -104,8 +104,8 @@ static uint64_t parse_tx_out(
 ) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrTxOut->value);
-    p += parse_varint(p, &ptrTxOut->pk_script_length);
-    p += PARSE_INTO_OF_LENGTH(p, &ptrTxOut->pk_script, ptrTxOut->pk_script_length);
+    p += parse_varint(p, &ptrTxOut->public_key_script_length);
+    p += PARSE_INTO_OF_LENGTH(p, &ptrTxOut->public_key_script, ptrTxOut->public_key_script_length);
     return p - ptrBuffer;
 }
 
@@ -119,7 +119,7 @@ static uint64_t parse_tx_witness(
     return p - ptrBuffer;
 }
 
-uint64_t parse_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
+uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrTx->version);
 
@@ -290,8 +290,8 @@ bool is_tx_legal(TxPayload *ptrTx) {
     bool inputsLegal = true;
     if (is_coinbase(ptrTx)) {
         TxIn firstIn = ptrTx->txInputs[0];
-        inputsLegal = firstIn.script_length <= mainnet.scriptSigSizeUpper
-                      && firstIn.script_length >= mainnet.scriptSigSizeLower;
+        inputsLegal = firstIn.signature_script_length <= mainnet.scriptSigSizeUpper
+                      && firstIn.signature_script_length >= mainnet.scriptSigSizeLower;
     }
     else {
         for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {

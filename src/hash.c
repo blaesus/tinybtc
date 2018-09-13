@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include "openssl/sha.h"
 #include "openssl/ripemd.h"
 #include "datatypes.h"
@@ -60,4 +62,13 @@ void sharipe(void *data, uint32_t length, SHA256_HASH result) {
     RIPEMD160_Init(&context);
     RIPEMD160_Update(&context, sha256Hash, SHA256_LENGTH);
     RIPEMD160_Final(result, &context);
+}
+
+void sha256_string_to_array(char *str, Byte *hash) {
+    char byteString[3] = {0};
+    for (uint16_t i = 0; i < SHA256_LENGTH; i++) {
+        memcpy(byteString, str + 2*i, 2);
+        Byte byteDigit = (Byte)strtol(byteString, NULL, 16);
+        hash[i] = byteDigit;
+    }
 }

@@ -120,7 +120,7 @@ bool is_peer(IP ip) {
 }
 
 int8_t get_next_missing_block(Byte *hash) {
-    SHA256_HASH finderHash = {0xcc};
+    SHA256_HASH finderHash = {0};
     memcpy(finderHash, global.genesisHash, SHA256_LENGTH);
     do {
         BlockIndex *index = hashmap_get(&global.blockIndices, finderHash, NULL);

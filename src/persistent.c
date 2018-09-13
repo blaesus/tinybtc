@@ -192,7 +192,6 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     return 0;
 }
 
-
 int8_t save_tx(TxPayload *ptrTx) {
     Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_tx:buffer
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
@@ -213,6 +212,28 @@ int8_t save_tx(TxPayload *ptrTx) {
     }
     freeReplyObject(reply);
     free(buffer); // [FREE] save_tx:buffer
+    return 0;
+}
+
+int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_tx:buffer
+    redisReply *reply = redisCommand(
+        global.ptrRedisContext,
+        "GET %b",
+        hash, SHA256_LENGTH
+    );
+    if (reply == NULL) {
+        printf("Load error: null reply");
+        return -1;
+    }
+    else if (reply->type == REDIS_REPLY_ERROR) {
+        printf("Load error: %s", reply->str);
+        return -2;
+    }
+    memcpy(buffer, reply->str, reply->len);
+    parse_into_tx_payload(buffer, ptrPayload);
+    freeReplyObject(reply);
+    free(buffer); // [FREE] load_tx:buffer
     return 0;
 }
 

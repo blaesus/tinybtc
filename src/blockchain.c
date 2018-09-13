@@ -8,6 +8,7 @@
 #include "util.h"
 #include "units.h"
 #include "persistent.h"
+#include "script.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
@@ -63,20 +64,61 @@ bool is_block_header_valid(BlockIndex *index) {
 }
 
 bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
-    printf("validating ");
-    print_tx_payload(&ptrNode->tx);
+    TxPayload *tx = &ptrNode->tx;
+    printf("\nvalidating ");
+    print_tx_payload(tx);
     printf("\n");
 
-    // TODO: Implement script
-
     if (is_coinbase(&ptrNode->tx)) {
-        int64_t subsidy = COIN(50) >> (blockIndex->context.height / 210000);
-        printf("Actual output %lli, correct output %lli\n", ptrNode->tx.txOutputs->value, subsidy);
-        if (ptrNode->tx.txOutputs->value > subsidy) {
+        int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+        printf("Coinbase: Actual output %lli, max output %lli\n", tx->txOutputs->value, maxSubsidy);
+        if (tx->txOutputs->value > maxSubsidy) {
             return false;
         }
     }
     else {
+        TxPayload *txSource = calloc(1, sizeof(TxPayload)); // is_tx_valid:txSource
+        for (uint32_t i = 0; i < tx->txInputCount; i++) {
+            TxIn input = tx->txInputs[i];
+            int8_t error = load_tx(input.previous_output.hash, txSource);
+            if (error) {
+                fprintf(stderr, "Cannot load source tx\n");
+                print_object(input.previous_output.hash, SHA256_LENGTH);
+                return false;
+            }
+            printf("source:\n");
+            print_tx_payload(txSource);
+            if (txSource->txOutputCount < input.previous_output.index + 1) {
+                fprintf(
+                    stderr,
+                    "Source transaction only has %llu output, but index %u is requested\n",
+                    txSource->txOutputCount,
+                    input.previous_output.index
+                );
+                return false;
+            }
+            TxOut *output = &txSource->txOutputs[input.previous_output.index];
+            uint64_t programLength = input.signature_script_length + output->public_key_script_length;
+
+            Byte *program = calloc(1, programLength); // is_tx_valid:program
+            memcpy(program, input.signature_script, input.signature_script_length);
+            memcpy(program+input.signature_script_length, output->public_key_script, output->public_key_script_length);
+            CheckSigMeta meta = {
+                .sourceOutput = output,
+                .txInputIndex = i,
+                .currentTx = tx,
+            };
+            bool result = run_program(program, programLength, meta);
+            if (!result) {
+                printf("verification script failed\n");
+                free(program); // [FREE] is_tx_valid:program
+                return false;
+            }
+            else {
+                free(program); // [FREE] is_tx_valid:program
+            }
+        }
+        free(txSource); // [FREE] is_tx_valid:txSource
     }
     return true;
 }

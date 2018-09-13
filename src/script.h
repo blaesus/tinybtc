@@ -1,5 +1,8 @@
 #pragma once
 
+#include "datatypes.h"
+#include "messages/tx.h"
+
 // Copied from official implementation
 enum OpcodeType {
     // push value
@@ -139,4 +142,14 @@ enum OpcodeType {
     OP_INVALIDOPCODE = 0xff,
 };
 
-const char* GetOpName(enum OpcodeType opcode);
+struct CheckSigMeta {
+    TxOut *sourceOutput;
+    TxPayload *currentTx;
+    uint64_t txInputIndex;
+};
+
+typedef struct CheckSigMeta CheckSigMeta;
+
+const char* get_op_name(enum OpcodeType opcode);
+
+bool run_program(Byte *program, uint64_t programLength, CheckSigMeta meta);

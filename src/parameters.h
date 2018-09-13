@@ -17,6 +17,8 @@
 
 #define CLEAR_OLD_ADDR_THRESHOLD 1000
 
+#define MAX_STACK_HEIGHT 100
+
 struct ChainParameters {
     uint32_t magic;
     int32_t minimalPeerVersion;
