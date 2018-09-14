@@ -372,7 +372,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     StackFrame resultFrame = {
                         .type = FRAME_TYPE_OP,
                         .dataWidth = 1,
-                        .data = { verification ? OP_TRUE : OP_FALSE }
+                        .data = { verification == 1 ? true : false }
                     };
                     push(&runtimeStack, resultFrame);
                     free(txCopy);
@@ -397,16 +397,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
         printf("No frames remain when input are exhausted\n");
         return false;
     }
-    else if (runtimeStack.height == 1) {
-        StackFrame lastFrame = top(&runtimeStack);
-        bool isTrue = lastFrame.type == FRAME_TYPE_OP
-                      && lastFrame.dataWidth == 1
-                      && lastFrame.data[0] == OP_TRUE;
-        return isTrue;
-    }
     else {
-        printf("Multiple frames remain when input are exhausted\n");
-        return false;
+        StackFrame lastFrame = top(&runtimeStack);
+        return !is_byte_array_empty(lastFrame.data, lastFrame.dataWidth);
     }
 }
 

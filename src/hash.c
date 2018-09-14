@@ -55,6 +55,7 @@ bool is_hash_empty(Byte *hash) {
     SHA256_HASH empty = {0};
     return memcmp(hash, empty, SHA256_LENGTH) == 0;
 }
+
 void sharipe(void *data, uint32_t length, SHA256_HASH result) {
     SHA256_HASH sha256Hash;
     sha256(data, length, sha256Hash);
