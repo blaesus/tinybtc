@@ -388,14 +388,27 @@ void test_script() {
     load_genesis();
     load_block_indices();
 
-    char *targetBlock = "84025f51f4510feaa820ee0aee32e9e7480a309cceea40ccff69450000000000";
-    SHA256_HASH targetHash = {0};
-    sha256_string_to_array(targetBlock, targetHash);
+    char *targets[] = {
+        "84025f51f4510feaa820ee0aee32e9e7480a309cceea40ccff69450000000000",
+        "4b8842d21590e3c7be46d8d1a148e9e05c500d86750ef290320a000000000000",
+        "211c58f63c5c779b190b86ca33b190e6f0160fab8318496b9011000000000000",
+    };
 
-    BlockIndex *index = GET_BLOCK_INDEX(targetHash);
-    BlockPayload block = {0};
-    load_block(targetHash, &block);
-    printf("block validity=%u\n", is_block_valid(&block, index));
+    for (uint32_t i = 0; i < sizeof(targets) / sizeof(char*); i ++) {
+        char *targetBlock = targets[i];
+        SHA256_HASH targetHash = {0};
+        sha256_string_to_array(targetBlock, targetHash);
+
+        BlockIndex *index = GET_BLOCK_INDEX(targetHash);
+        if (!index) {
+            print_hash_with_description("Block not found: ", targetHash);
+            return;
+        }
+        BlockPayload block = {0};
+        load_block(targetHash, &block);
+        bool valid = is_block_valid(&block, index);
+        printf("Validation of block %s, valid=%u\n", targetBlock, valid);
+    }
 }
 
 void test() {
