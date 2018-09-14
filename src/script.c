@@ -29,12 +29,30 @@ struct Stack {
     uint64_t height;
 };
 
+void hash_tx_with_sigtype(TxPayload *tx, int32_t sigType, Byte *hash) {
+    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    uint64_t width = serialize_tx_payload(tx, buffer);
+    memcpy(buffer + width, &sigType, 4);
+    width += 4;
+    dsha256(buffer, (uint32_t)width, hash);
+    free(buffer);
+}
+
 typedef struct Stack Stack;
 
 StackFrame get_empty_frame() {
     StackFrame frame;
     memset(&frame, 0, sizeof(frame));
     return frame;
+}
+
+StackFrame get_boolean_frame(bool value) {
+    StackFrame resultFrame = {
+        .type = FRAME_TYPE_DATA,
+        .dataWidth = 1,
+        .data = { (Byte)value }
+    };
+    return resultFrame;
 }
 
 StackFrame pop(Stack *stack) {
@@ -269,6 +287,33 @@ bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
            && (memcmp(frameA->data, frameB->data, frameA->dataWidth) == 0);
 }
 
+TxPayload *make_tx_copy(CheckSigMeta meta) {
+    Byte *subscript = calloc(1, 100000);
+    Byte subscriptIndex = 0;
+    memcpy(
+        subscript,
+        meta.sourceOutput->public_key_script,
+        meta.sourceOutput->public_key_script_length
+    );
+    subscriptIndex += meta.sourceOutput->public_key_script_length;
+    TxPayload *txCopy = calloc(1, sizeof(TxPayload));
+    memcpy(txCopy, meta.currentTx, sizeof(TxPayload));
+    for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
+        TxIn *txIn = &txCopy->txInputs[i];
+        txIn->signature_script_length = 0;
+        memset(txIn->signature_script, 0, sizeof(txIn->signature_script));
+    }
+    memcpy(
+        txCopy->txInputs[meta.txInputIndex].signature_script,
+        subscript,
+        subscriptIndex
+    );
+    txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptIndex;
+    free(subscript);
+    return txCopy;
+}
+
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -315,9 +360,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                         fprintf(stderr, "Unimplemented: compressed public key");
                         return false;
                     }
-                    EC_KEY *ptrKey = EC_KEY_new_by_curve_name(NID_secp256k1);
+                    EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
                     int32_t status = EC_KEY_oct2key(
-                        ptrKey,
+                        ptrPubKey,
                         pubkeyFrame.data,
                         pubkeyFrame.dataWidth,
                         NULL
@@ -329,55 +374,23 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
 
                     StackFrame sigFrame = pop(&runtimeStack);
                     uint32_t sigType = sigFrame.data[sigFrame.dataWidth-1];
-                    Byte *subscript = calloc(1, 100000);
-                    Byte subscriptIndex = 0;
-                    memcpy(
-                        subscript,
-                        meta.sourceOutput->public_key_script,
-                        meta.sourceOutput->public_key_script_length
-                    );
-                    subscriptIndex += meta.sourceOutput->public_key_script_length;
-                    TxPayload *txCopy = calloc(1, sizeof(TxPayload));
-                    memcpy(txCopy, meta.currentTx, sizeof(TxPayload));
-                    for (uint64_t j = 0; j < txCopy->txInputCount; j++) {
-                        TxIn *txIn = &txCopy->txInputs[j];
-                        txIn->signature_script_length = 0;
-                        memset(txIn->signature_script, 0, sizeof(txIn->signature_script));
-                    }
-                    memcpy(
-                        txCopy->txInputs[meta.txInputIndex].signature_script,
-                        subscript,
-                        subscriptIndex
-                    );
-                    txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptIndex;
 
-                    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
-                    uint64_t width = serialize_tx_payload(txCopy, buffer);
-
-                    memcpy(buffer + width, &sigType, 4);
-                    width += 4;
-
-                    SHA256_HASH hash = {0};
-                    dsha256(buffer, (uint32_t)width, hash);
+                    TxPayload *txCopy = make_tx_copy(meta);
+                    SHA256_HASH hashTx = {0};
+                    hash_tx_with_sigtype(txCopy, sigType, hashTx);
 
                     int32_t verification = ECDSA_verify(
                         0,
-                        (unsigned char*)&hash,
-                        sizeof(hash),
+                        (Byte *)&hashTx,
+                        sizeof(hashTx),
                         sigFrame.data,
                         sigFrame.dataWidth - 1,
-                        ptrKey
+                        ptrPubKey
                     );
 
-                    StackFrame resultFrame = {
-                        .type = FRAME_TYPE_OP,
-                        .dataWidth = 1,
-                        .data = { verification == 1 ? true : false }
-                    };
-                    push(&runtimeStack, resultFrame);
+                    push(&runtimeStack, get_boolean_frame(verification == 1));
                     free(txCopy);
-                    free(subscript);
-                    EC_KEY_free(ptrKey);
+                    EC_KEY_free(ptrPubKey);
                     break;
                 }
                 default: {
