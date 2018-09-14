@@ -377,6 +377,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, resultFrame);
                     free(txCopy);
                     free(subscript);
+                    EC_KEY_free(ptrKey);
                     break;
                 }
                 default: {
