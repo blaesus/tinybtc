@@ -22,7 +22,7 @@ struct Periods {
 
 struct Config {
     struct Periods periods;
-    int32_t maxPingLatency;
+    double peerLatencyTolerence;
     int32_t protocolVersion;
     uint8_t userAgent[128];
     ServiceBits services;

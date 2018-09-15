@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "uv/uv.h"
 
@@ -38,34 +39,45 @@ void on_handle_close(uv_handle_t *handle) {
 }
 
 void timeout_peers() {
-    time_t now = time(NULL);
+    double now = getNow();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         bool timeoutForLateHandshake =
             (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
             && !peer_hand_shaken(ptrPeer);
 
-        time_t ping = ptrPeer->requests.ping.pingSent;
-        time_t pong = ptrPeer->requests.ping.pongReceived;
+        double ping = ptrPeer->requests.ping.pingSent;
+        double pong = ptrPeer->requests.ping.pongReceived;
         bool neverReceivedPong = pong == 0;
-        bool timeoutForLatePong = ping && (
-            neverReceivedPong ? now - ping > config.maxPingLatency : pong - ping > config.maxPingLatency
-        );
+        double latency = neverReceivedPong ? now - ping : pong - ping;
+        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerence);
 
         if (timeoutForLateHandshake || timeoutForLatePong) {
-            printf("Timeout peer %u (reason: handshake=%u, pong=%u)\n", i, timeoutForLateHandshake, timeoutForLatePong);
+            printf(
+                "Timeout peer %u (reason: handshake=%u, pong=%u)",
+                i,
+                timeoutForLateHandshake,
+                timeoutForLatePong
+            );
+            if (timeoutForLatePong) {
+                printf("[latency=%.1fms]\n", latency);
+            }
+            else {
+                printf("\n");
+            }
             if (timeoutForLateHandshake || neverReceivedPong) {
-                uv_handle_t *ptrHandle = (uv_handle_t *) &ptrPeer->socket;
-                if (ptrHandle && !uv_is_closing(ptrHandle)) {
-                    if (ptrHandle->data) {
-                        free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
-                        ptrHandle->data = NULL;
-                    }
-                    SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
-                    ptrData->peer = ptrPeer;
-                    ptrHandle->data = ptrData;
-                    uv_close(ptrHandle, on_handle_close);
+                disable_ip(ptrPeer->address.ip);
+            }
+            uv_handle_t *ptrHandle = (uv_handle_t *) &ptrPeer->socket;
+            if (ptrHandle && !uv_is_closing(ptrHandle)) {
+                if (ptrHandle->data) {
+                    free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
+                    ptrHandle->data = NULL;
                 }
+                SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
+                ptrData->peer = ptrPeer;
+                ptrHandle->data = ptrData;
+                uv_close(ptrHandle, on_handle_close);
             }
         }
     }
@@ -140,7 +152,7 @@ void print_node_status() {
 void ping_peers() {
     printf("Pinging peers\n");
     // TODO: Use at least milliseconds. Seconds are too crude.
-    time_t now = time(NULL);
+    double now = getNow();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
@@ -441,8 +453,8 @@ void on_handshake_success(Peer *ptrPeer) {
 
 void handle_incoming_message(Peer *ptrPeer, Message message) {
     print_message(&message);
-    uint32_t now = (uint32_t)time(NULL);
-    set_addr_timestamp(ptrPeer->address.ip, now);
+    double now = getNow();
+    set_addr_timestamp(ptrPeer->address.ip, (uint32_t)round(now / SECOND_TO_MILLISECOND(1)));
 
     char *command = (char *)message.header.command;
 

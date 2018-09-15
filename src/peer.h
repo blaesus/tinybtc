@@ -12,8 +12,8 @@ struct HandshakeState {
 };
 
 struct PingState {
-    time_t pingSent;
-    time_t pongReceived;
+    double pingSent;
+    double pongReceived;
     uint64_t nonce;
 };
 

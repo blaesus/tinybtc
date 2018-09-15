@@ -5,14 +5,14 @@
 const struct Config config = {
     .periods = {
         .autoexit = MINUTE_TO_MILLISECOND(60),
-        .saveIndices = SECOND_TO_MILLISECOND(60),
-        .ping = SECOND_TO_MILLISECOND(60),
+        .saveIndices = SECOND_TO_MILLISECOND(120),
+        .ping = SECOND_TO_MILLISECOND(11),
         .peerDataExchange = SECOND_TO_MILLISECOND(1),
         .resetIBDMode = SECOND_TO_MILLISECOND(60),
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
     },
-    .maxPingLatency = 2,
+    .peerLatencyTolerence = SECOND_TO_MILLISECOND(2),
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
     .maxIncoming = 125,
