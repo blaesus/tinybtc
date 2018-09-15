@@ -86,11 +86,11 @@ void timeout_peers() {
 void data_exchange_with_peer(Peer *ptrPeer) {
     printf("Executing data exchange with peer %u (%s)\n", ptrPeer->index, convert_ipv4_readable(ptrPeer->address.ip));
     if (ptrPeer->chain_height > global.mainTip.context.height) {
-        printf("They have longer chain\n");
+        printf("They have longer chain (%u < %u)\n", global.mainTip.context.height, ptrPeer->chain_height);
         send_getheaders(&ptrPeer->socket);
     }
     else if (ptrPeer->chain_height == global.mainTip.context.height) {
-        printf("Chain synced\n");
+        printf("Chain synced at %u\n", global.mainTip.context.height);
         if (is_hash_empty(ptrPeer->requests.block)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
