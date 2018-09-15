@@ -39,6 +39,7 @@ struct GlobalState {
     SHA256_HASH genesisHash;
 
     BlockIndex mainTip;
+    uint32_t maxFullBlockHeight;
 };
 
 typedef struct GlobalState GlobalState;

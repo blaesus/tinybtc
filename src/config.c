@@ -20,4 +20,7 @@ const struct Config config = {
     .peerDataRequestPeriod = 1,
     .redisHost = "127.0.0.1",
     .redisPort = 6379,
+    .ibdModeAvailabilityThreshold = 0.95,
+    .ibdPeerMaxBlockDifference = 100,
+    .ibdModeResetPeriod = 60,
 };

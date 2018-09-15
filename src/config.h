@@ -28,6 +28,9 @@ struct Config {
     uint16_t peerDataRequestPeriod;
     const char redisHost[64];
     uint16_t redisPort;
+    double ibdModeAvailabilityThreshold;
+    uint16_t ibdPeerMaxBlockDifference;
+    uint16_t ibdModeResetPeriod;
 };
 
 extern const struct Config config;

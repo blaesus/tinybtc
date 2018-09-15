@@ -130,7 +130,9 @@ uint16_t print_node_status() {
     printf("%u addresses\n", global.peerAddressCount);
 
 
-    printf("main chain height %u\n", global.mainTip.context.height);
+    printf("main chain height %u; max full block %u\n",
+        global.mainTip.context.height, global.maxFullBlockHeight
+    );
     print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
     return validPeers;
@@ -167,6 +169,16 @@ void on_interval(uv_timer_t *handle) {
     }
     if (deltaT % config.pingPeriod == 0) {
         ping_peers();
+    }
+    if (deltaT % config.ibdModeResetPeriod == 0) {
+        if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height < config.ibdModeAvailabilityThreshold) {
+            printf("Switching off IBD mode\n");
+            global.ibdMode = false;
+        }
+        else {
+            printf("Switching on IBD mode\n");
+            global.ibdMode = true;
+        }
     }
     print_node_status();
     if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
@@ -367,6 +379,13 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 }
 
 void on_handshake_success(Peer *ptrPeer) {
+    if (global.ibdMode) {
+        if (ptrPeer->chain_height < global.maxFullBlockHeight) {
+            printf("Switching peer for lack of blocks\n");
+            connect_to_random_addr_for_peer(ptrPeer->index);
+            return;
+        }
+    }
     data_exchange_with_peer(ptrPeer);
     bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
     if (shouldSendGetaddr) {

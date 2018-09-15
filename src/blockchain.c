@@ -333,6 +333,9 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         print_hash_with_description("Block saved: ", hash);
     }
     index->meta.fullBlockAvailable = true;
+    if (index->context.height > global.maxFullBlockHeight) {
+        global.maxFullBlockHeight = index->context.height;
+    }
     TxNode *p =  ptrBlock->ptrFirstTxNode;
     while (p) {
         save_tx(&p->tx);
@@ -361,6 +364,9 @@ double recalculate_block_index_meta() {
         ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
+            if (ptrIndex->context.height > global.maxFullBlockHeight) {
+                global.maxFullBlockHeight = ptrIndex->context.height;
+            }
         }
     }
     free(keys); // recalculate_block_indices:keys

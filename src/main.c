@@ -7,6 +7,7 @@
 #include "persistent.h"
 #include "globalstate.h"
 #include "blockchain.h"
+#include "config.h"
 
 #include "test/test.h"
 
@@ -48,7 +49,7 @@ int8_t init() {
     load_genesis();
     load_block_indices();
     double blockAvailability = recalculate_block_index_meta();
-    if (blockAvailability < 0.95) {
+    if (blockAvailability < config.ibdModeAvailabilityThreshold) {
         global.ibdMode = true;
         printf("Activated IBD mode\n");
     }
