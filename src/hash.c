@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include "openssl/sha.h"
+#include "openssl/ripemd.h"
 #include "datatypes.h"
 #include "hash.h"
 
@@ -51,4 +54,22 @@ void print_sha256_short(Byte *hash) {
 bool is_hash_empty(Byte *hash) {
     SHA256_HASH empty = {0};
     return memcmp(hash, empty, SHA256_LENGTH) == 0;
+}
+
+void sharipe(void *data, uint32_t length, SHA256_HASH result) {
+    SHA256_HASH sha256Hash;
+    sha256(data, length, sha256Hash);
+    RIPEMD160_CTX context;
+    RIPEMD160_Init(&context);
+    RIPEMD160_Update(&context, sha256Hash, SHA256_LENGTH);
+    RIPEMD160_Final(result, &context);
+}
+
+void sha256_string_to_array(char *str, Byte *hash) {
+    char byteString[3] = {0};
+    for (uint16_t i = 0; i < SHA256_LENGTH; i++) {
+        memcpy(byteString, str + 2*i, 2);
+        Byte byteDigit = (Byte)strtol(byteString, NULL, 16);
+        hash[i] = byteDigit;
+    }
 }

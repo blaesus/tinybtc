@@ -49,7 +49,7 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     TxNode *ptrPreviousNode = NULL;
     for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
         TxNode *ptrNewNode = calloc(1, sizeof(TxNode)); // parse_block:TxNode
-        p += parse_tx_payload(p, &ptrNewNode->tx);
+        p += parse_into_tx_payload(p, &ptrNewNode->tx);
         if (!ptrBlock->ptrFirstTxNode) {
             ptrBlock->ptrFirstTxNode = ptrNewNode;
         }
@@ -230,3 +230,23 @@ bool is_block_header_legal(BlockPayloadHeader *ptrHeader) {
 void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash) {
     dsha256(ptrHeader, sizeof(BlockPayloadHeader), hash);
 }
+
+
+void print_block_payload(BlockPayload *ptrBlock) {
+    printf("version: %u\n", ptrBlock->header.version);
+    printf("merkle root:");
+    print_object(ptrBlock->header.merkle_root, SHA256_LENGTH);
+    TxNode *ptrTxNode = ptrBlock->ptrFirstTxNode;
+    for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
+        printf("\nTransaction %u\n", i+1);
+        TxPayload tx = ptrTxNode->tx;
+        printf(
+            "  version = %u, tx_in_count = %llu, tx_out_count = %llu\n",
+            tx.version,
+            tx.txInputCount,
+            tx.txOutputCount
+        );
+        ptrTxNode = ptrTxNode->next;
+    }
+}
+

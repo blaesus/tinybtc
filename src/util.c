@@ -161,3 +161,13 @@ char *date_string(time_t time) {
     strftime(text, sizeof(text)-1, "%Y-%m-%d %H:%M:%S", timeInfo);
     return text;
 }
+
+
+bool is_byte_array_empty(const Byte *hash, uint64_t length) {
+    for (uint64_t i = 0; i < length; i++) {
+        if (hash[i]) {
+            return false;
+        }
+    }
+    return true;
+}

@@ -34,18 +34,6 @@ void setup_cleanup() {
     sigaction(SIGKILL, &sa, NULL);
 }
 
-void load_genesis() {
-    printf("Loading genesis block...\n");
-    Message genesis = get_empty_message();
-    load_block_message("genesis.dat", &genesis);
-    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
-    memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
-    hash_block_header(&ptrBlock->header, global.genesisHash);
-    free(genesis.ptrPayload);
-    process_incoming_block(ptrBlock);
-    printf("Done.\n");
-}
-
 int8_t init() {
     printf("Initializing...\n");
     printf("Size of global state: %lu\n", sizeof(global.blockIndices));
@@ -59,7 +47,7 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
-    recalculate_block_indices();
+    recalculate_block_index_meta();
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();
@@ -77,6 +65,7 @@ int32_t connect_to_peers() {
 }
 
 int32_t main(/* int32_t argc, char **argv */) {
+    test(); return 0;
     int8_t initError = init();
     if (initError) {
         fprintf(stderr, "init error %i\n", initError);
@@ -85,7 +74,6 @@ int32_t main(/* int32_t argc, char **argv */) {
     connect_to_peers();
     run_main_loop();
 
-    // test();
     return 0;
 }
 

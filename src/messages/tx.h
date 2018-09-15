@@ -27,7 +27,7 @@ typedef struct Outpoint Outpoint;
 struct TxIn {
     Outpoint previous_output;
     uint32_t sequence;
-    uint64_t script_length;
+    uint64_t signature_script_length;
     Byte signature_script[MAX_SIGNATURE_SCRIPT_LENGTH];
 };
 
@@ -35,8 +35,8 @@ typedef struct TxIn TxIn;
 
 struct TxOut {
     int64_t value;
-    uint64_t pk_script_length;
-    Byte pk_script[MAX_PK_SCRIPT_LENGTH];
+    uint64_t public_key_script_length;
+    Byte public_key_script[MAX_PK_SCRIPT_LENGTH];
 };
 
 typedef struct TxOut TxOut;
@@ -72,7 +72,7 @@ struct TxNode {
 typedef struct TxNode TxNode;
 
 uint64_t serialize_tx_payload(TxPayload *ptrPayload, Byte *ptrBuffer);
-uint64_t parse_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx);
+uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx);
 uint64_t serialize_tx_message(Message *ptrPayload, Byte *ptrBuffer);
 int32_t make_tx_message(Message *ptrMessage, TxPayload *ptrPayload);
 int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result);

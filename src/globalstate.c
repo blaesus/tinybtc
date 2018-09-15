@@ -120,7 +120,7 @@ bool is_peer(IP ip) {
 }
 
 int8_t get_next_missing_block(Byte *hash) {
-    SHA256_HASH finderHash = {0xcc};
+    SHA256_HASH finderHash = {0};
     memcpy(finderHash, global.genesisHash, SHA256_LENGTH);
     do {
         BlockIndex *index = hashmap_get(&global.blockIndices, finderHash, NULL);
@@ -150,4 +150,18 @@ bool is_block_being_requested(Byte *hash) {
         }
     }
     return false;
+}
+
+bool peer_hand_shaken(Peer *ptrPeer) {
+    return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
+}
+
+uint32_t get_handshaken_peer_count() {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        if (peer_hand_shaken(&global.peers[i])) {
+            count++;
+        }
+    }
+    return count;
 }

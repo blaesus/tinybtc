@@ -8,6 +8,7 @@
 #include "util.h"
 #include "units.h"
 #include "persistent.h"
+#include "script.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
@@ -62,9 +63,61 @@ bool is_block_header_valid(BlockIndex *index) {
     return headerValid;
 }
 
-bool is_tx_valid(TxNode *ptrNode) {
-    printf("validating tx of flag %u\n", ptrNode->tx.flag);
-    // TODO: Implement script
+bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
+    TxPayload *tx = &ptrNode->tx;
+    printf("\nvalidating ");
+    print_tx_payload(tx);
+    printf("\n");
+
+    if (is_coinbase(&ptrNode->tx)) {
+        int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+        // TODO: Police on max subsidy
+        return true;
+    }
+    else {
+        TxPayload *txSource = calloc(1, sizeof(TxPayload)); // is_tx_valid:txSource
+        for (uint32_t i = 0; i < tx->txInputCount; i++) {
+            TxIn input = tx->txInputs[i];
+            int8_t error = load_tx(input.previous_output.hash, txSource);
+            if (error) {
+                fprintf(stderr, "Cannot load source tx\n");
+                print_object(input.previous_output.hash, SHA256_LENGTH);
+                return false;
+            }
+            printf("source:\n");
+            print_tx_payload(txSource);
+            if (txSource->txOutputCount < input.previous_output.index + 1) {
+                fprintf(
+                    stderr,
+                    "Source transaction only has %llu output, but index %u is requested\n",
+                    txSource->txOutputCount,
+                    input.previous_output.index
+                );
+                return false;
+            }
+            TxOut *output = &txSource->txOutputs[input.previous_output.index];
+            uint64_t programLength = input.signature_script_length + output->public_key_script_length;
+
+            Byte *program = calloc(1, programLength); // is_tx_valid:program
+            memcpy(program, input.signature_script, input.signature_script_length);
+            memcpy(program+input.signature_script_length, output->public_key_script, output->public_key_script_length);
+            CheckSigMeta meta = {
+                .sourceOutput = output,
+                .txInputIndex = i,
+                .currentTx = tx,
+            };
+            bool result = run_program(program, programLength, meta);
+            if (!result) {
+                printf("verification script failed\n");
+                free(program); // [FREE] is_tx_valid:program
+                return false;
+            }
+            else {
+                free(program); // [FREE] is_tx_valid:program
+            }
+        }
+        free(txSource); // [FREE] is_tx_valid:txSource
+    }
     return true;
 }
 
@@ -72,7 +125,7 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
     bool allTxValid = true;
     TxNode *p = ptrCandidate->ptrFirstTxNode;
     while (p) {
-        if (!is_tx_valid(p)) {
+        if (!is_tx_valid(p, ptrIndex)) {
             allTxValid = false;
             break;
         }
@@ -288,12 +341,15 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-void recalculate_block_indices() {
-    printf("Reindexing block indices...");
+void recalculate_block_index_meta() {
+    printf("Reindexing block indices...\n");
     Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
-    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    for (uint32_t i = 0; i < keyCount; i++) {
-        printf("reindexing %u/%u\n", i, keyCount);
+    uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    uint32_t fullBlockAvailable = 0;
+    for (uint32_t i = 0; i < indexCount; i++) {
+        if (i % 1000 == 0) {
+            printf("checking block index meta %u/%u\n", i, indexCount);
+        }
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
         BlockIndex *ptrIndex = hashmap_get(&global.blockIndices, key, NULL);
@@ -303,7 +359,11 @@ void recalculate_block_indices() {
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
         ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        if (ptrIndex->meta.fullBlockAvailable) {
+            fullBlockAvailable++;
+        }
     }
     free(keys); // recalculate_block_indices:keys
-    printf("Done.");
+    printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
+    printf("Done.\n");
 }
