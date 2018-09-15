@@ -281,6 +281,12 @@ Stack get_empty_stack() {
     return stack;
 }
 
+void free_stack_frames(Stack *stack) {
+    for (uint64_t i = 0; i < stack->height; i++) {
+        free(stack->frames[i]->data);
+    }
+}
+
 bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
     return (frameA->type == frameB->type)
            && (frameA->dataWidth == frameB->dataWidth)
@@ -343,13 +349,13 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_EQUALVERIFY: {
                     if (runtimeStack.height < 2) {
                         fprintf(stderr, "OP_EQUALVERIFY: insufficient frames\n");
-                        return false;
+                        goto immediate_fail;
                     }
                     StackFrame topFrame = pop(&runtimeStack);
                     StackFrame subtopFrame = pop(&runtimeStack);
                     if (!are_frames_equal(&topFrame, &subtopFrame)) {
                         fprintf(stderr, "OP_EQUALVERIFY: unequal frames\n");
-                        return false;
+                        goto immediate_fail;
                     }
                     break;
                 }
@@ -358,7 +364,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     StackFrame pubkeyFrame = pop(&runtimeStack);
                     if (pubkeyFrame.dataWidth < 65) {
                         fprintf(stderr, "Unimplemented: compressed public key");
-                        return false;
+                        goto immediate_fail;
                     }
                     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
                     int32_t status = EC_KEY_oct2key(
@@ -369,7 +375,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     );
                     if (status != 1) {
                         fprintf(stderr, "Failed to decode elliptic public key");
-                        return false;
+                        goto immediate_fail;
                     }
 
                     StackFrame sigFrame = pop(&runtimeStack);
@@ -395,31 +401,40 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 default: {
                     fprintf(stderr, "\nUnimplemented op %#02x [%s]", op, get_op_name(op));
-                    return false;
+                    goto immediate_fail;
                 }
             }
         }
         else {
             fprintf(stderr, "Unknown frame type %u", inputFrame->type);
-            return false;
+            goto immediate_fail;
         }
         print_stack_with_label(&runtimeStack, "Runtime");
     }
 
     // Calculate final output
+    bool result;
     if (runtimeStack.height == 0) {
         printf("No frames remain when input are exhausted\n");
-        return false;
+        result = false;
     }
     else {
         StackFrame lastFrame = top(&runtimeStack);
-        return !is_byte_array_empty(lastFrame.data, lastFrame.dataWidth);
+        result = !is_byte_array_empty(lastFrame.data, lastFrame.dataWidth);
     }
+    free_stack_frames(&runtimeStack);
+    return result;
+
+    immediate_fail:
+    free_stack_frames(&runtimeStack);
+    return false;
 }
 
 bool run_program(Byte *program, uint64_t programLength, CheckSigMeta meta) {
     Stack inputStack = get_empty_stack();
     load_program(&inputStack, program, programLength);
     print_stack_with_label(&inputStack, "Input");
-    return evaluate(&inputStack, meta);
+    bool result = evaluate(&inputStack, meta);
+    free_stack_frames(&inputStack);
+    return result;
 }
