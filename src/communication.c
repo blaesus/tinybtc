@@ -649,7 +649,8 @@ void connect_to_random_addr_for_peer(uint32_t peerIndex) {
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoing = min(config.maxOutgoing, global.peerAddressCount);
+    uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
+    uint32_t outgoing = min(outgoingConfig, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);
         global.peerCount += 1;

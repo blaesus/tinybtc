@@ -21,6 +21,7 @@ struct Config {
     ServiceBits services;
     uint32_t maxIncoming;
     uint32_t maxOutgoing;
+    uint32_t maxOutgoingIBD;
     uint32_t addrLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;

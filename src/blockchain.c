@@ -341,13 +341,13 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-void recalculate_block_index_meta() {
+double recalculate_block_index_meta() {
     printf("Reindexing block indices...\n");
     Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
     for (uint32_t i = 0; i < indexCount; i++) {
-        if (i % 1000 == 0) {
+        if (i % 2000 == 0) {
             printf("checking block index meta %u/%u\n", i, indexCount);
         }
         Byte key[SHA256_LENGTH] = {0};
@@ -366,4 +366,5 @@ void recalculate_block_index_meta() {
     free(keys); // recalculate_block_indices:keys
     printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
     printf("Done.\n");
+    return fullBlockAvailable * 1.0 / indexCount;
 }

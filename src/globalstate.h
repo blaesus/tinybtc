@@ -16,6 +16,8 @@
 #define MAX_ORPHAN_COUNT 4096
 
 struct GlobalState {
+    bool ibdMode;
+
     uv_tcp_t listenSocket;
     uv_timer_t mainTimer;
     redisContext *ptrRedisContext;
