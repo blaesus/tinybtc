@@ -96,7 +96,7 @@ void data_exchange_with_peer(Peer *ptrPeer) {
         }
     }
     else {
-        printf("We have longer chain\n");
+        printf("We have longer chain (%u > %u) \n", global.mainTip.context.height, ptrPeer->chain_height);
         // Peers has less data
     }
 }
