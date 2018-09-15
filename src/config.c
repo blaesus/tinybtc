@@ -4,12 +4,13 @@
 
 const struct Config config = {
     .periods = {
-        .mainTimer = 1000,
-        .autoexit = MINUTE(60),
-        .autosave = 60,
-        .ping = 59,
-        .peerDataExchange = 1,
-        .resetIBDMode = 60,
+        .autoexit = MINUTE_TO_MILLISECOND(60),
+        .saveIndices = SECOND_TO_MILLISECOND(60),
+        .ping = SECOND_TO_MILLISECOND(60),
+        .peerDataExchange = SECOND_TO_MILLISECOND(1),
+        .resetIBDMode = SECOND_TO_MILLISECOND(60),
+        .timeoutPeers = SECOND_TO_MILLISECOND(10),
+        .printNodeStatus = SECOND_TO_MILLISECOND(5),
     },
     .maxPingLatency = 2,
     .protocolVersion = 70015,
@@ -17,7 +18,7 @@ const struct Config config = {
     .maxIncoming = 125,
     .maxOutgoing = 8,
     .maxOutgoingIBD = 32,
-    .addrLife = DAY(14),
+    .addrLife = DAY_TO_SECOND(14),
     .userAgent = "/Satoshi:0.16.2/tinybtc:0.0.1/",
     .backlog = 32,
     .getaddrThreshold = 1000,

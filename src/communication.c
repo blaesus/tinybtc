@@ -101,8 +101,8 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     }
 }
 
-void request_data_from_peers() {
-    printf("Requesting data from peers...\n");
+void exchange_data_with_peers() {
+    printf("Exchanging data with peers...\n");
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
@@ -112,7 +112,7 @@ void request_data_from_peers() {
     }
 }
 
-uint16_t print_node_status() {
+void print_node_status() {
     printf("\n==== Node status ====\n");
 
     printf("peers handshake: ");
@@ -135,7 +135,6 @@ uint16_t print_node_status() {
     );
     print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
-    return validPeers;
 }
 
 void ping_peers() {
@@ -157,44 +156,91 @@ void ping_peers() {
     }
 }
 
-void on_interval(uv_timer_t *handle) {
-    time_t now = time(NULL);
-    time_t deltaT = now - global.start_time;
-    timeout_peers();
-    if (deltaT % config.periods.peerDataExchange == 0) {
-        request_data_from_peers();
+void terminate_main_loop(uv_timer_t *handle) {
+    printf("Stopping main loop...\n");
+    uv_timer_stop(handle);
+    uv_stop(uv_default_loop());
+    uv_loop_close(uv_default_loop());
+    printf("Done.\n");
+}
+
+void resetIBDMode() {
+    if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
+        printf("\nSwitching off IBD mode\n");
+        global.ibdMode = false;
     }
-    if (deltaT % config.periods.autosave == 0) {
-        save_chain_data();
+    else {
+        printf("\nSwitching on IBD mode\n");
+        global.ibdMode = true;
     }
-    if (deltaT % config.periods.ping == 0) {
-        ping_peers();
-    }
-    if (deltaT % config.periods.resetIBDMode == 0) {
-        if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height < config.ibdModeAvailabilityThreshold) {
-            printf("Switching off IBD mode\n");
-            global.ibdMode = false;
+}
+
+typedef void TimerCallback(uv_timer_t *);
+
+struct TimerTableRow {
+    uv_timer_t timer;
+    uint64_t interval;
+    TimerCallback *callback;
+    bool onlyOnce;
+};
+
+typedef struct TimerTableRow TimerTableRow;
+
+void setup_timers() {
+    TimerTableRow timerTableAutomatic[] = {
+        {
+            .interval = config.periods.peerDataExchange,
+            .callback = &exchange_data_with_peers,
+        },
+        {
+            .interval = config.periods.ping,
+            .callback = &ping_peers,
+        },
+        {
+            .interval = config.periods.saveIndices,
+            .callback = &save_chain_data,
+        },
+        {
+            .interval = config.periods.autoexit,
+            .callback = &terminate_main_loop,
+            .onlyOnce = true,
+        },
+        {
+            .interval = config.periods.resetIBDMode,
+            .callback = &resetIBDMode,
+        },
+        {
+            .interval = config.periods.timeoutPeers,
+            .callback = &timeout_peers,
+        },
+        {
+            .interval = config.periods.printNodeStatus,
+            .callback = &print_node_status,
+        },
+    };
+    uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);
+
+    TimerTableRow *timerTable = calloc(rowCount, sizeof(TimerTableRow));
+    memcpy(timerTable, timerTableAutomatic, sizeof(timerTableAutomatic));
+    for (uint32_t i = 0; i < rowCount; i++) {
+        TimerTableRow *row = &timerTable[i];
+        if (row->interval > 0) {
+            uv_timer_init(uv_default_loop(), &row->timer);
+            if (row->onlyOnce) {
+                uv_timer_start(&row->timer, row->callback, row->interval, 0);
+            }
+            else {
+                uv_timer_start(&row->timer, row->callback, 0, row->interval);
+            }
         }
-        else {
-            printf("Switching on IBD mode\n");
-            global.ibdMode = true;
-        }
     }
-    print_node_status();
-    if ((config.periods.autoexit > 0) && (deltaT >= config.periods.autoexit)) {
-        printf("Stopping main loop...\n");
-        uv_timer_stop(handle);
-        uv_stop(uv_default_loop());
-        uv_loop_close(uv_default_loop());
-        printf("Done.\n");
-    }
+    global.timerTable = timerTable;
 }
 
 uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
-    uv_timer_init(uv_default_loop(), &global.mainTimer);
-    uv_timer_start(&global.mainTimer, &on_interval, 0, config.periods.mainTimer);
+    setup_timers();
     printf("Done.\n");
     return 0;
 }
@@ -419,7 +465,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
-                uint32_t timestampForRecord = record->timestamp - HOUR(2);
+                uint32_t timestampForRecord = record->timestamp - HOUR_TO_SECOND(2);
                 add_peer_address(record->net_addr, timestampForRecord);
             }
             else {

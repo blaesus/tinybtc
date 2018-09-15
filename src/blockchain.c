@@ -259,7 +259,7 @@ int8_t get_maximal_target(BlockIndex *index, TargetCompact *result) {
     printf(
         "time difference in retarget period: %u seconds (%2.1f days) [from %u, to %u]\n",
         actualPeriod,
-        1.0 * actualPeriod / DAY(1),
+        1.0 * actualPeriod / DAY_TO_SECOND(1),
         ptrStartBlockIndex->header.timestamp,
         ptrEndBlockIndex->header.timestamp
     );

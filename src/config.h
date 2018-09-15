@@ -11,12 +11,13 @@
 #define SERVICE_NODE_NETWORK_LIMITED (1 << 10)
 
 struct Periods {
-    uint32_t mainTimer;
-    int32_t autoexit;
-    int32_t autosave;
-    int32_t ping;
-    uint16_t resetIBDMode;
-    uint16_t peerDataExchange;
+    uint64_t autoexit;
+    uint64_t saveIndices;
+    uint64_t ping;
+    uint64_t resetIBDMode;
+    uint64_t peerDataExchange;
+    uint64_t timeoutPeers;
+    uint64_t printNodeStatus;
 };
 
 struct Config {
