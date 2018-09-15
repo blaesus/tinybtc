@@ -18,6 +18,7 @@
 #include "blockchain.h"
 #include "config.h"
 #include "persistent.h"
+#include "util.h"
 
 
 static int32_t test_version_messages() {
@@ -92,26 +93,6 @@ static void test_genesis() {
     0000 - 6f e2 8c 0a b6 f1 b3 72 c1 a6 a2 46 ae 63 f7 4f
     0010 - 93 1e 83 65 e1 5a 08 9c 68 d6 19 00 00 00 00 00 END
      */
-}
-
-void print_block_payload(
-    BlockPayload *ptrBlock
-) {
-    printf("version: %u\n", ptrBlock->header.version);
-    printf("merkle root:");
-    print_object(ptrBlock->header.merkle_root, SHA256_LENGTH);
-    TxNode *ptrTxNode = ptrBlock->ptrFirstTxNode;
-    for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
-        printf("\nTransaction %u\n", i+1);
-        TxPayload tx = ptrTxNode->tx;
-        printf(
-            "  version = %u, tx_in_count = %llu, tx_out_count = %llu\n",
-            tx.version,
-            tx.txInputCount,
-            tx.txOutputCount
-        );
-        ptrTxNode = ptrTxNode->next;
-    }
 }
 
 static void test_block() {
@@ -389,15 +370,19 @@ void test_script() {
     load_block_indices();
 
     char *targets[] = {
-        "84025f51f4510feaa820ee0aee32e9e7480a309cceea40ccff69450000000000",
-        "4b8842d21590e3c7be46d8d1a148e9e05c500d86750ef290320a000000000000",
-        "211c58f63c5c779b190b86ca33b190e6f0160fab8318496b9011000000000000",
+        "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", // genesis
+        "00000000d1145790a8694403d4063f323d499e655c83426834d4ce2f8dd4a2ee", // 170, first block with real tx
+        "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
+
+    uint64_t totalTargets = sizeof(targets) / sizeof(targets[0]);
+    uint64_t validCount = 0;
 
     for (uint32_t i = 0; i < sizeof(targets) / sizeof(char*); i ++) {
         char *targetBlock = targets[i];
         SHA256_HASH targetHash = {0};
         sha256_string_to_array(targetBlock, targetHash);
+        reverse_endian(targetHash, sizeof(targetHash));
 
         BlockIndex *index = GET_BLOCK_INDEX(targetHash);
         if (!index) {
@@ -406,9 +391,18 @@ void test_script() {
         }
         BlockPayload block = {0};
         load_block(targetHash, &block);
+        print_block_payload(&block);
         bool valid = is_block_valid(&block, index);
-        printf("Validation of block %s, valid=%u\n", targetBlock, valid);
+        if (!valid) {
+            fprintf(stderr, "\nBlock validation: INVALID %s\n====\n", targetBlock);
+        }
+        else {
+            validCount += 1;
+            printf("\nBlock validation: valid %s\n====\n", targetBlock);
+        }
     }
+
+    printf("%llu/%llu valid\n", validCount, totalTargets);
 }
 
 void test() {
