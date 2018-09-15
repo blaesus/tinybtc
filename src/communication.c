@@ -161,16 +161,16 @@ void on_interval(uv_timer_t *handle) {
     time_t now = time(NULL);
     time_t deltaT = now - global.start_time;
     timeout_peers();
-    if (deltaT % config.peerDataRequestPeriod == 0) {
+    if (deltaT % config.periods.peerDataExchange == 0) {
         request_data_from_peers();
     }
-    if (deltaT % config.autoSavePeriod == 0) {
+    if (deltaT % config.periods.autosave == 0) {
         save_chain_data();
     }
-    if (deltaT % config.pingPeriod == 0) {
+    if (deltaT % config.periods.ping == 0) {
         ping_peers();
     }
-    if (deltaT % config.ibdModeResetPeriod == 0) {
+    if (deltaT % config.periods.resetIBDMode == 0) {
         if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height < config.ibdModeAvailabilityThreshold) {
             printf("Switching off IBD mode\n");
             global.ibdMode = false;
@@ -181,7 +181,7 @@ void on_interval(uv_timer_t *handle) {
         }
     }
     print_node_status();
-    if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
+    if ((config.periods.autoexit > 0) && (deltaT >= config.periods.autoexit)) {
         printf("Stopping main loop...\n");
         uv_timer_stop(handle);
         uv_stop(uv_default_loop());
@@ -194,7 +194,7 @@ uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
     uv_timer_init(uv_default_loop(), &global.mainTimer);
-    uv_timer_start(&global.mainTimer, &on_interval, 0, config.mainTimerInterval);
+    uv_timer_start(&global.mainTimer, &on_interval, 0, config.periods.mainTimer);
     printf("Done.\n");
     return 0;
 }

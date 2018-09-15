@@ -3,11 +3,15 @@
 #include "parameters.h"
 
 const struct Config config = {
-    .autoExitPeriod = MINUTE(60),
-    .autoSavePeriod = 60,
-    .pingPeriod = 59,
+    .periods = {
+        .mainTimer = 1000,
+        .autoexit = MINUTE(60),
+        .autosave = 60,
+        .ping = 59,
+        .peerDataExchange = 1,
+        .resetIBDMode = 60,
+    },
     .maxPingLatency = 2,
-    .mainTimerInterval = 1000,
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
     .maxIncoming = 125,
@@ -17,10 +21,8 @@ const struct Config config = {
     .userAgent = "/Satoshi:0.16.2/tinybtc:0.0.1/",
     .backlog = 32,
     .getaddrThreshold = 1000,
-    .peerDataRequestPeriod = 1,
     .redisHost = "127.0.0.1",
     .redisPort = 6379,
     .ibdModeAvailabilityThreshold = 0.95,
     .ibdPeerMaxBlockDifference = 100,
-    .ibdModeResetPeriod = 60,
 };
