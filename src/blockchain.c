@@ -71,10 +71,8 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
 
     if (is_coinbase(&ptrNode->tx)) {
         int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
-        printf("Coinbase: Actual output %lli, max output %lli\n", tx->txOutputs->value, maxSubsidy);
-        if (tx->txOutputs->value > maxSubsidy) {
-            return false;
-        }
+        // TODO: Police on max subsidy
+        return true;
     }
     else {
         TxPayload *txSource = calloc(1, sizeof(TxPayload)); // is_tx_valid:txSource
