@@ -17,7 +17,7 @@ struct GlobalState {
     bool ibdMode;
     void *timerTable;
 
-    uv_tcp_t listenSocket;
+    uv_tcp_t operationSocket;
     void *db;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];

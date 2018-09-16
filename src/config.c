@@ -25,4 +25,5 @@ const struct Config config = {
     .dbName = "chaindb",
     .ibdModeAvailabilityThreshold = 0.95,
     .ibdPeerMaxBlockDifference = 100,
+    .operationPort = 9494,
 };
