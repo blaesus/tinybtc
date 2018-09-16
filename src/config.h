@@ -37,7 +37,7 @@ struct Config {
     char *dbName;
     double ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
-    uint16_t operationPort;
+    uint16_t apiPort;
 };
 
 extern const struct Config config;

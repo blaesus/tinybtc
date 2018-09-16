@@ -31,7 +31,7 @@
 
 void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
-int32_t setup_operation_socket(void);
+int32_t setup_api_socket(void);
 
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
@@ -264,7 +264,7 @@ uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
     setup_timers();
-    setup_operation_socket();
+    setup_api_socket();
     printf("Done.\n");
     return 0;
 }
@@ -695,7 +695,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     return 0;
 }
 
-void on_incoming_segment_to_operation(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf) {
+void on_incoming_segment_to_api(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf) {
     if (nread < 0) {
         if (nread != UV_EOF) {
             fprintf(stderr, "Read error %s\n", uv_err_name((int)nread));
@@ -706,7 +706,7 @@ void on_incoming_segment_to_operation(uv_stream_t *socket, ssize_t nread, const 
         }
         return;
     }
-    printf("\nIncoming instruction to operation socket\n");
+    printf("\nIncoming segment to API socket\n");
     if (memcmp(buf->base, INSTRUCTION_KILL, strlen(INSTRUCTION_KILL)) == 0) {
         terminate_main_loop(NULL);
     }
@@ -714,8 +714,8 @@ void on_incoming_segment_to_operation(uv_stream_t *socket, ssize_t nread, const 
 }
 
 
-void on_incoming_connection(uv_stream_t *server, int status) {
-    printf("Incoming connection...\n");
+void on_incoming_api_connection(uv_stream_t *server, int status) {
+    printf("Incoming api connection...\n");
     if (status < 0) {
         fprintf(stderr, "New connection error %s\n", uv_strerror(status));
         return;
@@ -725,28 +725,28 @@ void on_incoming_connection(uv_stream_t *server, int status) {
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
-        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_segment_to_operation);
+        uv_read_start((uv_stream_t *) client, allocate_read_buffer, on_incoming_segment_to_api);
     } else {
         printf("Cannot accept\n");
         uv_close((uv_handle_t*) client, NULL);
     }
 }
 
-int32_t setup_operation_socket() {
-    printf("Setting up operational socket...\n");
+int32_t setup_api_socket() {
+    printf("Setting up api socket...\n");
     struct sockaddr_in localAddress;
-    uv_ip4_addr("0.0.0.0", config.operationPort, &localAddress);
-    uv_tcp_init(uv_default_loop(), &global.operationSocket);
-    uv_tcp_bind(&global.operationSocket, (const struct sockaddr*) &localAddress, 0);
+    uv_ip4_addr("0.0.0.0", config.apiPort, &localAddress);
+    uv_tcp_init(uv_default_loop(), &global.apiSocket);
+    uv_tcp_bind(&global.apiSocket, (const struct sockaddr*) &localAddress, 0);
     int32_t listenError = uv_listen(
-            (uv_stream_t*) &global.operationSocket,
-            config.backlog,
-            on_incoming_connection);
+        (uv_stream_t *) &global.apiSocket,
+        config.backlog,
+        on_incoming_api_connection
+    );
     if (listenError) {
         fprintf(stderr, "Listen error %s\n", uv_strerror(listenError));
         return 1;
     }
-    // uv_read_start((uv_stream_t *)&global.operationSocket, allocate_read_buffer, on_incoming_packet_to_operation);
     printf("Done\n");
     return 0;
 }
