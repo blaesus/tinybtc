@@ -354,6 +354,9 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
             print_message_header(msg.header);
         }
         if (msg.ptrPayload) {
+            if (is_block(&msg)) {
+                release_tx_in_block(msg.ptrPayload);
+            }
             FREE(msg.ptrPayload, "parse_message:payload");
             msg.ptrPayload = NULL;
         }
@@ -540,6 +543,9 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
     }
+    if (is_block(&message)) {
+        release_tx_in_block(message.ptrPayload);
+    }
     FREE(message.ptrPayload, "parse_message:payload");
 }
 
@@ -588,6 +594,9 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
                 int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
                 if (error) {
                     printf("Cannot parse message (%u)\n", error);
+                    if (is_block(&message)) {
+                        release_tx_in_block(message.ptrPayload);
+                    }
                     FREE(message.ptrPayload, "parse_message:payload");
                 }
                 else {

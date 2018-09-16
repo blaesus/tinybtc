@@ -346,6 +346,7 @@ void test_db() {
     BlockPayload *ptrBlockLoaded = MALLOC(sizeof(BlockPayload), "test_redis:payload");
     load_block(genesisHash, ptrBlockLoaded);
     print_block_payload(ptrBlockLoaded);
+    release_tx_in_block(ptrBlockLoaded);
     FREE(ptrBlockLoaded, "test_redis:payload");
 }
 

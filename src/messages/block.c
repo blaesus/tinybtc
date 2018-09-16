@@ -61,6 +61,17 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     return 0;
 }
 
+
+void release_tx_in_block(BlockPayload *ptrBlock) {
+    TxNode *p = ptrBlock->ptrFirstTxNode;
+    TxNode *freeTarget;
+    while (p) {
+        freeTarget = p;
+        p = p->next;
+        FREE(freeTarget, "parse_block:TxNode");
+    }
+}
+
 uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer) {
     Byte *p = ptrBuffer;
 
@@ -251,3 +262,6 @@ void print_block_payload(BlockPayload *ptrBlock) {
     }
 }
 
+bool is_block(Message *ptrMessage) {
+    return strcmp((char*)ptrMessage->header.command, CMD_BLOCK) == 0;
+}
