@@ -2,12 +2,21 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
-#define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
+#define TRACE_MEMORY_USE
 
+#ifdef TRACE_MEMORY_USE
 #define CALLOC(count, size, label) (calloc_audited(count, size, label))
 #define MALLOC(size, label) (malloc_audited(size, label))
 #define FREE(ptr, label) (free_audited(ptr, label))
+#else
+#define CALLOC(count, size, label) (calloc(count, size))
+#define MALLOC(size, label) (malloc(size))
+#define FREE(ptr, label) (free(ptr))
+#endif
+
+#define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
+#define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
+
 
 int segment_uint32(uint32_t number, uint8_t *chars);
 uint16_t combine_uint16(const uint8_t *chars);
