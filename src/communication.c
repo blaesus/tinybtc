@@ -323,7 +323,7 @@ int32_t parse_buffer_into_message(uint8_t *ptrBuffer, Message *ptrMessage) {
     }
 }
 
-void on_message_sent(uv_write_t *writeRequest, int status) {
+void on_message_attempted(uv_write_t *writeRequest, int status) {
     struct WriteContext *ptrContext = writeRequest->data;
 
     char *ipString = get_ip_from_context(ptrContext);
@@ -333,9 +333,13 @@ void on_message_sent(uv_write_t *writeRequest, int status) {
         return;
     }
     else {
-        printf("message sent to %s\n", ipString);
+        printf("message sent to %s", ipString);
+        Message msg;
+        parse_buffer_into_message(ptrContext->buf.base, &msg);
+        print_message_header(msg.header);
+        free(msg.ptrPayload);
     }
-    free(ptrContext->ptrBufferBase); // [FREE] send_message_serialization_buffer
+    free(ptrContext->buf.base); // [FREE] send_message:buffer
     free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
     free(writeRequest); // [FREE] write_buffer_to_socket:WriteRequest
 }
@@ -347,17 +351,17 @@ void write_buffer_to_socket(
     SocketContext *ptrSocketContext = socket->data;
     struct WriteContext *ptrWriteContext = calloc(1, sizeof(*ptrWriteContext)); // write_buffer_to_socket:WriteContext
     ptrWriteContext->peer = ptrSocketContext->peer;
-    ptrWriteContext->ptrBufferBase = ptrUvBuffer->base;
+    ptrWriteContext->buf = *ptrUvBuffer;
     uv_write_t *ptrWriteReq = calloc(1, sizeof(uv_write_t)); // write_buffer_to_socket:WriteRequest
     uint8_t bufferCount = 1;
     ptrWriteReq->data = ptrWriteContext;
-    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_sent);
+    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_attempted);
 }
 
 void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
     Message message = get_empty_message();
     SocketContext *ptrContext = (SocketContext *)socket->data;
-    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH); // send_message_serialization_buffer
+    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH); // send_message:buffer
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 

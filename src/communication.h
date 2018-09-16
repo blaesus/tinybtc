@@ -28,7 +28,7 @@ struct ConnectContext {
 
 struct WriteContext {
     struct Peer *peer;
-    char *ptrBufferBase;
+    uv_buf_t buf;
 };
 
 uint32_t setup_main_event_loop();
