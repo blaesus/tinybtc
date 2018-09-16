@@ -1,12 +1,13 @@
 #include <stdlib.h>
 
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 
 #include "communication.h"
 #include "networking.h"
 #include "persistent.h"
 #include "globalstate.h"
 #include "blockchain.h"
+#include "config.h"
 
 #include "test/test.h"
 
@@ -47,7 +48,11 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
-    recalculate_block_index_meta();
+    double blockAvailability = recalculate_block_index_meta();
+    if (blockAvailability < config.ibdModeAvailabilityThreshold) {
+        global.ibdMode = true;
+        printf("Activated IBD mode\n");
+    }
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();

@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include "uv/uv.h"
 #include "hiredis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
@@ -16,8 +15,10 @@
 #define MAX_ORPHAN_COUNT 4096
 
 struct GlobalState {
+    bool ibdMode;
+    void *timerTable;
+
     uv_tcp_t listenSocket;
-    uv_timer_t mainTimer;
     redisContext *ptrRedisContext;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];
@@ -37,6 +38,7 @@ struct GlobalState {
     SHA256_HASH genesisHash;
 
     BlockIndex mainTip;
+    uint32_t maxFullBlockHeight;
 };
 
 typedef struct GlobalState GlobalState;

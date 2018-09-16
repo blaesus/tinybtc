@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <sys/time.h>
 
 #include "util.h"
 #include "datatypes.h"
@@ -170,4 +171,14 @@ bool is_byte_array_empty(const Byte *hash, uint64_t length) {
         }
     }
     return true;
+}
+
+double timeval_to_double_ms(struct timeval time) {
+    return 1.0 * time.tv_sec * 1000 + 1.0 * time.tv_usec / 1000;
+}
+
+double getNow() {
+    struct timeval nowTimeval;
+    gettimeofday(&nowTimeval, NULL);
+    return timeval_to_double_ms(nowTimeval);
 }

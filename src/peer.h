@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 #include "datatypes.h"
 #include "hash.h"
 
@@ -12,8 +12,8 @@ struct HandshakeState {
 };
 
 struct PingState {
-    time_t pingSent;
-    time_t pongReceived;
+    double pingSent;
+    double pongReceived;
     uint64_t nonce;
 };
 

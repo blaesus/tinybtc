@@ -10,23 +10,32 @@
 #define SERVICE_NODE_XTHIN (1 << 4)
 #define SERVICE_NODE_NETWORK_LIMITED (1 << 10)
 
+struct Periods {
+    uint64_t autoexit;
+    uint64_t saveIndices;
+    uint64_t ping;
+    uint64_t resetIBDMode;
+    uint64_t peerDataExchange;
+    uint64_t timeoutPeers;
+    uint64_t printNodeStatus;
+};
+
 struct Config {
-    int32_t autoExitPeriod;
-    int32_t autoSavePeriod;
-    int32_t pingPeriod;
-    int32_t maxPingLatency;
-    uint32_t mainTimerInterval;
+    struct Periods periods;
+    double peerLatencyTolerence;
     int32_t protocolVersion;
     uint8_t userAgent[128];
     ServiceBits services;
     uint32_t maxIncoming;
     uint32_t maxOutgoing;
+    uint32_t maxOutgoingIBD;
     uint32_t addrLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;
-    uint16_t peerDataRequestPeriod;
     const char redisHost[64];
     uint16_t redisPort;
+    double ibdModeAvailabilityThreshold;
+    uint16_t ibdPeerMaxBlockDifference;
 };
 
 extern const struct Config config;

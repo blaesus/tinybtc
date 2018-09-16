@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 #include "datatypes.h"
 #include "parameters.h"
 
@@ -28,7 +28,7 @@ struct ConnectContext {
 
 struct WriteContext {
     struct Peer *peer;
-    char *ptrBufferBase;
+    uv_buf_t buf;
 };
 
 uint32_t setup_main_event_loop();

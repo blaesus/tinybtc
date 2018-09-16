@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <math.h>
 
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 
 #include "communication.h"
 #include "globalstate.h"
@@ -34,39 +35,57 @@ void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
     connect_to_random_addr_for_peer(data->peer->index);
-    free(handle->data); // [FREE] timeout_peers:SocketContext
+    free(handle->data); // [FREE] reconnect_peer:SocketContext
+}
+
+void replace_peer(Peer *ptrPeer) {
+    uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
+    if (ptrSocket->data) {
+        free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext
+        ptrSocket->data = NULL;
+    }
+    ptrSocket->data = calloc(1, sizeof(SocketContext)); // reconnect_peer:SocketContext
+    SocketContext *ptrData = ptrSocket->data;
+    ptrData->peer = ptrPeer;
+    if (uv_is_closing(ptrSocket)) {
+        fprintf(stderr, "replace_peer: Socket is already closing...\n");
+    }
+    else {
+        uv_close(ptrSocket, on_handle_close);
+    }
 }
 
 void timeout_peers() {
-    time_t now = time(NULL);
+    double now = getNow();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         bool timeoutForLateHandshake =
             (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
             && !peer_hand_shaken(ptrPeer);
 
-        time_t ping = ptrPeer->requests.ping.pingSent;
-        time_t pong = ptrPeer->requests.ping.pongReceived;
+        double ping = ptrPeer->requests.ping.pingSent;
+        double pong = ptrPeer->requests.ping.pongReceived;
         bool neverReceivedPong = pong == 0;
-        bool timeoutForLatePong = ping && (
-            neverReceivedPong ? now - ping > config.maxPingLatency : pong - ping > config.maxPingLatency
-        );
+        double latency = neverReceivedPong ? now - ping : pong - ping;
+        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerence);
 
         if (timeoutForLateHandshake || timeoutForLatePong) {
-            printf("Timeout peer %u (reason: handshake=%u, pong=%u)\n", i, timeoutForLateHandshake, timeoutForLatePong);
-            if (timeoutForLateHandshake || neverReceivedPong) {
-                uv_handle_t *ptrHandle = (uv_handle_t *) &ptrPeer->socket;
-                if (ptrHandle && !uv_is_closing(ptrHandle)) {
-                    if (ptrHandle->data) {
-                        free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
-                        ptrHandle->data = NULL;
-                    }
-                    SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
-                    ptrData->peer = ptrPeer;
-                    ptrHandle->data = ptrData;
-                    uv_close(ptrHandle, on_handle_close);
-                }
+            printf(
+                "Timeout peer %u (reason: handshake=%u, pong=%u)",
+                i,
+                timeoutForLateHandshake,
+                timeoutForLatePong
+            );
+            if (timeoutForLatePong) {
+                printf("[latency=%.1fms]\n", latency);
             }
+            else {
+                printf("\n");
+            }
+            if (timeoutForLateHandshake || neverReceivedPong) {
+                disable_ip(ptrPeer->address.ip);
+            }
+            replace_peer(ptrPeer);
         }
     }
 }
@@ -74,11 +93,11 @@ void timeout_peers() {
 void data_exchange_with_peer(Peer *ptrPeer) {
     printf("Executing data exchange with peer %u (%s)\n", ptrPeer->index, convert_ipv4_readable(ptrPeer->address.ip));
     if (ptrPeer->chain_height > global.mainTip.context.height) {
-        printf("They have longer chain\n");
+        printf("They have longer chain (%u < %u)\n", global.mainTip.context.height, ptrPeer->chain_height);
         send_getheaders(&ptrPeer->socket);
     }
     else if (ptrPeer->chain_height == global.mainTip.context.height) {
-        printf("Chain synced\n");
+        printf("Chain synced at %u\n", global.mainTip.context.height);
         if (is_hash_empty(ptrPeer->requests.block)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
@@ -101,8 +120,8 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     }
 }
 
-void request_data_from_peers() {
-    printf("Requesting data from peers...\n");
+void exchange_data_with_peers() {
+    printf("Exchanging data with peers...\n");
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
@@ -112,7 +131,7 @@ void request_data_from_peers() {
     }
 }
 
-uint16_t print_node_status() {
+void print_node_status() {
     printf("\n==== Node status ====\n");
 
     printf("peers handshake: ");
@@ -130,16 +149,17 @@ uint16_t print_node_status() {
     printf("%u addresses\n", global.peerAddressCount);
 
 
-    printf("main chain height %u\n", global.mainTip.context.height);
+    printf("main chain height %u; max full block %u\n",
+        global.mainTip.context.height, global.maxFullBlockHeight
+    );
     print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
-    return validPeers;
 }
 
 void ping_peers() {
     printf("Pinging peers\n");
     // TODO: Use at least milliseconds. Seconds are too crude.
-    time_t now = time(NULL);
+    double now = getNow();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
@@ -155,34 +175,91 @@ void ping_peers() {
     }
 }
 
-void on_interval(uv_timer_t *handle) {
-    time_t now = time(NULL);
-    time_t deltaT = now - global.start_time;
-    timeout_peers();
-    if (deltaT % config.peerDataRequestPeriod == 0) {
-        request_data_from_peers();
+void terminate_main_loop(uv_timer_t *handle) {
+    printf("Stopping main loop...\n");
+    uv_timer_stop(handle);
+    uv_stop(uv_default_loop());
+    uv_loop_close(uv_default_loop());
+    printf("Done.\n");
+}
+
+void resetIBDMode() {
+    if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
+        printf("\nSwitching off IBD mode\n");
+        global.ibdMode = false;
     }
-    if (deltaT % config.autoSavePeriod == 0) {
-        save_chain_data();
+    else {
+        printf("\nSwitching on IBD mode\n");
+        global.ibdMode = true;
     }
-    if (deltaT % config.pingPeriod == 0) {
-        ping_peers();
+}
+
+typedef void TimerCallback(uv_timer_t *);
+
+struct TimerTableRow {
+    uv_timer_t timer;
+    uint64_t interval;
+    TimerCallback *callback;
+    bool onlyOnce;
+};
+
+typedef struct TimerTableRow TimerTableRow;
+
+void setup_timers() {
+    TimerTableRow timerTableAutomatic[] = {
+        {
+            .interval = config.periods.peerDataExchange,
+            .callback = &exchange_data_with_peers,
+        },
+        {
+            .interval = config.periods.ping,
+            .callback = &ping_peers,
+        },
+        {
+            .interval = config.periods.saveIndices,
+            .callback = &save_chain_data,
+        },
+        {
+            .interval = config.periods.autoexit,
+            .callback = &terminate_main_loop,
+            .onlyOnce = true,
+        },
+        {
+            .interval = config.periods.resetIBDMode,
+            .callback = &resetIBDMode,
+        },
+        {
+            .interval = config.periods.timeoutPeers,
+            .callback = &timeout_peers,
+        },
+        {
+            .interval = config.periods.printNodeStatus,
+            .callback = &print_node_status,
+        },
+    };
+    uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);
+
+    TimerTableRow *timerTable = calloc(rowCount, sizeof(TimerTableRow));
+    memcpy(timerTable, timerTableAutomatic, sizeof(timerTableAutomatic));
+    for (uint32_t i = 0; i < rowCount; i++) {
+        TimerTableRow *row = &timerTable[i];
+        if (row->interval > 0) {
+            uv_timer_init(uv_default_loop(), &row->timer);
+            if (row->onlyOnce) {
+                uv_timer_start(&row->timer, row->callback, row->interval, 0);
+            }
+            else {
+                uv_timer_start(&row->timer, row->callback, 0, row->interval);
+            }
+        }
     }
-    print_node_status();
-    if ((config.autoExitPeriod > 0) && (deltaT >= config.autoExitPeriod)) {
-        printf("Stopping main loop...\n");
-        uv_timer_stop(handle);
-        uv_stop(uv_default_loop());
-        uv_loop_close(uv_default_loop());
-        printf("Done.\n");
-    }
+    global.timerTable = timerTable;
 }
 
 uint32_t setup_main_event_loop() {
     printf("Setting up main event loop...");
     uv_loop_init(uv_default_loop());
-    uv_timer_init(uv_default_loop(), &global.mainTimer);
-    uv_timer_start(&global.mainTimer, &on_interval, 0, config.mainTimerInterval);
+    setup_timers();
     printf("Done.\n");
     return 0;
 }
@@ -253,19 +330,22 @@ int32_t parse_buffer_into_message(uint8_t *ptrBuffer, Message *ptrMessage) {
     }
 }
 
-void on_message_sent(uv_write_t *writeRequest, int status) {
+void on_message_attempted(uv_write_t *writeRequest, int status) {
     struct WriteContext *ptrContext = writeRequest->data;
 
     char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
-        connect_to_random_addr_for_peer(ptrContext->peer->index);
         return;
     }
     else {
-        printf("message sent to %s\n", ipString);
+        printf("message sent to %s", ipString);
+        Message msg;
+        parse_buffer_into_message(ptrContext->buf.base, &msg);
+        print_message_header(msg.header);
+        // free(msg.ptrPayload); // TODO: free() throws here
     }
-    free(ptrContext->ptrBufferBase); // [FREE] send_message_serialization_buffer
+    free(ptrContext->buf.base); // [FREE] send_message:buffer
     free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
     free(writeRequest); // [FREE] write_buffer_to_socket:WriteRequest
 }
@@ -277,17 +357,17 @@ void write_buffer_to_socket(
     SocketContext *ptrSocketContext = socket->data;
     struct WriteContext *ptrWriteContext = calloc(1, sizeof(*ptrWriteContext)); // write_buffer_to_socket:WriteContext
     ptrWriteContext->peer = ptrSocketContext->peer;
-    ptrWriteContext->ptrBufferBase = ptrUvBuffer->base;
+    ptrWriteContext->buf = *ptrUvBuffer;
     uv_write_t *ptrWriteReq = calloc(1, sizeof(uv_write_t)); // write_buffer_to_socket:WriteRequest
     uint8_t bufferCount = 1;
     ptrWriteReq->data = ptrWriteContext;
-    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_sent);
+    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_attempted);
 }
 
 void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
     Message message = get_empty_message();
     SocketContext *ptrContext = (SocketContext *)socket->data;
-    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH); // send_message_serialization_buffer
+    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH); // send_message:buffer
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
@@ -367,6 +447,13 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 }
 
 void on_handshake_success(Peer *ptrPeer) {
+    if (global.ibdMode) {
+        if (ptrPeer->chain_height < global.maxFullBlockHeight) {
+            printf("Switching peer for lack of blocks\n");
+            replace_peer(ptrPeer);
+            return;
+        }
+    }
     data_exchange_with_peer(ptrPeer);
     bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
     if (shouldSendGetaddr) {
@@ -376,8 +463,8 @@ void on_handshake_success(Peer *ptrPeer) {
 
 void handle_incoming_message(Peer *ptrPeer, Message message) {
     print_message(&message);
-    uint32_t now = (uint32_t)time(NULL);
-    set_addr_timestamp(ptrPeer->address.ip, now);
+    double now = getNow();
+    set_addr_timestamp(ptrPeer->address.ip, (uint32_t)round(now / SECOND_TO_MILLISECOND(1)));
 
     char *command = (char *)message.header.command;
 
@@ -400,7 +487,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
         for (uint64_t i = 0; i < ptrPayload->count; i++) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
-                uint32_t timestampForRecord = record->timestamp - HOUR(2);
+                uint32_t timestampForRecord = record->timestamp - HOUR_TO_SECOND(2);
                 add_peer_address(record->net_addr, timestampForRecord);
             }
             else {
@@ -541,7 +628,7 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
         );
         if (ptrContext->peer->relationship == REL_MY_SERVER) {
             disable_ip(ptrContext->peer->address.ip);
-            connect_to_random_addr_for_peer(ptrContext->peer->index);
+            replace_peer(ptrContext->peer);
         }
     }
     else {
@@ -565,7 +652,6 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     );
 
     Peer *ptrPeer = &global.peers[peerIndex];
-
 
     reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
@@ -649,7 +735,8 @@ void connect_to_random_addr_for_peer(uint32_t peerIndex) {
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoing = min(config.maxOutgoing, global.peerAddressCount);
+    uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
+    uint32_t outgoing = min(outgoingConfig, global.peerAddressCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);
         global.peerCount += 1;
