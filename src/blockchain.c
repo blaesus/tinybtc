@@ -79,7 +79,7 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
         return true;
     }
     else {
-        TxPayload *txSource = calloc(1, sizeof(TxPayload)); // is_tx_valid:txSource
+        TxPayload *txSource = CALLOC(1, sizeof(TxPayload), "is_tx_valid:txSource");
         for (uint32_t i = 0; i < tx->txInputCount; i++) {
             TxIn input = tx->txInputs[i];
             int8_t error = load_tx(input.previous_output.hash, txSource);
@@ -102,7 +102,7 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
             TxOut *output = &txSource->txOutputs[input.previous_output.index];
             uint64_t programLength = input.signature_script_length + output->public_key_script_length;
 
-            Byte *program = calloc(1, programLength); // is_tx_valid:program
+            Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
             memcpy(program, input.signature_script, input.signature_script_length);
             memcpy(program+input.signature_script_length, output->public_key_script, output->public_key_script_length);
             CheckSigMeta meta = {
@@ -113,14 +113,14 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
             bool result = run_program(program, programLength, meta);
             if (!result) {
                 printf("verification script failed\n");
-                free(program); // [FREE] is_tx_valid:program
+                FREE(program, "is_tx_valid:program");
                 return false;
             }
             else {
-                free(program); // [FREE] is_tx_valid:program
+                FREE(program, "is_tx_valid:program");
             }
         }
-        free(txSource); // [FREE] is_tx_valid:txSource
+        FREE(txSource, "is_tx_valid:txSource");
     }
     return true;
 }
@@ -350,7 +350,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
 
 double recalculate_block_index_meta() {
     printf("Reindexing block indices...\n");
-    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
     for (uint32_t i = 0; i < indexCount; i++) {
@@ -373,7 +373,7 @@ double recalculate_block_index_meta() {
             }
         }
     }
-    free(keys); // recalculate_block_indices:keys
+    FREE(keys, "recalculate_block_indices:keys");
     printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
     printf("Done.\n");
     return fullBlockAvailable * 1.0 / indexCount;

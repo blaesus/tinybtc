@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include "util.h"
 #include "messages/shared.h"
 #include "reject.h"
 
@@ -26,7 +27,7 @@ int32_t parse_into_reject_message(
     RejectPayload payload;
     memset(&payload, 0, sizeof(payload));
     parse_reject_payload(ptrBuffer + sizeof(header), &payload);
-    ptrMessage->ptrPayload = malloc(sizeof(RejectPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(RejectPayload), "parse_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

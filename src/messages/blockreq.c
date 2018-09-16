@@ -41,7 +41,7 @@ int32_t make_blockreq_message(
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, commandSize);
 
-    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // make_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(BlockRequestPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(BlockRequestPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -75,7 +75,7 @@ int32_t parse_into_blockreq_message(Byte *ptrBuffer, Message *ptrMessage) {
     parse_message_header(ptrBuffer, &header);
     parse_blockreq_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(BlockRequestPayload), "parse_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }
@@ -86,10 +86,10 @@ uint64_t load_blockreq_message(char *path, Message *ptrMessage) {
     fread(ptrMessage, sizeof(ptrMessage->header), 1, file);
 
     uint64_t payloadLength = ptrMessage->header.length;
-    Byte *buffer = malloc(payloadLength); // load_blockreq_message:buffer
+    Byte *buffer = MALLOC(payloadLength, "load_blockreq_message:buffer");
     fread(buffer, payloadLength, 1, file);
 
-    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // load_blockreq_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(BlockRequestPayload), "load_blockreq_message:payload");
     parse_blockreq_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
     free(buffer); // load_blockreq_message:buffer

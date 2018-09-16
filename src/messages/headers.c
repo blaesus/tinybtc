@@ -25,7 +25,7 @@ int32_t parse_into_headers_message(
     parse_message_header(ptrBuffer, &header);
     parse_headers_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(HeadersPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(HeadersPayload), "parse_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

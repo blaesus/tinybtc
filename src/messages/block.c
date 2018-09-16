@@ -48,7 +48,7 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
 
     TxNode *ptrPreviousNode = NULL;
     for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
-        TxNode *ptrNewNode = calloc(1, sizeof(TxNode)); // parse_block:TxNode
+        TxNode *ptrNewNode = CALLOC(1, sizeof(TxNode), "parse_block:TxNode");
         p += parse_into_tx_payload(p, &ptrNewNode->tx);
         if (!ptrBlock->ptrFirstTxNode) {
             ptrBlock->ptrFirstTxNode = ptrNewNode;
@@ -82,7 +82,7 @@ int32_t make_block_message(Message *ptrMessage, BlockPayload *ptrPayload) {
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_BLOCK, sizeof(CMD_BLOCK));
 
-    ptrMessage->ptrPayload = malloc(sizeof(BlockPayload)); // make_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(BlockPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(BlockPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -112,13 +112,13 @@ uint64_t load_block_message(char *path, Message *ptrMessage) {
     fread(ptrMessage, sizeof(ptrMessage->header), 1, file);
 
     uint64_t payloadLength = ptrMessage->header.length;
-    Byte *buffer = malloc(payloadLength); // load_block_message:buffer
+    Byte *buffer = MALLOC(payloadLength, "load_block_message:buffer");
     fread(buffer, payloadLength, 1, file);
 
-    ptrMessage->ptrPayload = calloc(1, sizeof(BlockPayload)); // load_block_message:paylaod
+    ptrMessage->ptrPayload = CALLOC(1, sizeof(BlockPayload), "load_block_message:paylaod");
     parse_into_block_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
-    free(buffer); // load_block_message:buffer
+    FREE(buffer, "load_block_message:buffer");
 
     return sizeof(ptrMessage->header)+payloadLength;
 }
@@ -144,7 +144,7 @@ int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
     parse_message_header(ptrBuffer, &header);
     parse_into_block_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(BlockPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(BlockPayload), "parse_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

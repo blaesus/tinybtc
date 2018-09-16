@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <util.h>
 #include "pingpong.h"
 #include "messages/shared.h"
 
@@ -11,7 +12,7 @@ int32_t make_pingpong_message(
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, command, sizeof(ptrMessage->header.command));
 
-    ptrMessage->ptrPayload = malloc(sizeof(PingpongPayload)); // make_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(PingpongPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(PingpongPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -68,7 +69,7 @@ int32_t parse_into_pingpong_message(
     parse_message_header(ptrBuffer, &header);
     parse_pingpong_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(PingpongPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(PingpongPayload), "parse_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

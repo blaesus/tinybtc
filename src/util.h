@@ -5,6 +5,10 @@
 #define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
 #define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
 
+#define CALLOC(count, size, label) (calloc_audited(count, size, label))
+#define MALLOC(size, label) (malloc_audited(size, label))
+#define FREE(ptr, label) (free_audited(ptr, label))
+
 int segment_uint32(uint32_t number, uint8_t *chars);
 uint16_t combine_uint16(const uint8_t *chars);
 uint32_t combine_uint32(const uint8_t *chars);
@@ -26,3 +30,6 @@ char *date_string(time_t time);
 bool is_byte_array_empty(const Byte *hash, uint64_t length);
 double timeval_to_double_ms(struct timeval time);
 double getNow();
+void *malloc_audited(size_t size, char* label);
+void *calloc_audited(size_t count, size_t size, char* label);
+void free_audited(void *ptr, char* label);

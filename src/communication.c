@@ -36,7 +36,7 @@ int32_t setup_api_socket(void);
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
     connect_to_random_addr_for_peer(data->peer->index);
-    free(handle->data); // [FREE] reconnect_peer:SocketContext
+    FREE(handle->data, "SocketContext");
 }
 
 void replace_peer(Peer *ptrPeer) {
@@ -46,7 +46,7 @@ void replace_peer(Peer *ptrPeer) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
         ptrSocket->data = NULL;
     }
-    ptrSocket->data = calloc(1, sizeof(SocketContext)); // reconnect_peer:SocketContext
+    ptrSocket->data = CALLOC(1, sizeof(SocketContext), "SocketContext");
     SocketContext *ptrData = ptrSocket->data;
     ptrData->peer = ptrPeer;
     if (uv_is_closing(ptrSocket)) {
@@ -243,7 +243,7 @@ void setup_timers() {
     };
     uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);
 
-    TimerTableRow *timerTable = calloc(rowCount, sizeof(TimerTableRow));
+    TimerTableRow *timerTable = CALLOC(rowCount, sizeof(TimerTableRow), "setup_timers:timerTable");
     memcpy(timerTable, timerTableAutomatic, sizeof(timerTableAutomatic));
     for (uint32_t i = 0; i < rowCount; i++) {
         TimerTableRow *row = &timerTable[i];
@@ -354,13 +354,13 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
             print_message_header(msg.header);
         }
         if (msg.ptrPayload) {
-            free(msg.ptrPayload); // [FREE] parse_message:payload
+            FREE(msg.ptrPayload, "parse_message:payload");
             msg.ptrPayload = NULL;
         }
     }
-    free(ptrContext->buf.base); // [FREE] send_message:buffer
-    free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
-    free(writeRequest); // [FREE] write_buffer_to_socket:WriteRequest
+    FREE(ptrContext->buf.base, "send_message:buffer");
+    FREE(ptrContext, "write_buffer_to_socket:WriteContext");
+    FREE(writeRequest, "write_buffer_to_socket:WriteRequest");
 }
 
 void write_buffer_to_socket(
@@ -368,10 +368,10 @@ void write_buffer_to_socket(
     uv_tcp_t *socket
 ) {
     SocketContext *ptrSocketContext = socket->data;
-    struct WriteContext *ptrWriteContext = calloc(1, sizeof(*ptrWriteContext)); // write_buffer_to_socket:WriteContext
+    struct WriteContext *ptrWriteContext = CALLOC(1, sizeof(*ptrWriteContext), "write_buffer_to_socket:WriteContext");
     ptrWriteContext->peer = ptrSocketContext->peer;
     ptrWriteContext->buf = *ptrUvBuffer;
-    uv_write_t *ptrWriteReq = calloc(1, sizeof(uv_write_t)); // write_buffer_to_socket:WriteRequest
+    uv_write_t *ptrWriteReq = CALLOC(1, sizeof(uv_write_t), "write_buffer_to_socket:WriteRequest");
     uint8_t bufferCount = 1;
     ptrWriteReq->data = ptrWriteContext;
     uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_attempted);
@@ -380,7 +380,7 @@ void write_buffer_to_socket(
 void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
     Message message = get_empty_message();
     SocketContext *ptrContext = (SocketContext *)socket->data;
-    Byte *buffer = malloc(MESSAGE_BUFFER_LENGTH); // send_message:buffer
+    Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "send_message:buffer");
     uv_buf_t uvBuffer = uv_buf_init((char *)buffer, sizeof(buffer));
     uvBuffer.base = (char *)buffer;
 
@@ -456,7 +456,7 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
         );
     }
     write_buffer_to_socket(&uvBuffer, socket);
-    free(message.ptrPayload);
+    FREE(message.ptrPayload, "make_message:payload");
 }
 
 void on_handshake_success(Peer *ptrPeer) {
@@ -540,7 +540,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
     }
-    free(message.ptrPayload); // [free]parse_message:payload
+    FREE(message.ptrPayload, "parse_message:payload");
 }
 
 bool checksum_match(Byte *ptrBuffer) {
@@ -588,7 +588,7 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
                 int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
                 if (error) {
                     printf("Cannot parse message (%u)\n", error);
-                    free(message.ptrPayload); // parse_message:payload
+                    FREE(message.ptrPayload, "parse_message:payload");
                 }
                 else {
                     handle_incoming_message(ptrPeer, message);
@@ -619,7 +619,7 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
     MessageCache *ptrCache = &(ptrContext->streamCache);
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
-    free(buf->base); // allocate_read_buffer:bufBase
+    FREE(buf->base, "allocate_read_buffer:bufBase");
     extract_message_from_stream_buffer(ptrCache, ptrContext->peer);
 }
 
@@ -627,7 +627,7 @@ void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *
     if (!handle) {
         // Make it used
     }
-    buf->base = (char*)malloc(suggested_size); // allocate_read_buffer:bufBase
+    buf->base = MALLOC(suggested_size, "allocate_read_buffer:bufBase");
     buf->len = suggested_size;
 }
 
@@ -650,14 +650,14 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     else {
         printf("connected with peer %s \n", ipString);
 
-        SocketContext *socketContext = calloc(1, sizeof(*socketContext)); // on_peer_connect:SocketContext
+        SocketContext *socketContext = CALLOC(1, sizeof(*socketContext), "SocketContext");
         socketContext->peer = ptrContext->peer;
         connectRequest->handle->data = socketContext;
         send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
         uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
     }
-    free(connectRequest); // [FREE] initialize_peer:ConnectRequest
-    free(ptrContext); // [FREE] initialize_peer:ConnectContext
+    FREE(connectRequest, "initialize_peer:ConnectRequest");
+    FREE(ptrContext, "initialize_peer:ConnectContext");
 }
 
 int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
@@ -675,9 +675,9 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
 
     // Connection request
-    struct ConnectContext *ptrContext = calloc(1, sizeof(*ptrContext)); // initialize_peer:ConnectContext
+    struct ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "initialize_peer:ConnectContext");
     ptrContext->peer = ptrPeer;
-    uv_connect_t *ptrConnectRequest = calloc(1, sizeof(uv_connect_t)); // initialize_peer:ConnectRequest
+    uv_connect_t *ptrConnectRequest = CALLOC(1, sizeof(uv_connect_t), "initialize_peer:ConnectRequest");
     ptrConnectRequest->data = ptrContext;
 
     // TCP socket
@@ -710,7 +710,7 @@ void on_incoming_segment_to_api(uv_stream_t *socket, ssize_t nread, const uv_buf
     if (memcmp(buf->base, INSTRUCTION_KILL, strlen(INSTRUCTION_KILL)) == 0) {
         terminate_main_loop(NULL);
     }
-    free(buf->base); // allocate_read_buffer:bufBase
+    FREE(buf->base, "allocate_read_buffer:bufBase");
 }
 
 
@@ -721,7 +721,7 @@ void on_incoming_api_connection(uv_stream_t *server, int status) {
         return;
     }
 
-    uv_tcp_t *client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t)); // on_incoming_connection:client (TODO: release)
+    uv_tcp_t *client = MALLOC(sizeof(uv_tcp_t), "on_incoming_api_connection: client");
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         printf("Accepted\n");
