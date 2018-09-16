@@ -35,7 +35,24 @@ void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
     connect_to_random_addr_for_peer(data->peer->index);
-    free(handle->data); // [FREE] timeout_peers:SocketContext
+    free(handle->data); // [FREE] reconnect_peer:SocketContext
+}
+
+void replace_peer(Peer *ptrPeer) {
+    uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
+    if (ptrSocket->data) {
+        free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext
+        ptrSocket->data = NULL;
+    }
+    ptrSocket->data = calloc(1, sizeof(SocketContext)); // reconnect_peer:SocketContext
+    SocketContext *ptrData = ptrSocket->data;
+    ptrData->peer = ptrPeer;
+    if (uv_is_closing(ptrSocket)) {
+        fprintf(stderr, "replace_peer: Socket is already closing...\n");
+    }
+    else {
+        uv_close(ptrSocket, on_handle_close);
+    }
 }
 
 void timeout_peers() {
@@ -68,17 +85,7 @@ void timeout_peers() {
             if (timeoutForLateHandshake || neverReceivedPong) {
                 disable_ip(ptrPeer->address.ip);
             }
-            uv_handle_t *ptrHandle = (uv_handle_t *) &ptrPeer->socket;
-            if (ptrHandle && !uv_is_closing(ptrHandle)) {
-                if (ptrHandle->data) {
-                    free(ptrHandle->data); // [FREE] on_peer_connect:SocketContext
-                    ptrHandle->data = NULL;
-                }
-                SocketContext *ptrData = calloc(1, sizeof(SocketContext)); // timeout_peers:SocketContext
-                ptrData->peer = ptrPeer;
-                ptrHandle->data = ptrData;
-                uv_close(ptrHandle, on_handle_close);
-            }
+            replace_peer(ptrPeer);
         }
     }
 }
@@ -329,7 +336,6 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
     char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
-        connect_to_random_addr_for_peer(ptrContext->peer->index);
         return;
     }
     else {
@@ -337,7 +343,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         Message msg;
         parse_buffer_into_message(ptrContext->buf.base, &msg);
         print_message_header(msg.header);
-        free(msg.ptrPayload);
+        // free(msg.ptrPayload); // TODO: free() throws here
     }
     free(ptrContext->buf.base); // [FREE] send_message:buffer
     free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
@@ -444,7 +450,7 @@ void on_handshake_success(Peer *ptrPeer) {
     if (global.ibdMode) {
         if (ptrPeer->chain_height < global.maxFullBlockHeight) {
             printf("Switching peer for lack of blocks\n");
-            connect_to_random_addr_for_peer(ptrPeer->index);
+            replace_peer(ptrPeer);
             return;
         }
     }
@@ -622,7 +628,7 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
         );
         if (ptrContext->peer->relationship == REL_MY_SERVER) {
             disable_ip(ptrContext->peer->address.ip);
-            connect_to_random_addr_for_peer(ptrContext->peer->index);
+            replace_peer(ptrContext->peer);
         }
     }
     else {
@@ -646,7 +652,6 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     );
 
     Peer *ptrPeer = &global.peers[peerIndex];
-
 
     reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
