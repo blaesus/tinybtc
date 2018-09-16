@@ -236,8 +236,10 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
             memcpy(buffer+SHA256_LENGTH, rightHash, SHA256_LENGTH);
             dsha256(buffer, SHA256_LENGTH * 2, p->hash);
             if (p->next) {
+                HashNode *freeTarget = p->next;
                 p->next = p->next->next;
                 p = p->next;
+                FREE(freeTarget, "compute_merkle_root:HashNode");
             }
             else {
                 p = NULL;
@@ -246,14 +248,7 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
     }
     memcpy(result, ptrFirstHashNode->hash, SHA256_LENGTH);
 
-    // Free
-    HashNode *p = ptrFirstHashNode;
-    while (p) {
-        HashNode *freeTarget = p;
-        p = p->next;
-        FREE(freeTarget, "compute_merkle_root:HashNode");
-    }
-
+    FREE(ptrFirstHashNode, "compute_merkle_root:HashNode");
     return 0;
 }
 
