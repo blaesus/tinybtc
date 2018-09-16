@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "leveldb/c.h"
 #include "libuv/include/uv.h"
 
 #include "communication.h"
@@ -15,7 +16,7 @@ void cleanup() {
     printf("\nCleaning up\n");
     uv_loop_close(uv_default_loop());
     save_chain_data();
-    redisFree(global.ptrRedisContext);
+    leveldb_close(global.db);
     release_sockets();
     printf("\nGood byte!\n");
 }

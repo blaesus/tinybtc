@@ -39,9 +39,10 @@ void on_handle_close(uv_handle_t *handle) {
 }
 
 void replace_peer(Peer *ptrPeer) {
+    printf("Replacing peer %u\n", ptrPeer->index);
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
-        free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext
+        // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
         ptrSocket->data = NULL;
     }
     ptrSocket->data = calloc(1, sizeof(SocketContext)); // reconnect_peer:SocketContext
@@ -341,7 +342,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
     else {
         printf("message sent to %s", ipString);
         Message msg;
-        parse_buffer_into_message(ptrContext->buf.base, &msg);
+        parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
         print_message_header(msg.header);
         // free(msg.ptrPayload); // TODO: free() throws here
     }
@@ -531,7 +532,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
 }
 
 bool checksum_match(Byte *ptrBuffer) {
-    Header messageHeader = {0};
+    Header messageHeader;
     parse_message_header(ptrBuffer, &messageHeader);
     PayloadChecksum checksum = {0};
     calculate_data_checksum(ptrBuffer + sizeof(messageHeader), messageHeader.length, checksum);
@@ -557,7 +558,7 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
             ptrCache->bufferIndex -= magicOffset;
             printf("Trimmed preceding %llu non-magic bytes", magicOffset);
         }
-        Header header;
+        Header header = get_empty_header();
         parse_message_header(ptrCache->buffer, &header);
         uint64_t messageSize = sizeof(Header) + header.length;
         printf("Message loading from %s: (%llu/%llu)\n",
@@ -611,6 +612,9 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
 }
 
 void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+    if (!handle) {
+        // Make it used
+    }
     buf->base = (char*)malloc(suggested_size); // allocate_read_buffer:bufBase
     buf->len = suggested_size;
 }
@@ -668,7 +672,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
 
     // Connection request
-    struct sockaddr_in remoteAddress = {0};
+    struct sockaddr_in remoteAddress;
     uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
     uv_tcp_connect(
         ptrConnectRequest,
@@ -700,7 +704,7 @@ void on_incoming_connection(uv_stream_t *server, int status) {
 
 int32_t setup_listen_socket() {
     printf("Setting up listen socket...");
-    struct sockaddr_in localAddress = {0};
+    struct sockaddr_in localAddress;
     uv_ip4_addr("0.0.0.0", mainnet.port, &localAddress);
     uv_tcp_init(uv_default_loop(), &global.listenSocket);
     uv_tcp_bind(&global.listenSocket, (const struct sockaddr*) &localAddress, 0);

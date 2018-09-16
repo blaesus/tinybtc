@@ -51,7 +51,6 @@ static int32_t test_version_messages() {
             .acceptThem = false,
             .acceptUs = false,
         },
-        .socket = NULL,
         .relationship = REL_MY_SERVER,
         .address = {
             .services = 0x9,
@@ -272,7 +271,7 @@ void test_hashmap() {
     for (uint32_t i = 0; i < KEY_COUNT; i++) {
         Byte valueIn[VALUE_WIDTH] = {0};
         Byte *key = keys[i];
-        sprintf(valueIn, "data->%u", combine_uint32(key));
+        sprintf((char*)valueIn, "data->%u", combine_uint32(key));
         hashmap_set(ptrHashmap, key, &valueIn, VALUE_WIDTH);
     }
     puts("");
@@ -280,7 +279,7 @@ void test_hashmap() {
     for (uint32_t i = 0; i < KEY_COUNT; i++) {
         Byte valueIn[VALUE_WIDTH] = {0};
         Byte *key = keys[i];
-        sprintf(valueIn, "data->%u", combine_uint32(key));
+        sprintf((char*)valueIn, "data->%u", combine_uint32(key));
         uint32_t valueLength = 0;
         Byte valueOut[VALUE_WIDTH];
         Byte *ptr = hashmap_get(ptrHashmap, key, &valueLength);
@@ -333,12 +332,13 @@ void test_target_conversions() {
     printf("Regenerated genesis = %x", genesisReconstruct);
 }
 
-void test_redis() {
+void test_db() {
     init_db();
     Message genesis = get_empty_message();
     load_block_message("genesis.dat", &genesis);
-    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+    print_block_message(&genesis);
 
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
     save_block(ptrBlock);
 
     SHA256_HASH genesisHash = {0};
@@ -381,7 +381,7 @@ void test_script() {
     for (uint32_t i = 0; i < sizeof(targets) / sizeof(char*); i ++) {
         char *targetBlock = targets[i];
         SHA256_HASH targetHash = {0};
-        sha256_string_to_array(targetBlock, targetHash);
+        sha256_hex_to_binary(targetBlock, targetHash);
         reverse_endian(targetHash, sizeof(targetHash));
 
         BlockIndex *index = GET_BLOCK_INDEX(targetHash);
@@ -389,7 +389,7 @@ void test_script() {
             print_hash_with_description("Block not found: ", targetHash);
             return;
         }
-        BlockPayload block = {0};
+        BlockPayload block;
         load_block(targetHash, &block);
         print_block_payload(&block);
         bool valid = is_block_valid(&block, index);
@@ -403,6 +403,20 @@ void test_script() {
     }
 
     printf("%llu/%llu valid\n", validCount, totalTargets);
+}
+
+void test_hash() {
+    init_db();
+    Message genesis = get_empty_message();
+    load_block_message("genesis.dat", &genesis);
+    print_block_message(&genesis);
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+    SHA256_HASH genesisHash = {0};
+    dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
+    reverse_endian(genesisHash, SHA256_LENGTH);
+    char s[2 * SHA256_LENGTH] = {0};
+    hash_binary_to_hex(genesisHash, s);
+    printf("s=%s", s);
 }
 
 void test() {
@@ -419,7 +433,8 @@ void test() {
     // test_blockchain_validation();
     // test_print_hash();
     // test_target_conversions();
-    // test_redis();
+    test_db();
     // test_ripe();
-    test_script();
+    // test_script();
+    // test_hash();
 }

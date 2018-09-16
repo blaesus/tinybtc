@@ -64,13 +64,17 @@ bool is_block_header_valid(BlockIndex *index) {
 }
 
 bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
+    if (blockIndex == NULL) {
+        fprintf(stderr, "No block index\n");
+        return false;
+    }
     TxPayload *tx = &ptrNode->tx;
     printf("\nvalidating ");
     print_tx_payload(tx);
     printf("\n");
 
     if (is_coinbase(&ptrNode->tx)) {
-        int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+        // int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
         // TODO: Police on max subsidy
         return true;
     }

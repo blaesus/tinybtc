@@ -89,8 +89,7 @@ bool starts_with_magic(void *p);
 
 uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,
-    uint8_t *ptrBuffer,
-    uint32_t bufferSize
+    uint8_t *ptrBuffer
 );
 
 Message get_empty_message(void);

@@ -92,8 +92,7 @@ uint64_t parse_as_varstr(
 
 uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,
-    uint8_t *ptrBuffer,
-    uint32_t bufferSize
+    uint8_t *ptrBuffer
 ) {
     //TODO: Check buffer overflow
     uint8_t *p = ptrBuffer;
@@ -132,8 +131,8 @@ bool starts_with_magic(void *p) {
 
 Message get_empty_message() {
     Message message = {
-        .header = {0},
-        .ptrPayload = NULL
+        .header = get_empty_header(),
+        .ptrPayload = NULL,
     };
     return message;
 }

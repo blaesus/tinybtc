@@ -12,13 +12,8 @@
 
 uint64_t serialize_version_payload(
     struct VersionPayload *ptrPayload,
-    uint8_t *ptrBuffer,
-    uint32_t bufferSize
+    uint8_t *ptrBuffer
 ) {
-    if (bufferSize < 0) {
-        // TODO: Check buffer overflow in the following procedures;
-        return 0;
-    }
     uint8_t *p = ptrBuffer;
     uint64_t offset = 0;
 
@@ -31,10 +26,10 @@ uint64_t serialize_version_payload(
     memcpy(p, &ptrPayload->timestamp, sizeof(ptrPayload->timestamp));
     p += sizeof(ptrPayload->timestamp);
 
-    offset = serialize_network_address(&ptrPayload->addr_recv, p, bufferSize);
+    offset = serialize_network_address(&ptrPayload->addr_recv, p);
     p += offset;
 
-    offset = serialize_network_address(&ptrPayload->addr_from, p, bufferSize);
+    offset = serialize_network_address(&ptrPayload->addr_from, p);
     p += offset;
 
     memcpy(p, &ptrPayload->nonce, sizeof(ptrPayload->nonce));
@@ -83,10 +78,11 @@ int32_t make_version_message(
     struct Message *ptrMessage,
     Peer *ptrPeer
 ) {
-    VersionPayload payload = {0};
+    VersionPayload payload;
+    memset(&payload, 0, sizeof(payload));
     uint32_t payloadLength = make_version_payload(&payload, ptrPeer);
     uint8_t checksumCalculationBuffer[MESSAGE_BUFFER_LENGTH] = {0};
-    serialize_version_payload(&payload, checksumCalculationBuffer, MESSAGE_BUFFER_LENGTH);
+    serialize_version_payload(&payload, checksumCalculationBuffer);
     ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
@@ -108,8 +104,7 @@ uint64_t serialize_version_message(
     memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
     serialize_version_payload(
         (struct VersionPayload *)ptrMessage->ptrPayload,
-        ptrBuffer+messageHeaderSize,
-        1000
+        ptrBuffer+messageHeaderSize
     );
     return messageHeaderSize + ptrMessage->header.length;
 }
@@ -129,13 +124,15 @@ uint64_t parse_version_payload(
     memcpy(&ptrPayload->timestamp, p, sizeof(ptrPayload->timestamp));
     p += sizeof ptrPayload->timestamp;
 
-    struct NetworkAddress recipientAddress = {0};
+    NetworkAddress recipientAddress;
+    memset(&recipientAddress, 0, sizeof(recipientAddress));
     uint64_t recipientAddressWidth = parse_network_address(p, &recipientAddress);
     ptrPayload->addr_recv = recipientAddress;
     p += recipientAddressWidth;
 
     if (ptrPayload->version >= 106) {
-        struct NetworkAddress senderAddress = {0};
+        NetworkAddress senderAddress;
+        memset(&senderAddress, 0, sizeof(senderAddress));
         uint64_t sendAddressWidth = parse_network_address(p, &senderAddress);
         ptrPayload->addr_from = senderAddress;
         p += sendAddressWidth;
@@ -164,8 +161,9 @@ int32_t parse_into_version_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
-    Header header = {0};
-    struct VersionPayload payload = {0};
+    Header header = get_empty_header();
+    VersionPayload payload;
+    memset(&payload, 0, sizeof(payload));
     parse_message_header(ptrBuffer, &header);
     parse_version_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));

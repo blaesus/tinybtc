@@ -30,11 +30,12 @@ int32_t parse_into_addr_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
-    Header header = {0};
+    Header header = get_empty_header();
     parse_message_header(ptrBuffer, &header);
     memcpy(ptrMessage, &header, sizeof(header));
 
-    AddrPayload payload = {0};
+    AddrPayload payload;
+    memset(&payload, 0, sizeof(payload));
     parse_addr_payload(ptrBuffer + sizeof(header), &payload);
     ptrMessage->ptrPayload = malloc(sizeof(AddrPayload)); // parse_message:payload
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));

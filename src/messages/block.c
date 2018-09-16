@@ -138,8 +138,9 @@ void print_block_message(Message *ptrMessage) {
 }
 
 int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
-    Header header = {0};
-    BlockPayload payload = {0};
+    Header header = get_empty_header();
+    BlockPayload payload;
+    memset(&payload, 0, sizeof(payload));
     parse_message_header(ptrBuffer, &header);
     parse_into_block_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));

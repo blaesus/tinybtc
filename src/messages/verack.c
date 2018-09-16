@@ -23,6 +23,9 @@ int32_t parse_into_verack_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
+    if (ptrBuffer) {
+        // Make use of it
+    }
     make_verack_message(ptrMessage);
     return 0;
 }

@@ -32,8 +32,7 @@ struct Config {
     uint32_t addrLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;
-    const char redisHost[64];
-    uint16_t redisPort;
+    char *dbName;
     double ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
 };

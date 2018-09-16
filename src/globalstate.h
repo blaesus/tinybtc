@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
-#include "hiredis/hiredis.h"
 #include "parameters.h"
 #include "datatypes.h"
 #include "peer.h"
@@ -19,7 +18,7 @@ struct GlobalState {
     void *timerTable;
 
     uv_tcp_t listenSocket;
-    redisContext *ptrRedisContext;
+    void *db;
 
     AddrRecord peerAddresses[MAX_ADDR_CACHE];
     uint32_t peerAddressCount;
