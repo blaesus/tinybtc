@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <math.h>
 
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 
 #include "communication.h"
 #include "globalstate.h"

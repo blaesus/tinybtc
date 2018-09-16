@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 
 #include "communication.h"
 #include "networking.h"

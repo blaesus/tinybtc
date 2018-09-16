@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 #include "datatypes.h"
 #include "hash.h"
 
