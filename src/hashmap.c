@@ -112,7 +112,7 @@ void print_hashmap(Hashmap *ptrHashmap) {
     for (uint32_t i = 0; i < ptrHashmap->bucketCount; i++) {
         HashmapNode *ptrNode = ptrHashmap->data[i];
         if (ptrNode) {
-            printf("Node %u: %p\n", i, ptrNode);
+            printf("Node %u: %p\n", i, (void *)ptrNode);
         }
     }
 }

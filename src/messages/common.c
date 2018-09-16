@@ -81,8 +81,9 @@ int32_t parse_into_iv_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
-    Header header = {0};
-    GenericIVPayload payload = {0};
+    Header header = get_empty_header();
+    GenericIVPayload payload;
+    memset(&payload, 0, sizeof(payload));
     parse_message_header(ptrBuffer, &header);
     parse_iv_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));

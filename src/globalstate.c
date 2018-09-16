@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdbool.h>
-#include <time.h>
 
 #include "globalstate.h"
 #include "util.h"

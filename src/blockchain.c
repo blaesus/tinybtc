@@ -64,13 +64,17 @@ bool is_block_header_valid(BlockIndex *index) {
 }
 
 bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
+    if (blockIndex == NULL) {
+        fprintf(stderr, "No block index\n");
+        return false;
+    }
     TxPayload *tx = &ptrNode->tx;
     printf("\nvalidating ");
     print_tx_payload(tx);
     printf("\n");
 
     if (is_coinbase(&ptrNode->tx)) {
-        int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+        // int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
         // TODO: Police on max subsidy
         return true;
     }
@@ -259,7 +263,7 @@ int8_t get_maximal_target(BlockIndex *index, TargetCompact *result) {
     printf(
         "time difference in retarget period: %u seconds (%2.1f days) [from %u, to %u]\n",
         actualPeriod,
-        1.0 * actualPeriod / DAY(1),
+        1.0 * actualPeriod / DAY_TO_SECOND(1),
         ptrStartBlockIndex->header.timestamp,
         ptrEndBlockIndex->header.timestamp
     );
@@ -333,6 +337,9 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         print_hash_with_description("Block saved: ", hash);
     }
     index->meta.fullBlockAvailable = true;
+    if (index->context.height > global.maxFullBlockHeight) {
+        global.maxFullBlockHeight = index->context.height;
+    }
     TxNode *p =  ptrBlock->ptrFirstTxNode;
     while (p) {
         save_tx(&p->tx);
@@ -341,13 +348,13 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-void recalculate_block_index_meta() {
+double recalculate_block_index_meta() {
     printf("Reindexing block indices...\n");
     Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // recalculate_block_indices:keys
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
     for (uint32_t i = 0; i < indexCount; i++) {
-        if (i % 1000 == 0) {
+        if (i % 2000 == 0) {
             printf("checking block index meta %u/%u\n", i, indexCount);
         }
         Byte key[SHA256_LENGTH] = {0};
@@ -361,9 +368,13 @@ void recalculate_block_index_meta() {
         ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
+            if (ptrIndex->context.height > global.maxFullBlockHeight) {
+                global.maxFullBlockHeight = ptrIndex->context.height;
+            }
         }
     }
     free(keys); // recalculate_block_indices:keys
     printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
     printf("Done.\n");
+    return fullBlockAvailable * 1.0 / indexCount;
 }

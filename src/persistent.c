@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "hiredis/hiredis.h"
+#include "leveldb/c.h"
 
 #include "persistent.h"
 
@@ -80,18 +80,19 @@ int32_t load_peer_addresses() {
 
 
 int8_t init_db() {
-    printf("Connecting to redis database...");
-
-    struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    global.ptrRedisContext = redisConnectWithTimeout(config.redisHost, config.redisPort, timeout);
-    if (global.ptrRedisContext == NULL || global.ptrRedisContext->err) {
-        if (global.ptrRedisContext ) {
-            printf("\nConnection error: %s\n", global.ptrRedisContext->errstr);
-        } else {
-            printf("\nConnection error: can't allocate redis context\n");
-        }
-        return 1;
+    printf("Connecting to LevelDB...");
+    leveldb_t *db;
+    leveldb_options_t *options;
+    char *error = NULL;
+    options = leveldb_options_create();
+    leveldb_options_set_create_if_missing(options, 1);
+    db = leveldb_open(options, config.dbName, &error);
+    if (error != NULL) {
+        fprintf(stderr, "Open LevelDB fail: %s\n", error);
+        return -1;
     }
+    leveldb_free(error); error = NULL;
+    global.db = db;
     printf("Done.\n");
     return 0;
 }
@@ -147,47 +148,88 @@ int32_t load_block_indices(void) {
     return 0;
 }
 
+int8_t save_data_by_hash(Byte *hash, Byte *value, uint64_t valueLength) {
+    uint32_t keyLength = SHA256_HEXSTR_LENGTH;
+    char key[SHA256_HEXSTR_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+    char *error = NULL;
+    leveldb_writeoptions_t *writeOptions = leveldb_writeoptions_create();
+    leveldb_put(
+        global.db, writeOptions,
+        key, keyLength,
+        (char*)value, valueLength,
+        &error
+    );
+
+    if (error != NULL) {
+        fprintf(stderr, "Write fail: %s\n", error);
+        return -1;
+    }
+    leveldb_free(error);
+    return 0;
+}
+
+int8_t load_data_by_hash(Byte *hash, Byte *output) {
+    const uint32_t keyLength = SHA256_HEXSTR_LENGTH;
+    char key[SHA256_HEXSTR_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+
+    size_t read_len;
+    char *error;
+    leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
+    char *read = leveldb_get(
+        global.db, readOptions,
+        key, keyLength,
+        &read_len,
+        &error
+    );
+
+    if (error != NULL) {
+        fprintf(stderr, "Read fail: %s\n", error);
+        print_object(error, 5);
+        return -1;
+    }
+    leveldb_free(error);
+    memcpy(output, read, read_len);
+    return 0;
+}
+
+bool check_existence_by_hash(Byte *hash) {
+    uint32_t keyLength = SHA256_HEXSTR_LENGTH;
+    char key[SHA256_HEXSTR_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+
+    size_t read_len;
+    char *error;
+    leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
+    leveldb_get(
+        global.db, readOptions,
+        (char*)key, keyLength,
+        &read_len,
+        &error
+    );
+
+    if (error != NULL) {
+        return false;
+    }
+    leveldb_free(error);
+    return read_len > 0;
+}
+
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
     Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_block:buffer
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
-    redisReply *reply = redisCommand(
-        global.ptrRedisContext,
-        "SET %b %b",
-        hash, SHA256_LENGTH,
-        buffer, width
-    );
-    if (reply == NULL) {
-        return -1;
-    }
-    else if (reply->type == REDIS_REPLY_ERROR) {
-        printf("Save error: %s", reply->str);
-        return -2;
-    }
-    freeReplyObject(reply);
+    save_data_by_hash(hash, buffer, width);
     free(buffer); // [FREE] save_block:buffer
     return 0;
 }
 
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_block:buffer
-    redisReply *reply = redisCommand(
-        global.ptrRedisContext,
-        "GET %b",
-        hash, SHA256_LENGTH
-    );
-    if (reply == NULL) {
-        printf("Load error: null reply");
-        return -1;
-    }
-    else if (reply->type == REDIS_REPLY_ERROR) {
-        printf("Load error: %s", reply->str);
-        return -2;
-    }
-    memcpy(buffer, reply->str, reply->len);
+    load_data_by_hash(hash, buffer);
     parse_into_block_payload(buffer, ptrBlock);
-    freeReplyObject(reply);
     free(buffer); // [FREE] load_block:buffer
     return 0;
 }
@@ -197,63 +239,22 @@ int8_t save_tx(TxPayload *ptrTx) {
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
     SHA256_HASH hash = {0};
     dsha256(buffer, (uint32_t)width, hash);
-    redisReply *reply = redisCommand(
-        global.ptrRedisContext,
-        "SET %b %b",
-        hash, SHA256_LENGTH,
-        buffer, width
-    );
-    if (reply == NULL) {
-        return -1;
-    }
-    else if (reply->type == REDIS_REPLY_ERROR) {
-        printf("Save error: %s", reply->str);
-        return -2;
-    }
-    freeReplyObject(reply);
+    save_data_by_hash(hash, buffer, width);
     free(buffer); // [FREE] save_tx:buffer
     return 0;
 }
 
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_tx:buffer
-    redisReply *reply = redisCommand(
-        global.ptrRedisContext,
-        "GET %b",
-        hash, SHA256_LENGTH
-    );
-    if (reply == NULL) {
-        printf("Load error: null reply");
-        return -1;
-    }
-    else if (reply->type == REDIS_REPLY_ERROR) {
-        printf("Load error: %s", reply->str);
-        return -2;
-    }
-    memcpy(buffer, reply->str, reply->len);
+
+    load_data_by_hash(hash, buffer);
     parse_into_tx_payload(buffer, ptrPayload);
-    freeReplyObject(reply);
     free(buffer); // [FREE] load_tx:buffer
     return 0;
 }
 
 bool check_block_existence(Byte *hash) {
-    redisReply *reply = redisCommand(
-        global.ptrRedisContext,
-        "EXISTS %b",
-        hash, SHA256_LENGTH
-    );
-    if (reply == NULL) {
-        printf("Redis error: null reply");
-        return 0;
-    }
-    else if (reply->type == REDIS_REPLY_ERROR) {
-        printf("Redis error: %s", reply->str);
-        return 0;
-    }
-    int64_t result = reply->integer;
-    freeReplyObject(reply);
-    return (bool)result;
+    return check_existence_by_hash(hash);
 }
 
 

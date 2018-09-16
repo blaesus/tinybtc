@@ -1,7 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
-#include "uv/uv.h"
+#include "libuv/include/uv.h"
 
 #define BITS_IN_BYTE 8 // TODO: Dubious?
 

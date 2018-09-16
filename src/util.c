@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <sys/time.h>
 
 #include "util.h"
 #include "datatypes.h"
@@ -99,16 +100,17 @@ void printUint64(uint64_t input) {
     printf("%"PRIu64"\n", input);
 }
 
-void print_object(uint8_t *ptrData, uint64_t length) {
+void print_object(void *ptrData, uint64_t length) {
     uint64_t index;
     uint8_t character = 0;
+    Byte *p = ptrData;
     for (index = 0; index < length; index++) {
-        character = (uint8_t)(*ptrData & 0xFF);
+        character = (uint8_t)(*p & 0xFF);
         if (index % 16 == 0) {
             printf("\n%03llx0 - ", index / 16);
         }
         printf("%02x ", character);
-        ptrData++;
+        p++;
     }
     printf("END \n");
 }
@@ -144,7 +146,7 @@ int8_t bytescmp(
     const Byte *bytesB,
     uint32_t width
 ) {
-    for (uint32_t i = width - 1; i >= 0; i--) {
+    for (uint32_t i = width - 1; i > 0; i--) {
         if (bytesA[i] < bytesB[i]) {
             return -1;
         }
@@ -162,7 +164,6 @@ char *date_string(time_t time) {
     return text;
 }
 
-
 bool is_byte_array_empty(const Byte *hash, uint64_t length) {
     for (uint64_t i = 0; i < length; i++) {
         if (hash[i]) {
@@ -170,4 +171,14 @@ bool is_byte_array_empty(const Byte *hash, uint64_t length) {
         }
     }
     return true;
+}
+
+double timeval_to_double_ms(struct timeval time) {
+    return 1.0 * time.tv_sec * 1000 + 1.0 * time.tv_usec / 1000;
+}
+
+double getNow() {
+    struct timeval nowTimeval;
+    gettimeofday(&nowTimeval, NULL);
+    return timeval_to_double_ms(nowTimeval);
 }

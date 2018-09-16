@@ -129,7 +129,7 @@ int32_t get_local_listen_address(struct sockaddr_in *addr) {
         printf("getaddrinfo: %s\n", gai_strerror(addrInfoError));
         return 1;
     }
-    memcpy(addr, (struct sockaddr_in *)localAddress->ai_addr, sizeof(struct sockaddr_in *));
+    memcpy(addr, (struct sockaddr_in *)localAddress->ai_addr, sizeof(*addr));
     return 0;
 }
 

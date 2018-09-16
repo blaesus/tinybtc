@@ -1,12 +1,14 @@
 #include <stdlib.h>
 
-#include "uv/uv.h"
+#include "leveldb/c.h"
+#include "libuv/include/uv.h"
 
 #include "communication.h"
 #include "networking.h"
 #include "persistent.h"
 #include "globalstate.h"
 #include "blockchain.h"
+#include "config.h"
 
 #include "test/test.h"
 
@@ -14,7 +16,7 @@ void cleanup() {
     printf("\nCleaning up\n");
     uv_loop_close(uv_default_loop());
     save_chain_data();
-    redisFree(global.ptrRedisContext);
+    leveldb_close(global.db);
     release_sockets();
     printf("\nGood byte!\n");
 }
@@ -47,7 +49,11 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
-    recalculate_block_index_meta();
+    double blockAvailability = recalculate_block_index_meta();
+    if (blockAvailability < config.ibdModeAvailabilityThreshold) {
+        global.ibdMode = true;
+        printf("Activated IBD mode\n");
+    }
     load_peer_addresses();
     if (global.peerAddressCount == 0) {
         dns_bootstrap();

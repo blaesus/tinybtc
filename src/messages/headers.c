@@ -19,8 +19,9 @@ int32_t parse_into_headers_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
-    Header header = {0};
-    HeadersPayload payload = {0};
+    Header header = get_empty_header();
+    HeadersPayload payload;
+    memset(&payload, 0, sizeof(payload));
     parse_message_header(ptrBuffer, &header);
     parse_headers_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));

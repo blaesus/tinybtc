@@ -9,7 +9,7 @@ int32_t make_pingpong_message(
     char *command
 ) {
     ptrMessage->header.magic = mainnet.magic;
-    strcpy(ptrMessage->header.command, command);
+    memcpy(ptrMessage->header.command, command, sizeof(ptrMessage->header.command));
 
     ptrMessage->ptrPayload = malloc(sizeof(PingpongPayload)); // make_message:payload
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(PingpongPayload));
@@ -63,7 +63,7 @@ int32_t parse_into_pingpong_message(
     Byte *ptrBuffer,
     Message *ptrMessage
 ) {
-    Header header = {0};
+    Header header;
     PingpongPayload payload = {0};
     parse_message_header(ptrBuffer, &header);
     parse_pingpong_payload(ptrBuffer + sizeof(header), &payload);
