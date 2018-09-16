@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include "bn.h"
+#include "openssl/bn.h"
 #include "hash.h"
 #include "datatypes.h"
 #include "messages/block.h"

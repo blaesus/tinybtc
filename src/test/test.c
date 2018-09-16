@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include "openssl/bn.h"
 
-#include "bn.h"
 #include "datatypes.h"
 #include "networking.h"
 #include "peer.h"
