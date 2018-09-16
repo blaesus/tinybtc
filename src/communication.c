@@ -340,11 +340,16 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         return;
     }
     else {
-        printf("message sent to %s", ipString);
+        printf("message sent to %s\n", ipString);
         Message msg = get_empty_message();
-        parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
-        print_message_header(msg.header);
-        free(msg.ptrPayload); // [FREE] parse_message:payload
+        int32_t error = parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
+        if (!error) {
+            print_message_header(msg.header);
+        }
+        if (msg.ptrPayload) {
+            free(msg.ptrPayload); // [FREE] parse_message:payload
+            msg.ptrPayload = NULL;
+        }
     }
     free(ptrContext->buf.base); // [FREE] send_message:buffer
     free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
