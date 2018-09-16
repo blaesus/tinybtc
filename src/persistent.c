@@ -82,16 +82,16 @@ int32_t load_peer_addresses() {
 int8_t init_db() {
     printf("Connecting to LevelDB...");
     leveldb_t *db;
-    leveldb_options_t *options;
-    char *error = NULL;
-    options = leveldb_options_create();
+    leveldb_options_t *options = leveldb_options_create();
     leveldb_options_set_create_if_missing(options, 1);
+    char *error = NULL;
     db = leveldb_open(options, config.dbName, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         return -1;
     }
-    leveldb_free(error); error = NULL;
+    leveldb_free(error);
+    leveldb_free(options);
     global.db = db;
     printf("Done.\n");
     return 0;
@@ -166,6 +166,7 @@ int8_t save_data_by_hash(Byte *hash, Byte *value, uint64_t valueLength) {
         return -1;
     }
     leveldb_free(error);
+    leveldb_free(writeOptions);
     return 0;
 }
 
@@ -190,6 +191,7 @@ int8_t load_data_by_hash(Byte *hash, Byte *output) {
         return -1;
     }
     leveldb_free(error);
+    leveldb_free(readOptions);
     memcpy(output, read, read_len);
     return 0;
 }
@@ -213,6 +215,7 @@ bool check_existence_by_hash(Byte *hash) {
         return false;
     }
     leveldb_free(error);
+    leveldb_free(readOptions);
     return read_len > 0;
 }
 
