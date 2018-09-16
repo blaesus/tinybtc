@@ -341,10 +341,10 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
     }
     else {
         printf("message sent to %s", ipString);
-        Message msg;
+        Message msg = get_empty_message();
         parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
         print_message_header(msg.header);
-        // free(msg.ptrPayload); // TODO: free() throws here
+        free(msg.ptrPayload); // [FREE] parse_message:payload
     }
     free(ptrContext->buf.base); // [FREE] send_message:buffer
     free(ptrContext); // [FREE] write_buffer_to_socket:WriteContext
