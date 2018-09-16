@@ -325,6 +325,9 @@ int32_t parse_buffer_into_message(uint8_t *ptrBuffer, Message *ptrMessage) {
     else if (strcmp(command, CMD_BLOCK) == 0) {
         return parse_into_block_message(ptrBuffer, ptrMessage);
     }
+    else if (strcmp(command, CMD_GETDATA) == 0) {
+        return parse_into_blockreq_message(ptrBuffer, ptrMessage);
+    }
     else {
         fprintf(stderr, "Cannot parse message with unknown command '%s'\n", command);
         return 1;
@@ -340,7 +343,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         return;
     }
     else {
-        printf("message sent to %s\n", ipString);
+        printf("message sent to %s", ipString);
         Message msg = get_empty_message();
         int32_t error = parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
         if (!error) {

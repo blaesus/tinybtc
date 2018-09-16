@@ -37,3 +37,5 @@ uint64_t load_blockreq_message(
     char *path,
     Message *ptrMessage
 );
+
+int32_t parse_into_blockreq_message(Byte *ptrBuffer, Message *ptrMessage);

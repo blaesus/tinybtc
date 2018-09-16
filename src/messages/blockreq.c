@@ -68,6 +68,18 @@ uint64_t serialize_blockreq_message(
     return messageHeaderSize + ptrMessage->header.length;
 }
 
+int32_t parse_into_blockreq_message(Byte *ptrBuffer, Message *ptrMessage) {
+    Header header = get_empty_header();
+    BlockRequestPayload payload;
+    memset(&payload, 0, sizeof(payload));
+    parse_message_header(ptrBuffer, &header);
+    parse_blockreq_payload(ptrBuffer + sizeof(header), &payload);
+    memcpy(ptrMessage, &header, sizeof(header));
+    ptrMessage->ptrPayload = malloc(sizeof(BlockRequestPayload)); // parse_message:payload
+    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
+    return 0;
+}
+
 uint64_t load_blockreq_message(char *path, Message *ptrMessage) {
     FILE *file = fopen(path, "rb");
 
