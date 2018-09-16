@@ -442,7 +442,7 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
     }
     else {
         fprintf(stderr, "send_message: Cannot recognize command %s", command);
-        return;
+        goto release_resources;
     }
     uvBuffer.len = dataSize;
 
@@ -459,6 +459,7 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
         );
     }
     write_buffer_to_socket(&uvBuffer, socket);
+    release_resources:
     FREE(message.ptrPayload, "make_message:payload");
 }
 
