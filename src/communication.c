@@ -69,6 +69,7 @@ void ping_peer(Peer *ptrPeer) {
 
 void timeout_peers() {
     double now = get_now();
+    uint32_t droppedPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         bool timeoutForLateHandshake =
@@ -80,6 +81,7 @@ void timeout_peers() {
         bool neverReceivedPong = pong == 0;
         double latency = neverReceivedPong ? now - ping : pong - ping;
         bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerance);
+
 
         if (timeoutForLateHandshake || timeoutForLatePong) {
             printf(
@@ -98,8 +100,10 @@ void timeout_peers() {
                 disable_ip(ptrPeer->address.ip);
             }
             replace_peer(ptrPeer);
+            droppedPeers++;
         }
     }
+    printf("Dropped %u/%u peers\n", droppedPeers, global.peerCount);
 
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
