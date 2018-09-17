@@ -9,7 +9,7 @@ const struct Config config = {
         .peerDataExchange = SECOND_TO_MILLISECOND(1),
         .resetIBDMode = SECOND_TO_MILLISECOND(60),
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
-        .printNodeStatus = SECOND_TO_MILLISECOND(2),
+        .printNodeStatus = SECOND_TO_MILLISECOND(5),
     },
     .handshakeTimeTolerance = SECOND_TO_MILLISECOND(5),
     .peerLatencyTolerance = SECOND_TO_MILLISECOND(5),
@@ -26,4 +26,5 @@ const struct Config config = {
     .ibdModeAvailabilityThreshold = 0.95,
     .ibdPeerMaxBlockDifference = 100,
     .apiPort = 9494,
+    .silentIncomingMessageCommands = "inv,pong,ping",
 };

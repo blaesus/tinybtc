@@ -50,6 +50,7 @@ void filter_peer_candidates();
 
 bool set_candidate_timestamp(PeerCandidate *ptrCandidate, uint32_t timestamp);
 bool set_candidate_services(PeerCandidate *ptrCandidate, ServiceBits bits);
+bool set_candidate_lantecy(PeerCandidate *ptrCandidate, double averageLatency);
 bool disable_candidate(PeerCandidate *ptrCandidate);
 
 bool is_peer(PeerCandidate *ptrCandidate);

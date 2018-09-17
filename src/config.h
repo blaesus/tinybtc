@@ -40,6 +40,7 @@ struct Config {
     double ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
     uint16_t apiPort;
+    char *silentIncomingMessageCommands;
 };
 
 extern const struct Config config;

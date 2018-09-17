@@ -86,6 +86,14 @@ bool set_candidate_services(PeerCandidate *ptrCandidate, ServiceBits bits) {
     return false;
 }
 
+bool set_candidate_lantecy(PeerCandidate *ptrCandidate, double averageLatency) {
+    if (ptrCandidate) {
+        ptrCandidate->averageLatency = averageLatency;
+        return true;
+    }
+    return false;
+}
+
 bool is_peer(PeerCandidate *ptrCandidate) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (ips_equal(global.peers[i].address.ip, ptrCandidate->addr.net_addr.ip)) {

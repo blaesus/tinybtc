@@ -89,12 +89,15 @@ bool check_peer(Peer *ptrPeer) {
     ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
     ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
     double averageLatency = average_peer_latency(ptrPeer);
+    set_candidate_lantecy(ptrPeer->candidacy, averageLatency);
 
-    bool timeoutForLatePong = ping && (averageLatency > config.peerLatencyTolerance);
+    bool timeoutForLatePong =
+        ping
+        && is_latency_fully_tested(ptrPeer)
+        && (averageLatency > config.peerLatencyTolerance);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
     }
-    printf("peer %u: latency [instant %.1fms][average %.1fms]\n", ptrPeer->index, latency, averageLatency);
     return false;
 }
 
@@ -159,20 +162,16 @@ void exchange_data_with_peers() {
 void print_node_status() {
     printf("\n==== Node status ====\n");
 
-    printf("peers handshake: ");
+    printf("Peers: \n");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (peer_hand_shaken(&global.peers[i])) {
+        Peer *ptrPeer = &global.peers[i];
+        if (peer_hand_shaken(ptrPeer)) {
             validPeers++;
-            printf("O ");
-        }
-        else {
-            printf("X ");
+            printf("Peer %02u: %05.1fms\n", ptrPeer->index, ptrPeer->candidacy->averageLatency);
         }
     }
-    printf(" (%u/%u)\n", validPeers, global.peerCount);
-    printf("%u candidates\n", global.peerCandidateCount);
-
+    printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
 
     printf("main chain height %u; max full block %u\n",
         global.mainTip.context.height, global.maxFullBlockHeight
@@ -478,8 +477,14 @@ void on_handshake_success(Peer *ptrPeer) {
     ping_peer(ptrPeer);
 }
 
+bool should_skip_print(char *command) {
+    return strstr(config.silentIncomingMessageCommands, command) != NULL;
+}
+
 void handle_incoming_message(Peer *ptrPeer, Message message) {
-    print_message(&message);
+    if (!should_skip_print((char *)message.header.command)) {
+        print_message(&message);
+    }
     double now = get_now();
     set_candidate_timestamp(ptrPeer->candidacy, (uint32_t) round(now / SECOND_TO_MILLISECOND(1)));
 

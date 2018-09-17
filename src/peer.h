@@ -66,3 +66,4 @@ typedef struct PeerCandidate PeerCandidate;
 
 void reset_peer(Peer *ptrPeer);
 double average_peer_latency(Peer *ptrPeer);
+bool is_latency_fully_tested(Peer *ptrPeer);
