@@ -94,18 +94,27 @@ bool check_peer(Peer *ptrPeer) {
     double ping = ptrPeer->networking.ping.pingSent;
     double pong = ptrPeer->networking.ping.pongReceived;
     bool neverReceivedPong = pong == 0;
-    double latency = !ping ? 0 : neverReceivedPong ? now - ping : pong - ping;
+    double latency;
+    if (!ping) {
+        latency = 0;
+    }
+    else if (neverReceivedPong) {
+        latency = 2 * (now - ping); // Penalize
+    }
+    else {
+        latency = pong - ping;
+    }
     ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
     ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
     double averageLatency = average_peer_latency(ptrPeer);
-    bool latency_fully_tested = is_latency_fully_tested(ptrPeer);
-    if (latency_fully_tested) {
+    bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
+    if (latencyFullyTested) {
         ptrPeer->candidacy->averageLatency =  averageLatency;
     }
 
     bool timeoutForLatePong =
         ping
-        && latency_fully_tested
+        && latencyFullyTested
         && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
