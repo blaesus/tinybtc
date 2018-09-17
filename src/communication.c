@@ -68,14 +68,14 @@ void replace_peer(Peer *ptrPeer) {
 }
 
 void ping_peer(Peer *ptrPeer) {
-    double now = get_now();
     if (ptrPeer->networking.ping.pingSent && !ptrPeer->networking.ping.pongReceived) {
+        double now = get_now();
         fprintf(stderr, "ping: unfinished ping before...\n");
         record_latency(ptrPeer, now - ptrPeer->networking.ping.pingSent);
     }
     ptrPeer->networking.ping.nonce = random_uint64();
-    ptrPeer->networking.ping.pingSent = now;
     ptrPeer->networking.ping.pongReceived = 0;
+    // networking.ping.pingSent is recorded in on_message_attempted
     PingpongPayload ptrPayload = {
         .nonce = ptrPeer->networking.ping.nonce
     };
@@ -393,6 +393,10 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         }
         else {
             printf("%s message sent to %s\n", msg.header.command, ipString);
+            if (strcmp((char *)msg.header.command, CMD_PING) == 0) {
+                double now = get_now();
+                ptrContext->peer->networking.ping.pingSent = now;
+            }
         }
         if (msg.ptrPayload) {
             free_message_payload(&msg);
