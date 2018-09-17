@@ -5,16 +5,16 @@
 const struct Config config = {
     .periods = {
         .autoexit = MINUTE_TO_MILLISECOND(30),
-        .saveIndices = SECOND_TO_MILLISECOND(120),
-        .peerDataExchange = SECOND_TO_MILLISECOND(1),
+        .saveIndices = MINUTE_TO_MILLISECOND(5),
+        .peerDataExchange = SECOND_TO_MILLISECOND(2),
         .resetIBDMode = SECOND_TO_MILLISECOND(60),
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
         .ping = SECOND_TO_MILLISECOND(13),
     },
     .tolerances = {
-        .handshake = SECOND_TO_MILLISECOND(9),
-        .latency = SECOND_TO_MILLISECOND(11),
+        .handshake = SECOND_TO_MILLISECOND(10),
+        .latency = SECOND_TO_MILLISECOND(10),
         .peerLife = MINUTE_TO_MILLISECOND(10),
     },
     .protocolVersion = 70015,
