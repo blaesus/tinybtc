@@ -42,7 +42,7 @@ void filter_peer_candidates() {
             }
         }
 
-        bool old = (get_now() / 1000 - candidate->addr.timestamp) > config.addrLife;
+        bool old = (get_now() / 1000 - candidate->addr.timestamp) > config.peerCandidateLife;
 
         bool shouldDrop = duplicated || old;
 

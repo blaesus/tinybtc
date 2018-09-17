@@ -21,6 +21,7 @@ struct Periods {
     uint64_t peerDataExchange;
     uint64_t timeoutPeers;
     uint64_t printNodeStatus;
+    uint64_t ping;
 };
 
 struct Tolerances {
@@ -38,7 +39,7 @@ struct Config {
     uint32_t maxIncoming;
     uint32_t maxOutgoing;
     uint32_t maxOutgoingIBD;
-    uint32_t addrLife;
+    uint32_t peerCandidateLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;
     char *dbName;

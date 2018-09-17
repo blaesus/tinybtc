@@ -69,6 +69,10 @@ void replace_peer(Peer *ptrPeer) {
 
 void ping_peer(Peer *ptrPeer) {
     double now = get_now();
+    if (ptrPeer->networking.ping.pingSent && !ptrPeer->networking.ping.pongReceived) {
+        fprintf(stderr, "ping: unfinished ping before...\n");
+        record_latency(ptrPeer, now - ptrPeer->networking.ping.pingSent);
+    }
     ptrPeer->networking.ping.nonce = random_uint64();
     ptrPeer->networking.ping.pingSent = now;
     ptrPeer->networking.ping.pongReceived = 0;
@@ -93,55 +97,45 @@ bool check_peer(Peer *ptrPeer) {
     }
 
     // Check ping
-    double ping = ptrPeer->networking.ping.pingSent;
-    double pong = ptrPeer->networking.ping.pongReceived;
-    bool neverReceivedPong = pong == 0;
-    double latency;
-    if (!ping) {
-        latency = 0;
-    }
-    else if (neverReceivedPong) {
-        latency = 2 * (now - ping); // Penalize
-    }
-    else {
-        latency = pong - ping;
-    }
-    record_latency(ptrPeer, latency);
-    double averageLatency = average_peer_latency(ptrPeer);
     bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
-    if (latencyFullyTested) {
-        ptrPeer->candidacy->averageLatency =  averageLatency;
-    }
+    double averageLatency = average_peer_latency(ptrPeer);
 
-    bool timeoutForLatePong =
-        ping
-        && latencyFullyTested
-        && (averageLatency > config.tolerances.latency);
+    bool timeoutForLatePong = latencyFullyTested && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
     }
     return false;
 }
 
-void check_peers_networking() {
+void check_peer_life(Peer *ptrPeer) {
     double now = get_now();
+    double life = now - ptrPeer->connectionStart;
+    if (life > config.tolerances.peerLife) {
+        printf(
+            "Timeout peer %u as life exhausted (%.1f > %llu) \n",
+            ptrPeer->index,
+            life,
+            config.tolerances.peerLife
+        );
+        replace_peer(ptrPeer);
+    }
+}
+
+void ping_peers() {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (peer_hand_shaken(ptrPeer)) {
+            ping_peer(ptrPeer);
+        }
+    }
+}
+
+void check_peers_connectivity() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         check_peer(ptrPeer);
         if (config.tolerances.peerLife) {
-            double life = now - ptrPeer->connectionStart;
-            if (life > config.tolerances.peerLife) {
-                printf(
-                    "Timeout peer %u as life exhausted (%.1f > %llu) \n",
-                    ptrPeer->index,
-                    life,
-                    config.tolerances.peerLife
-                );
-                replace_peer(ptrPeer);
-            }
-        }
-        if (peer_hand_shaken(ptrPeer)) {
-            ping_peer(ptrPeer);
+            check_peer_life(ptrPeer);
         }
     }
 }
@@ -204,10 +198,11 @@ void print_node_status() {
         if (peer_hand_shaken(ptrPeer)) {
             validPeers++;
             if (is_latency_fully_tested(ptrPeer)) {
-                printf("Peer %02u: %7.1fms\n", ptrPeer->index, ptrPeer->candidacy->averageLatency);
+                double averageLatency = average_peer_latency(ptrPeer);
+                printf("Peer %02u: %7.1fms\n", ptrPeer->index, averageLatency);
             }
             else {
-                printf("Peer %02u: -\n", ptrPeer->index);
+                printf("Peer %02u:     -\n", ptrPeer->index);
             }
         }
     }
@@ -274,7 +269,11 @@ void setup_timers() {
         },
         {
             .interval = config.periods.timeoutPeers,
-            .callback = &check_peers_networking,
+            .callback = &check_peers_connectivity,
+        },
+        {
+            .interval = config.periods.ping,
+            .callback = &ping_peers,
         },
         {
             .interval = config.periods.printNodeStatus,
@@ -573,6 +572,14 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
         PingpongPayload *ptrPayload = message.ptrPayload;
         if (ptrPayload->nonce == ptrPeer->networking.ping.nonce) {
             ptrPeer->networking.ping.pongReceived = now;
+            double ping = ptrPeer->networking.ping.pingSent;
+            double latency = now - ping;
+            record_latency(ptrPeer, latency);
+            bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
+            if (latencyFullyTested) {
+                double averageLatency = average_peer_latency(ptrPeer);
+                ptrPeer->candidacy->averageLatency = averageLatency;
+            }
         }
         else {
             printf(
