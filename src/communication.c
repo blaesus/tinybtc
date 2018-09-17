@@ -48,9 +48,11 @@ void on_handle_close(uv_handle_t *handle) {
 }
 
 void replace_peer(Peer *ptrPeer) {
+    #if LOG_PEER_REPLACE
     double now = get_now();
     double life = (now - ptrPeer->connectionStart) / SECOND_TO_MILLISECOND(1);
     printf("Replacing peer %u (life %.1fs)\n", ptrPeer->index, life);
+    #endif
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
@@ -86,7 +88,7 @@ bool check_peer(Peer *ptrPeer) {
     double now = get_now();
 
     // Check handshake
-    double timeSinceConnection = now - ptrPeer->connectionStart;
+    double timeSinceConnection = now - ptrPeer->handshake.handshakeStart;
     bool timeoutForLateHandshake =
         !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.tolerances.handshake);
     if (timeoutForLateHandshake) {
@@ -141,6 +143,7 @@ void check_peers_connectivity() {
 }
 
 void data_exchange_with_peer(Peer *ptrPeer) {
+    #if LOG_DATA_EXCHANGE
     printf(
         "\nExchanging data with peer %u(%s) - block height %u:%u\n",
         ptrPeer->index,
@@ -148,6 +151,7 @@ void data_exchange_with_peer(Peer *ptrPeer) {
         global.mainTip.context.height,
         ptrPeer->chain_height
     );
+    #endif
     if (ptrPeer->chain_height > global.mainTip.context.height) {
         send_getheaders(&ptrPeer->socket);
     }
@@ -157,7 +161,9 @@ void data_exchange_with_peer(Peer *ptrPeer) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
             if (!status) {
+                #if LOG_DATA_EXCHANGE
                 print_hash_with_description("  requesting block: ", nextMissingBlock);
+                #endif
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
                 memcpy(ptrPeer->networking.requesting, nextMissingBlock, SHA256_LENGTH);
             }
@@ -166,10 +172,12 @@ void data_exchange_with_peer(Peer *ptrPeer) {
             }
         }
         else {
+            #if LOG_DATA_EXCHANGE
             print_hash_with_description(
                 "  skipped block request because already requesting ",
                 ptrPeer->networking.requesting
             );
+            #endif
         }
     }
     else {
@@ -389,13 +397,21 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         Message msg = get_empty_message();
         int32_t error = parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
         if (error) {
+            #if LOG_MESSAGE_SENT
             printf("unknown message sent to %s\n", msg.header.command);
+            #endif
         }
         else {
+            #if LOG_MESSAGE_SENT
             printf("%s message sent to %s\n", msg.header.command, ipString);
+            #endif
             if (strcmp((char *)msg.header.command, CMD_PING) == 0) {
                 double now = get_now();
                 ptrContext->peer->networking.ping.pingSent = now;
+            }
+            else if (strcmp((char *)msg.header.command, CMD_VERSION) == 0) {
+                double now = get_now();
+                ptrContext->peer->handshake.handshakeStart = now;
             }
         }
         if (msg.ptrPayload) {
@@ -494,11 +510,13 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
         print_object((Byte *)uvBuffer.base, uvBuffer.len);
     }
     else {
+        #if LOG_MESSAGE_SENDING
         printf(
             "Sending message %s to peer %s\n",
             message.header.command,
             ipString
         );
+        #endif
     }
     write_buffer_to_socket(&uvBuffer, socket);
     release_resources:
@@ -567,7 +585,6 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
                 skipped++;
             }
         }
-        printf("Skipped %llu IPs\n", skipped);
     }
     else if (strcmp(command, CMD_PING) == 0) {
         send_message(&ptrPeer->socket, CMD_PONG, message.ptrPayload);
@@ -645,10 +662,10 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
         uint64_t messageSize = sizeof(Header) + header.length;
         #if LOG_MESSAGE_LOADING
         printf("Message loading from %s: (%llu/%llu)\n",
-            convert_ipv4_readable(ptrPeer->address.ip),
-            ptrCache->bufferIndex,
-            messageSize
-        );
+                   convert_ipv4_readable(ptrPeer->address.ip),
+                   ptrCache->bufferIndex,
+                   messageSize
+            );
         #endif
         if (ptrCache->bufferIndex >= messageSize) {
             Message message = get_empty_message();
@@ -659,7 +676,6 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
             else {
                 int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
                 if (error) {
-                    printf("Cannot parse message (%u)\n", error);
                     free_message_payload(&message);
                 }
                 else {
@@ -744,8 +760,10 @@ int32_t initialize_peer(uint32_t peerIndex, PeerCandidate *ptrCandidate)  {
     Peer *ptrPeer = &global.peers[peerIndex];
 
     reset_peer(ptrPeer);
+    double now = get_now();
     ptrPeer->index = peerIndex;
-    ptrPeer->connectionStart = get_now();
+    ptrPeer->connectionStart = now;
+    ptrPeer->handshake.handshakeStart = now; // to be updated in on_message_attempted
     memcpy(ptrPeer->address.ip, netAddr->ip, sizeof(IP));
     ptrPeer->candidacy = ptrCandidate;
 
@@ -893,7 +911,6 @@ static PeerCandidate *pick_best_nonpeer_candidate(double *finalScore) {
 void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
     double score = 0;
     PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate(&score);
-    printf("Selected candidate on score %f\n", score);
     initialize_peer(peerIndex, ptrCandidate);
 }
 

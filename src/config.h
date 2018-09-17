@@ -13,6 +13,10 @@
 #define INSTRUCTION_KILL "kill"
 
 #define LOG_MESSAGE_LOADING false
+#define LOG_MESSAGE_SENDING false
+#define LOG_MESSAGE_SENT false
+#define LOG_DATA_EXCHANGE false
+#define LOG_PEER_REPLACE false
 
 struct Periods {
     uint64_t autoexit;

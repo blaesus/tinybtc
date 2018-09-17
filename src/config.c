@@ -30,6 +30,6 @@ const struct Config config = {
     .ibdModeAvailabilityThreshold = 0.95,
     .ibdPeerMaxBlockDifference = 100,
     .apiPort = 9494,
-    .silentIncomingMessageCommands = "inv,pong,ping",
+    .silentIncomingMessageCommands = "inv,pong,ping,addr",
     .deepReindexBlocks = false,
 };

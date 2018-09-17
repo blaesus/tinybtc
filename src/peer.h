@@ -24,6 +24,7 @@ typedef struct PeerCandidate PeerCandidate;
 struct HandshakeState {
     bool acceptThem : 1;
     bool acceptUs : 1;
+    double handshakeStart;
 };
 
 struct PingState {
