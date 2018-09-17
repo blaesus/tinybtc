@@ -86,7 +86,7 @@ int32_t make_version_message(
     ptrMessage->header.magic = mainnet.magic;
     strcpy((char *)ptrMessage->header.command, CMD_VERSION);
     ptrMessage->header.length = payloadLength;
-    ptrMessage->ptrPayload = malloc(sizeof(VersionPayload)); // make_message_payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(VersionPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(VersionPayload));
     calculate_data_checksum(
         checksumCalculationBuffer,
@@ -167,7 +167,7 @@ int32_t parse_into_version_message(
     parse_message_header(ptrBuffer, &header);
     parse_version_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = malloc(sizeof(struct VersionPayload)); // parse_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(struct VersionPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
     return 0;
 }

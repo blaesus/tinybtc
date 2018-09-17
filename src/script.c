@@ -30,12 +30,12 @@ struct Stack {
 };
 
 void hash_tx_with_sigtype(TxPayload *tx, int32_t sigType, Byte *hash) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_sigtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
     memcpy(buffer + width, &sigType, 4);
     width += 4;
     dsha256(buffer, (uint32_t)width, hash);
-    free(buffer);
+    FREE(buffer, "hash_tx_with_sigtype:buffer");
 }
 
 typedef struct Stack Stack;
@@ -63,12 +63,12 @@ StackFrame pop(Stack *stack) {
     StackFrame *ptrTop = stack->frames[stack->height - 1];
     stack->height--;
     StackFrame result = *ptrTop;
-    free(ptrTop); // [FREE] push:frame
+    FREE(ptrTop, "push:frame");
     return result;
 }
 
 void push(Stack *stack, StackFrame data) {
-    stack->frames[stack->height] = calloc(1, sizeof(StackFrame)); // push:frame
+    stack->frames[stack->height] = CALLOC(1, sizeof(StackFrame), "push:frame");
     memcpy(stack->frames[stack->height], &data, sizeof(StackFrame));
     stack->height++;
 }
@@ -283,7 +283,7 @@ Stack get_empty_stack() {
 
 void free_stack_frames(Stack *stack) {
     for (uint64_t i = 0; i < stack->height; i++) {
-        free(stack->frames[i]->data);
+        FREE(stack->frames[i]->data, "push:frame");
     }
 }
 
@@ -294,7 +294,7 @@ bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
 }
 
 TxPayload *make_tx_copy(CheckSigMeta meta) {
-    Byte *subscript = calloc(1, 100000);
+    Byte *subscript = CALLOC(1, 100000, "make_tx_copy:subscript");
     Byte subscriptIndex = 0;
     memcpy(
         subscript,
@@ -302,7 +302,7 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
         meta.sourceOutput->public_key_script_length
     );
     subscriptIndex += meta.sourceOutput->public_key_script_length;
-    TxPayload *txCopy = calloc(1, sizeof(TxPayload));
+    TxPayload *txCopy = CALLOC(1, sizeof(TxPayload), "make_tx_copy:txCopy");
     memcpy(txCopy, meta.currentTx, sizeof(TxPayload));
     for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
         TxIn *txIn = &txCopy->txInputs[i];
@@ -315,7 +315,7 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
         subscriptIndex
     );
     txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptIndex;
-    free(subscript);
+    FREE(subscript, "make_tx_copy:subscript");
     return txCopy;
 }
 
@@ -395,7 +395,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     );
 
                     push(&runtimeStack, get_boolean_frame(verification == 1));
-                    free(txCopy);
+                    FREE(txCopy, "make_tx_copy:txCopy");
                     EC_KEY_free(ptrPubKey);
                     break;
                 }

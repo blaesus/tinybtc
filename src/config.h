@@ -10,6 +10,8 @@
 #define SERVICE_NODE_XTHIN (1 << 4)
 #define SERVICE_NODE_NETWORK_LIMITED (1 << 10)
 
+#define INSTRUCTION_KILL "kill"
+
 struct Periods {
     uint64_t autoexit;
     uint64_t saveIndices;
@@ -35,6 +37,7 @@ struct Config {
     char *dbName;
     double ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
+    uint16_t apiPort;
 };
 
 extern const struct Config config;

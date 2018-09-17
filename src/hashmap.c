@@ -27,14 +27,14 @@ uint64_t calculate_index(Byte *key, uint32_t keyWidth, uint64_t bucketCount) {
 }
 
 int8_t hashmap_set(Hashmap *ptrHashmap, Byte *key, void *ptrValue, uint32_t valueLength) {
-    HashmapNode *ptrNewNode = calloc(1, sizeof(*ptrNewNode)); // hashmap_set:node
+    HashmapNode *ptrNewNode = CALLOC(1, sizeof(*ptrNewNode), "hashmap_set:node");
     if (ptrNewNode == NULL) {
         printf("Failed to allocate for hashmap node!\n");
         return -1;
     }
     memcpy(ptrNewNode->key, key, ptrHashmap->keyWidth);
     ptrNewNode->valueLength = valueLength;
-    ptrNewNode->ptrValue = calloc(1, valueLength); // hashmap_set:value
+    ptrNewNode->ptrValue = CALLOC(1, valueLength, "hashmap_set:value");
     if (ptrNewNode->ptrValue == NULL) {
         printf("Failed to allocate for hashmap value!\n");
         return -2;
@@ -50,15 +50,15 @@ int8_t hashmap_set(Hashmap *ptrHashmap, Byte *key, void *ptrValue, uint32_t valu
     else {
         // Collision
         if (memcmp(ptrSearch->key, key, ptrHashmap->keyWidth) == 0) {
-            free(ptrHashmap->data[bucketIndex]->ptrValue); // [FREE] hashmap_set:value
-            free(ptrHashmap->data[bucketIndex]); // [FREE] hashmap_set:node
+            FREE(ptrHashmap->data[bucketIndex]->ptrValue, "hashmap_set:value");
+            FREE(ptrHashmap->data[bucketIndex], "hashmap_set:node");
             ptrHashmap->data[bucketIndex] = ptrNewNode;
             return 0;
         }
         while (ptrSearch->next) {
             if (memcmp(ptrSearch->key, key, ptrHashmap->keyWidth) == 0) {
-                free(ptrHashmap->data[bucketIndex]->ptrValue); // [FREE] hashmap_set:value
-                free(ptrHashmap->data[bucketIndex]); // [FREE] hashmap_set:node
+                FREE(ptrHashmap->data[bucketIndex]->ptrValue, "hashmap_set:value");
+                FREE(ptrHashmap->data[bucketIndex], "hashmap_set:node");
                 ptrHashmap->data[bucketIndex] = ptrNewNode;
                 return 0;
             }

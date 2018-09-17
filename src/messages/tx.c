@@ -159,7 +159,7 @@ int32_t make_tx_message(
     ptrMessage->header.magic = mainnet.magic;
     memcpy(ptrMessage->header.command, CMD_TX, sizeof(CMD_TX));
 
-    ptrMessage->ptrPayload = malloc(sizeof(TxPayload)); // make_message:payload
+    ptrMessage->ptrPayload = MALLOC(sizeof(TxPayload), "make_message:payload");
     memcpy(ptrMessage->ptrPayload, ptrPayload, sizeof(TxPayload));
 
     Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
@@ -214,7 +214,7 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
     HashNode *ptrPreviousHashNode = NULL;
     TxNode *ptrTxNode = ptrFirstTxNode;
     while (ptrTxNode) {
-        HashNode *newHashNode = calloc(1, sizeof(HashNode)); // compute_merkle_root:HashNode
+        HashNode *newHashNode = CALLOC(1, sizeof(HashNode), "compute_merkle_root:HashNode");
         hash_tx(&ptrTxNode->tx, newHashNode->hash);
         if (!ptrFirstHashNode) {
             ptrFirstHashNode = newHashNode;
@@ -236,8 +236,10 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
             memcpy(buffer+SHA256_LENGTH, rightHash, SHA256_LENGTH);
             dsha256(buffer, SHA256_LENGTH * 2, p->hash);
             if (p->next) {
+                HashNode *freeTarget = p->next;
                 p->next = p->next->next;
                 p = p->next;
+                FREE(freeTarget, "compute_merkle_root:HashNode");
             }
             else {
                 p = NULL;
@@ -246,14 +248,7 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
     }
     memcpy(result, ptrFirstHashNode->hash, SHA256_LENGTH);
 
-    // Free
-    HashNode *p = ptrFirstHashNode;
-    while (p) {
-        HashNode *freeTarget = p;
-        p = p->next;
-        free(freeTarget); // [FREE] compute_merkle_root:HashNode
-    }
-
+    FREE(ptrFirstHashNode, "compute_merkle_root:HashNode");
     return 0;
 }
 

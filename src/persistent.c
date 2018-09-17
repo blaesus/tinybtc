@@ -82,16 +82,16 @@ int32_t load_peer_addresses() {
 int8_t init_db() {
     printf("Connecting to LevelDB...");
     leveldb_t *db;
-    leveldb_options_t *options;
-    char *error = NULL;
-    options = leveldb_options_create();
+    leveldb_options_t *options = leveldb_options_create();
     leveldb_options_set_create_if_missing(options, 1);
+    char *error = NULL;
     db = leveldb_open(options, config.dbName, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         return -1;
     }
-    leveldb_free(error); error = NULL;
+    leveldb_free(error);
+    leveldb_free(options);
     global.db = db;
     printf("Done.\n");
     return 0;
@@ -106,7 +106,7 @@ int32_t save_block_indices(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
     fwrite(&global.mainTip, sizeof(global.mainTip), 1, file);
 
-    Byte *keys = calloc(MAX_BLOCK_COUNT, SHA256_LENGTH); // save_block_indices:keys
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
@@ -124,7 +124,7 @@ int32_t save_block_indices(void) {
         }
     }
     printf("Exported %u block indices \n", actualCount);
-    free(keys); // [FREE] save_block_indices:keys
+    FREE(keys, "save_block_indices:keys");
     fclose(file);
     return 0;
 }
@@ -166,6 +166,7 @@ int8_t save_data_by_hash(Byte *hash, Byte *value, uint64_t valueLength) {
         return -1;
     }
     leveldb_free(error);
+    leveldb_free(writeOptions);
     return 0;
 }
 
@@ -190,6 +191,7 @@ int8_t load_data_by_hash(Byte *hash, Byte *output) {
         return -1;
     }
     leveldb_free(error);
+    leveldb_free(readOptions);
     memcpy(output, read, read_len);
     return 0;
 }
@@ -213,43 +215,44 @@ bool check_existence_by_hash(Byte *hash) {
         return false;
     }
     leveldb_free(error);
+    leveldb_free(readOptions);
     return read_len > 0;
 }
 
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_block:buffer
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_block:buffer");
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
     save_data_by_hash(hash, buffer, width);
-    free(buffer); // [FREE] save_block:buffer
+    FREE(buffer, "save_block:buffer");
     return 0;
 }
 
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_block:buffer
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
     load_data_by_hash(hash, buffer);
     parse_into_block_payload(buffer, ptrBlock);
-    free(buffer); // [FREE] load_block:buffer
+    FREE(buffer, "load_block:buffer");
     return 0;
 }
 
 int8_t save_tx(TxPayload *ptrTx) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // save_tx:buffer
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_tx:buffer");
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
     SHA256_HASH hash = {0};
     dsha256(buffer, (uint32_t)width, hash);
     save_data_by_hash(hash, buffer, width);
-    free(buffer); // [FREE] save_tx:buffer
+    FREE(buffer, "save_tx:buffer");
     return 0;
 }
 
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
-    Byte *buffer = calloc(1, MESSAGE_BUFFER_LENGTH); // load_tx:buffer
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
 
     load_data_by_hash(hash, buffer);
     parse_into_tx_payload(buffer, ptrPayload);
-    free(buffer); // [FREE] load_tx:buffer
+    FREE(buffer, "load_tx:buffer");
     return 0;
 }
 

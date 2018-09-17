@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "shared.h"
 #include "util.h"
+#include "block.h"
 
 uint8_t calc_number_varint_width(uint64_t number) {
     if (number < VAR_INT_CHECKPOINT_8) {
@@ -143,4 +144,12 @@ uint64_t load_file(char *path, Byte *buffer) {
     fread(buffer, (size_t)filesize, 1, file);
     fclose(file);
     return (uint64_t) filesize;
+}
+
+
+void free_message_payload(Message *message) {
+    if (is_block(message)) {
+        release_tx_in_block(message->ptrPayload);
+    }
+    FREE(message->ptrPayload, "parse_message:payload");
 }

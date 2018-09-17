@@ -64,7 +64,6 @@ int8_t init() {
 }
 
 int32_t connect_to_peers() {
-    // setup_listen_socket();
     // connect_to_local();
     connect_to_initial_peers();
     return 0;

@@ -105,3 +105,4 @@ uint64_t parse_as_varstr(
 );
 
 uint64_t load_file(char *path, Byte *buffer);
+void free_message_payload(Message *message);
