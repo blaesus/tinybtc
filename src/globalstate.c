@@ -67,27 +67,26 @@ bool is_peer(PeerCandidate *ptrCandidate) {
     return false;
 }
 
-int8_t get_next_missing_block(Byte *hash) {
+uint32_t find_missing_blocks(SHA256_HASH *hashes, uint32_t desiredCount) {
+    uint32_t count = 0;
     SHA256_HASH finderHash = {0};
     memcpy(finderHash, global.genesisHash, SHA256_LENGTH);
     do {
         BlockIndex *index = hashmap_get(&global.blockIndices, finderHash, NULL);
         if (index == NULL) {
-            return -1;
+            return count;
         }
         else if (!index->meta.fullBlockAvailable && !is_block_being_requested(finderHash)) {
-            memcpy(hash, finderHash, SHA256_LENGTH);
-            return 0;
+            memcpy(hashes[count], finderHash, SHA256_LENGTH);
+            count++;
         }
         else if (index->context.children.length == 0) {
             // Obtained all blocks
-            return 1;
+            return count;
         }
-        else {
-            // TODO: Handle side chains
-            memcpy(finderHash, index->context.children.hashes[0], SHA256_LENGTH);
-        }
-    } while (true);
+        memcpy(finderHash, index->context.children.hashes[0], SHA256_LENGTH); // TODO: Side chain
+    } while (count < desiredCount);
+    return count;
 }
 
 bool is_block_being_requested(Byte *hash) {
@@ -104,7 +103,7 @@ bool peer_hand_shaken(Peer *ptrPeer) {
     return ptrPeer->handshake.acceptUs && ptrPeer->handshake.acceptThem;
 }
 
-uint32_t get_handshaken_peer_count() {
+uint32_t count_hand_shaken_peers() {
     uint32_t count = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (peer_hand_shaken(&global.peers[i])) {

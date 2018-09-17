@@ -48,7 +48,7 @@ void add_address_as_candidate(NetworkAddress netAddr, uint32_t timestamp);
 void filter_peer_candidates();
 
 bool is_peer(PeerCandidate *ptrCandidate);
-int8_t get_next_missing_block(Byte *hash);
+uint32_t find_missing_blocks(SHA256_HASH *hashes, uint32_t desiredCount);
 bool is_block_being_requested(Byte *hash);
-uint32_t get_handshaken_peer_count();
+uint32_t count_hand_shaken_peers();
 bool peer_hand_shaken(Peer *ptrPeer);
