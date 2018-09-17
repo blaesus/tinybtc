@@ -141,7 +141,7 @@ int8_t get_next_missing_block(Byte *hash) {
 
 bool is_block_being_requested(Byte *hash) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Byte *requesting = global.peers[i].requests.block;
+        Byte *requesting = global.peers[i].interactions.requesting;
         if (memcmp(requesting, hash, SHA256_LENGTH) == 0) {
             return true;
         }

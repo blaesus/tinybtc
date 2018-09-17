@@ -17,8 +17,8 @@ struct PingState {
     uint64_t nonce;
 };
 
-struct RequestsState {
-    SHA256_HASH block;
+struct InteractionState {
+    SHA256_HASH requesting;
     struct PingState ping;
 };
 
@@ -30,7 +30,7 @@ enum PeerRelationship {
 struct Peer {
     uint32_t index;
     struct HandshakeState handshake;
-    struct RequestsState requests;
+    struct InteractionState interactions;
 
     uv_tcp_t socket;
     double connectionStart;

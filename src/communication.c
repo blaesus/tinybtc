@@ -58,11 +58,11 @@ void replace_peer(Peer *ptrPeer) {
 
 void ping_peer(Peer *ptrPeer) {
     double now = get_now();
-    ptrPeer->requests.ping.nonce = random_uint64();
-    ptrPeer->requests.ping.pingSent = now;
-    ptrPeer->requests.ping.pongReceived = 0;
+    ptrPeer->interactions.ping.nonce = random_uint64();
+    ptrPeer->interactions.ping.pingSent = now;
+    ptrPeer->interactions.ping.pongReceived = 0;
     PingpongPayload ptrPayload = {
-        .nonce = ptrPeer->requests.ping.nonce
+        .nonce = ptrPeer->interactions.ping.nonce
     };
     send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
 }
@@ -76,8 +76,8 @@ void timeout_peers() {
             (now - ptrPeer->connectionStart > config.peerLatencyTolerance)
             && !peer_hand_shaken(ptrPeer);
 
-        double ping = ptrPeer->requests.ping.pingSent;
-        double pong = ptrPeer->requests.ping.pongReceived;
+        double ping = ptrPeer->interactions.ping.pingSent;
+        double pong = ptrPeer->interactions.ping.pongReceived;
         bool neverReceivedPong = pong == 0;
         double latency = neverReceivedPong ? now - ping : pong - ping;
         bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerance);
@@ -126,13 +126,13 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     }
     // else if (ptrPeer->chain_height == global.mainTip.context.height) {
     else if (true) {
-        if (is_hash_empty(ptrPeer->requests.block)) {
+        if (is_hash_empty(ptrPeer->interactions.requesting)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
             if (!status) {
                 print_hash_with_description("  requesting block: ", nextMissingBlock);
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-                memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
+                memcpy(ptrPeer->interactions.requesting, nextMissingBlock, SHA256_LENGTH);
             }
             else {
                 printf("Block sync status %i\n", status);
@@ -141,7 +141,7 @@ void data_exchange_with_peer(Peer *ptrPeer) {
         else {
             print_hash_with_description(
                 "  skipped block request because already requesting ",
-                ptrPeer->requests.block
+                ptrPeer->interactions.requesting
             );
         }
     }
@@ -523,12 +523,12 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     }
     else if (strcmp(command, CMD_PONG) == 0) {
         PingpongPayload *ptrPayload = message.ptrPayload;
-        if (ptrPayload->nonce == ptrPeer->requests.ping.nonce) {
-            ptrPeer->requests.ping.pongReceived = now;
+        if (ptrPayload->nonce == ptrPeer->interactions.ping.nonce) {
+            ptrPeer->interactions.ping.pongReceived = now;
         }
         else {
             printf("Unexpected pong nonce: received %llu, expecting %llu\n",
-                ptrPayload->nonce, ptrPeer->requests.ping.nonce);
+                ptrPayload->nonce, ptrPeer->interactions.ping.nonce);
         }
     }
     else if (strcmp(command, CMD_HEADERS) == 0) {
@@ -544,7 +544,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     else if (strcmp(command, CMD_BLOCK) == 0) {
         BlockPayload *ptrBlock = message.ptrPayload;
         process_incoming_block(ptrBlock);
-        memset(ptrPeer->requests.block, 0, SHA256_LENGTH);
+        memset(ptrPeer->interactions.requesting, 0, SHA256_LENGTH);
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
