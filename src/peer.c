@@ -12,7 +12,7 @@ void reset_peer(Peer *ptrPeer) {
 double average_peer_latency(Peer *ptrPeer) {
     double total = 0;
     uint32_t count = 0;
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < PEER_LATENCY_SLOT; i++) {
         double latency = ptrPeer->networking.latencies[i];
         if (latency > 0) {
             total += latency;

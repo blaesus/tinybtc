@@ -10,106 +10,85 @@
 
 GlobalState global;
 
-void add_peer_address(NetworkAddress addr, uint32_t timestamp) {
-    const uint32_t index = global.peerAddressCount;
-    global.peerAddresses[index].timestamp = timestamp;
-    memcpy(&global.peerAddresses[index].net_addr, &addr, sizeof(addr));
-
-    global.peerAddressCount += 1;
+void add_address_as_candidate(NetworkAddress netAddr, uint32_t timestamp) {
+    PeerCandidate candidate;
+    memset(&candidate, 0, sizeof(candidate));
+    memcpy(&candidate.addr.net_addr, &netAddr, sizeof(NetworkAddress));
+    candidate.addr.timestamp = timestamp;
+    candidate.averageLatency = 0;
+    memcpy(
+        &global.peerCandidates[global.peerCandidateCount],
+        &candidate,
+        sizeof(candidate)
+    );
+    global.peerCandidateCount += 1;
 }
 
-void dedupe_global_addr_cache() {
-    printf("Deduplicating address cache...\n");
-    struct AddrRecord buffer[MAX_ADDR_CACHE];
-    memset(buffer, 0, sizeof(buffer));
+void filter_peer_candidates() {
+    printf("Removing invalid address cache...\n");
+    PeerCandidate *buffer = CALLOC(MAX_PEER_CANDIDATES, sizeof(PeerCandidate), "filter_peer_candidates:buffer");
 
     uint32_t newLength = 0;
-    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
+    for (uint32_t index = 0; index < global.peerCandidateCount; index++) {
+        PeerCandidate *candidate = &global.peerCandidates[index];
 
         bool duplicated = false;
-        for (uint32_t search = index+1; search < global.peerAddressCount; search++) {
-            Byte *ipAtSearch = global.peerAddresses[search].net_addr.ip;
+        Byte *ipAtIndex = candidate->addr.net_addr.ip;
+        for (uint32_t search = index+1; search < global.peerCandidateCount; search++) {
+            Byte *ipAtSearch = global.peerCandidates[search].addr.net_addr.ip;
             if (ips_equal(ipAtSearch, ipAtIndex)) {
                 duplicated = true;
                 break;
             }
         }
 
-        if (!duplicated) {
-            memcpy(
-                &buffer[newLength],
-                &global.peerAddresses[index],
-                sizeof(struct AddrRecord)
-            );
-            newLength++;
+        bool disabled = candidate->status == PEER_CANDIDATE_STATUS_DISABLED;
+
+        bool shouldDrop = duplicated || disabled;
+
+        if (!shouldDrop) {
+            memcpy(&buffer[newLength++], candidate, sizeof(*candidate));
         }
     }
-    printf("Deduplicated peer addresses: %u => %u\n", global.peerAddressCount, newLength);
+    printf("Removed invalid candidates: %u => %u\n", global.peerCandidateCount, newLength);
 
-    memcpy(&global.peerAddresses, &buffer, sizeof(buffer));
-    global.peerAddressCount = newLength;
+    memcpy(&global.peerCandidates, &buffer, sizeof(buffer));
+    global.peerCandidateCount = newLength;
+
+    FREE(buffer, "filter_peer_candidates:buffer");
 }
 
-void clear_old_addr() {
-    printf("Clearing up old address cache...\n");
-    struct AddrRecord buffer[MAX_ADDR_CACHE];
-    memset(buffer, 0, sizeof(buffer));
-
-    uint32_t now = (uint32_t) time(NULL);
-
-    uint32_t newLength = 0;
-    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        bool shouldRemove = (now - global.peerAddresses[index].timestamp > config.addrLife);
-
-        if (!shouldRemove) {
-            memcpy(
-                &buffer[newLength],
-                &global.peerAddresses[index],
-                sizeof(struct AddrRecord)
-            );
-            newLength++;
-        }
+bool disable_candidate(PeerCandidate *ptrCandidate) {
+    if (ptrCandidate) {
+        ptrCandidate->status = PEER_CANDIDATE_STATUS_DISABLED;
+        return true;
     }
-    printf("Cleared old peer addresses: %u => %u\n", global.peerAddressCount, newLength);
-
-    memcpy(&global.peerAddresses, &buffer, sizeof(buffer));
-    global.peerAddressCount = newLength;
+    return false;
 }
 
-int32_t disable_ip(IP ip) {
-    return set_addr_timestamp(ip, 0);
-}
-
-int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
-    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
-        if (ips_equal(ipAtIndex, ip)) {
-            global.peerAddresses[index].timestamp = timestamp;
-        }
+bool set_candidate_timestamp(PeerCandidate *ptrCandidate, uint32_t timestamp) {
+    if (ptrCandidate) {
+        ptrCandidate->addr.timestamp = timestamp;
+        return true;
     }
-    return 0;
+    return false;
 }
 
-int32_t set_addr_services(IP ip, ServiceBits bits) {
-    for (uint32_t index = 0; index < global.peerAddressCount; index++) {
-        Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
-        if (ips_equal(ipAtIndex, ip)) {
-            memcpy(
-                &global.peerAddresses[index].net_addr.services,
-                &bits,
-                sizeof(ServiceBits)
-            );
-            char *ipString = convert_ipv4_readable(ip);
-            printf("Updated services of ip %s to %llu\n", ipString, bits);
-        }
+bool set_candidate_services(PeerCandidate *ptrCandidate, ServiceBits bits) {
+    if (ptrCandidate) {
+        memcpy(
+            &ptrCandidate->addr.net_addr.services,
+            &bits,
+            sizeof(ServiceBits)
+        );
+        return true;
     }
-    return 0;
+    return false;
 }
 
-bool is_peer(IP ip) {
+bool is_peer(PeerCandidate *ptrCandidate) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (ips_equal(global.peers[i].address.ip, ip)) {
+        if (ips_equal(global.peers[i].address.ip, ptrCandidate->addr.net_addr.ip)) {
             return true;
         }
     }

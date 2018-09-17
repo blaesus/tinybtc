@@ -105,7 +105,7 @@ int dns_bootstrap() {
                     // .ip = ips[ipIndex] <- via memcpy
                 };
                 memcpy(addr.ip, ips[ipIndex], sizeof(IP));
-                add_peer_address(addr, DNS_BOOTSTRAP_PEER_TIMESTAMP);
+                add_address_as_candidate(addr, DNS_BOOTSTRAP_PEER_TIMESTAMP);
                 printf("%s\n", convert_ipv4_readable(ips[ipIndex]));
             }
         }

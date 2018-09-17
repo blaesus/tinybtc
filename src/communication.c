@@ -75,7 +75,7 @@ bool check_peer(Peer *ptrPeer) {
     bool timeoutForLateHandshake =
         !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.handshakeTimeTolerance);
     if (timeoutForLateHandshake) {
-        disable_ip(ptrPeer->address.ip);
+        disable_candidate(ptrPeer->candidacy);
         printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->index, timeSinceConnection);
         replace_peer(ptrPeer);
         return true;
@@ -85,7 +85,7 @@ bool check_peer(Peer *ptrPeer) {
     double ping = ptrPeer->networking.ping.pingSent;
     double pong = ptrPeer->networking.ping.pongReceived;
     bool neverReceivedPong = pong == 0;
-    double latency = neverReceivedPong ? now - ping : pong - ping;
+    double latency = !ping ? 0 : neverReceivedPong ? now - ping : pong - ping;
     ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
     ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
     double averageLatency = average_peer_latency(ptrPeer);
@@ -94,6 +94,7 @@ bool check_peer(Peer *ptrPeer) {
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
     }
+    printf("peer %u: latency [instant %.1fms][average %.1fms]\n", ptrPeer->index, latency, averageLatency);
     return false;
 }
 
@@ -170,7 +171,7 @@ void print_node_status() {
         }
     }
     printf(" (%u/%u)\n", validPeers, global.peerCount);
-    printf("%u addresses\n", global.peerAddressCount);
+    printf("%u candidates\n", global.peerCandidateCount);
 
 
     printf("main chain height %u; max full block %u\n",
@@ -470,7 +471,7 @@ void on_handshake_success(Peer *ptrPeer) {
         }
     }
     data_exchange_with_peer(ptrPeer);
-    bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
+    bool shouldSendGetaddr = global.peerCandidateCount < config.getaddrThreshold;
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
     }
@@ -480,7 +481,7 @@ void on_handshake_success(Peer *ptrPeer) {
 void handle_incoming_message(Peer *ptrPeer, Message message) {
     print_message(&message);
     double now = get_now();
-    set_addr_timestamp(ptrPeer->address.ip, (uint32_t)round(now / SECOND_TO_MILLISECOND(1)));
+    set_candidate_timestamp(ptrPeer->candidacy, (uint32_t) round(now / SECOND_TO_MILLISECOND(1)));
 
     char *command = (char *)message.header.command;
 
@@ -490,7 +491,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
             ptrPeer->handshake.acceptThem = true;
         }
         ptrPeer->chain_height = ptrPayloadTyped->start_height;
-        set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
+        set_candidate_services(ptrPeer->candidacy, ptrPayloadTyped->services);
         if (peer_hand_shaken(ptrPeer)) {
             on_handshake_success(ptrPeer);
         }
@@ -509,7 +510,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
                 uint32_t timestampForRecord = record->timestamp - HOUR_TO_SECOND(2);
-                add_peer_address(record->net_addr, timestampForRecord);
+                add_address_as_candidate(record->net_addr, timestampForRecord);
             }
             else {
                 skipped++;
@@ -583,11 +584,13 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
         Header header = get_empty_header();
         parse_message_header(ptrCache->buffer, &header);
         uint64_t messageSize = sizeof(Header) + header.length;
+        #if LOG_MESSAGE_LOADING
         printf("Message loading from %s: (%llu/%llu)\n",
             convert_ipv4_readable(ptrPeer->address.ip),
             ptrCache->bufferIndex,
             messageSize
         );
+        #endif
         if (ptrCache->bufferIndex >= messageSize) {
             Message message = get_empty_message();
             if (!checksum_match(ptrCache->buffer)) {
@@ -654,7 +657,7 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
             error
         );
         if (ptrContext->peer->relationship == PEER_RELATIONSHIP_OUR_SERVER) {
-            disable_ip(ptrContext->peer->address.ip);
+            disable_candidate(ptrContext->peer->candidacy);
             replace_peer(ptrContext->peer);
         }
     }
@@ -671,11 +674,12 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     FREE(ptrContext, "initialize_peer:ConnectContext");
 }
 
-int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
+int32_t initialize_peer(uint32_t peerIndex, PeerCandidate *ptrCandidate)  {
+    NetworkAddress *netAddr = &ptrCandidate->addr.net_addr;
     printf(
         "Initializing peer %u with IP %s \n",
         peerIndex,
-        convert_ipv4_readable(addr.ip)
+        convert_ipv4_readable(netAddr->ip)
     );
 
     Peer *ptrPeer = &global.peers[peerIndex];
@@ -683,7 +687,8 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
     reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
     ptrPeer->connectionStart = get_now();
-    memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
+    memcpy(ptrPeer->address.ip, netAddr->ip, sizeof(IP));
+    ptrPeer->candidacy = ptrCandidate;
 
     // Connection request
     struct ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "initialize_peer:ConnectContext");
@@ -696,7 +701,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
 
     // Connection request
     struct sockaddr_in remoteAddress;
-    uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
+    uv_ip4_addr(convert_ipv4_readable(netAddr->ip), htons(netAddr->port), &remoteAddress);
     uv_tcp_connect(
         ptrConnectRequest,
         &ptrPeer->socket,
@@ -762,27 +767,27 @@ int32_t setup_api_socket() {
     return 0;
 }
 
-static NetworkAddress pick_random_addr() {
-    uint32_t index = random_range(0, global.peerAddressCount - 1);
-    return global.peerAddresses[index].net_addr;
+static PeerCandidate *pick_random_addr() {
+    uint32_t index = random_range(0, global.peerCandidateCount - 1);
+    return &global.peerCandidates[index];
 }
 
-static NetworkAddress pick_random_nonpeer_addr() {
-    NetworkAddress addr;
+static PeerCandidate *pick_random_nonpeer_candidate() {
+    PeerCandidate *ptrCandidate;
     do {
-        addr = pick_random_addr();
-    } while (is_peer(addr.ip));
-    return addr;
+        ptrCandidate = pick_random_addr();
+    } while (is_peer(ptrCandidate));
+    return ptrCandidate;
 }
 
 void connect_to_random_addr_for_peer(uint32_t peerIndex) {
-    NetworkAddress addr = pick_random_nonpeer_addr();
-    initialize_peer(peerIndex, addr);
+    PeerCandidate *ptrCandidate = pick_random_nonpeer_candidate();
+    initialize_peer(peerIndex, ptrCandidate);
 }
 
 int32_t connect_to_initial_peers() {
     uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
-    uint32_t outgoing = min(outgoingConfig, global.peerAddressCount);
+    uint32_t outgoing = min(outgoingConfig, global.peerCandidateCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_random_addr_for_peer(i);
         global.peerCount += 1;

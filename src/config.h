@@ -12,10 +12,11 @@
 
 #define INSTRUCTION_KILL "kill"
 
+#define LOG_MESSAGE_LOADING false
+
 struct Periods {
     uint64_t autoexit;
     uint64_t saveIndices;
-    uint64_t ping;
     uint64_t resetIBDMode;
     uint64_t peerDataExchange;
     uint64_t timeoutPeers;

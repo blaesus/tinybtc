@@ -8,6 +8,19 @@
 
 #define PEER_LATENCY_SLOT 5
 
+enum PeerCandidateStatus {
+    PEER_CANDIDATE_STATUS_NORMAL = 0,
+    PEER_CANDIDATE_STATUS_DISABLED = 0,
+};
+
+struct PeerCandidate {
+    AddrRecord addr;
+    double averageLatency;
+    enum PeerCandidateStatus status;
+};
+
+typedef struct PeerCandidate PeerCandidate;
+
 struct HandshakeState {
     bool acceptThem : 1;
     bool acceptUs : 1;
@@ -43,9 +56,13 @@ struct Peer {
     enum PeerRelationship relationship;
     NetworkAddress address;
     uint32_t chain_height;
+
+    PeerCandidate *candidacy;
 };
 
 typedef struct Peer Peer;
+
+typedef struct PeerCandidate PeerCandidate;
 
 void reset_peer(Peer *ptrPeer);
 double average_peer_latency(Peer *ptrPeer);
