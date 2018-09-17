@@ -124,7 +124,8 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     if (ptrPeer->chain_height > global.mainTip.context.height) {
         send_getheaders(&ptrPeer->socket);
     }
-    else if (ptrPeer->chain_height == global.mainTip.context.height) {
+    // else if (ptrPeer->chain_height == global.mainTip.context.height) {
+    else if (true) {
         if (is_hash_empty(ptrPeer->requests.block)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
@@ -650,7 +651,7 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
             uv_strerror(error),
             error
         );
-        if (ptrContext->peer->relationship == REL_MY_SERVER) {
+        if (ptrContext->peer->relationship == PEER_RELATIONSHIP_OUR_SERVER) {
             disable_ip(ptrContext->peer->address.ip);
             replace_peer(ptrContext->peer);
         }

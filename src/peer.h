@@ -22,8 +22,10 @@ struct RequestsState {
     struct PingState ping;
 };
 
-#define REL_MY_SERVER 0
-#define REL_MY_CLIENT 1
+enum PeerRelationship {
+    PEER_RELATIONSHIP_OUR_SERVER = 0x01,
+    PEER_RELATIONSHIP_OUR_CLIENT = 0x02,
+};
 
 struct Peer {
     uint32_t index;
@@ -33,7 +35,7 @@ struct Peer {
     uv_tcp_t socket;
     double connectionStart;
 
-    uint8_t relationship;
+    enum PeerRelationship relationship;
     NetworkAddress address;
     uint32_t chain_height;
 };
