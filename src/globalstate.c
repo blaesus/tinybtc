@@ -42,9 +42,9 @@ void filter_peer_candidates() {
             }
         }
 
-        bool disabled = candidate->status == PEER_CANDIDATE_STATUS_DISABLED;
+        bool old = (get_now() / 1000 - candidate->addr.timestamp) > config.addrLife;
 
-        bool shouldDrop = duplicated || disabled;
+        bool shouldDrop = duplicated || old;
 
         if (!shouldDrop) {
             memcpy(&buffer[newLength++], candidate, sizeof(*candidate));
