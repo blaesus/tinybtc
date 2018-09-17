@@ -858,15 +858,20 @@ static PeerCandidate *pick_random_nonpeer_candidate() {
 }
 
 static double rate_candidate(PeerCandidate *ptrCandidate) {
-    if (ptrCandidate->status == PEER_CANDIDATE_STATUS_DISABLED) {
-        return 0;
-    }
     double now = get_now();
+
+    double statusScore;
+    if (ptrCandidate->status == PEER_CANDIDATE_STATUS_DISABLED) {
+        statusScore = -10;
+    }
+    else {
+        statusScore = 0;
+    }
     double timestampScore = 0;
     double deltaT = now - SECOND_TO_MILLISECOND(ptrCandidate->addr.timestamp * 1.0);
     // Prefer recent candidates, but not those connected in last 24 hours
     if (deltaT > DAY_TO_MILLISECOND(7)) {
-        timestampScore = 0.2;
+        timestampScore = 0.8;
     }
     else if (deltaT > DAY_TO_MILLISECOND(1)) {
         timestampScore = 1.0;
@@ -882,9 +887,8 @@ static double rate_candidate(PeerCandidate *ptrCandidate) {
     else {
         latencyScore = 1;
     }
-    double shuffleScore = random_betwen_0_1();
-    double score = timestampScore + latencyScore + shuffleScore;
-    // printf("%f + %f + %f = %f\n", timestampScore, latencyScore, shuffleScore, score);
+    double shuffleScore = random_betwen_0_1() * 2;
+    double score = statusScore + timestampScore + latencyScore + shuffleScore;
     return score;
 }
 

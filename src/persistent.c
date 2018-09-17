@@ -28,7 +28,8 @@ int32_t save_peers_for_human() {
         char *ipString = convert_ipv4_readable(candidate->addr.net_addr.ip);
         fprintf(
             file,
-            "%u,%s,%u,%llu,%.1f\n",
+            "%u,%u,%s,%u,%llu,%.1f\n",
+            candidate->status,
             candidate->addr.timestamp,
             ipString,
             ntohs(candidate->addr.net_addr.port),
