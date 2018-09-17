@@ -33,13 +33,22 @@ void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 int32_t setup_api_socket(void);
 
+bool disable_candidate(PeerCandidate *ptrCandidate) {
+    if (ptrCandidate) {
+        ptrCandidate->status = PEER_CANDIDATE_STATUS_DISABLED;
+        return true;
+    }
+    return false;
+}
+
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
-    connect_to_random_addr_for_peer(data->peer->index);
+    connect_to_best_candidate_as_peer(data->peer->index);
     FREE(handle->data, "SocketContext");
 }
 
 void replace_peer(Peer *ptrPeer) {
+    printf("Replacing peer %u\n", ptrPeer->index);
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
@@ -73,7 +82,7 @@ bool check_peer(Peer *ptrPeer) {
     // Check handshake
     double timeSinceConnection = now - ptrPeer->connectionStart;
     bool timeoutForLateHandshake =
-        !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.handshakeTimeTolerance);
+        !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.tolerances.handshake);
     if (timeoutForLateHandshake) {
         disable_candidate(ptrPeer->candidacy);
         printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->index, timeSinceConnection);
@@ -89,12 +98,15 @@ bool check_peer(Peer *ptrPeer) {
     ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
     ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
     double averageLatency = average_peer_latency(ptrPeer);
-    set_candidate_lantecy(ptrPeer->candidacy, averageLatency);
+    bool latency_fully_tested = is_latency_fully_tested(ptrPeer);
+    if (latency_fully_tested) {
+        ptrPeer->candidacy->averageLatency =  averageLatency;
+    }
 
     bool timeoutForLatePong =
         ping
-        && is_latency_fully_tested(ptrPeer)
-        && (averageLatency > config.peerLatencyTolerance);
+        && latency_fully_tested
+        && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
     }
@@ -168,7 +180,12 @@ void print_node_status() {
         Peer *ptrPeer = &global.peers[i];
         if (peer_hand_shaken(ptrPeer)) {
             validPeers++;
-            printf("Peer %02u: %05.1fms\n", ptrPeer->index, ptrPeer->candidacy->averageLatency);
+            if (is_latency_fully_tested(ptrPeer)) {
+                printf("Peer %02u: %7.1fms\n", ptrPeer->index, ptrPeer->candidacy->averageLatency);
+            }
+            else {
+                printf("Peer %02u: -\n", ptrPeer->index);
+            }
         }
     }
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
@@ -486,7 +503,8 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
         print_message(&message);
     }
     double now = get_now();
-    set_candidate_timestamp(ptrPeer->candidacy, (uint32_t) round(now / SECOND_TO_MILLISECOND(1)));
+    uint32_t timestamp = (uint32_t) round(now / SECOND_TO_MILLISECOND(1));
+    ptrPeer->candidacy->addr.timestamp = timestamp;
 
     char *command = (char *)message.header.command;
 
@@ -496,7 +514,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
             ptrPeer->handshake.acceptThem = true;
         }
         ptrPeer->chain_height = ptrPayloadTyped->start_height;
-        set_candidate_services(ptrPeer->candidacy, ptrPayloadTyped->services);
+        ptrPeer->candidacy->addr.net_addr.services = ptrPayloadTyped->services;
         if (peer_hand_shaken(ptrPeer)) {
             on_handshake_success(ptrPeer);
         }
@@ -785,8 +803,38 @@ static PeerCandidate *pick_random_nonpeer_candidate() {
     return ptrCandidate;
 }
 
-void connect_to_random_addr_for_peer(uint32_t peerIndex) {
-    PeerCandidate *ptrCandidate = pick_random_nonpeer_candidate();
+static double rate_candidate(PeerCandidate *ptrCandidate) {
+    double latencyScore = 0;
+    if (ptrCandidate->averageLatency) {
+        latencyScore = config.tolerances.latency / ptrCandidate->averageLatency;
+    }
+    else {
+        latencyScore = 1;
+    }
+    double shuffleScore = random_betwen_0_1();
+    double score = latencyScore + shuffleScore;
+    return score;
+}
+
+static PeerCandidate *pick_best_nonpeer_candidate() {
+    PeerCandidate *ptrBestCandidate = &global.peerCandidates[0];
+    double best_score = rate_candidate(ptrBestCandidate);
+    for (uint32_t i = 0; i < global.peerCandidateCount; i++) {
+        PeerCandidate *ptrCandidate = &global.peerCandidates[i];
+        if (is_peer(ptrCandidate)) {
+            continue;
+        }
+        double score = rate_candidate(ptrCandidate);
+        if (score > best_score) {
+            ptrBestCandidate = ptrCandidate;
+            best_score = score;
+        }
+    }
+    return ptrBestCandidate;
+}
+
+void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
+    PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate();
     initialize_peer(peerIndex, ptrCandidate);
 }
 
@@ -794,7 +842,7 @@ int32_t connect_to_initial_peers() {
     uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
     uint32_t outgoing = min(outgoingConfig, global.peerCandidateCount);
     for (uint32_t i = 0; i < outgoing; i++) {
-        connect_to_random_addr_for_peer(i);
+        connect_to_best_candidate_as_peer(i);
         global.peerCount += 1;
     }
     return 0;

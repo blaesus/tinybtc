@@ -11,8 +11,10 @@ const struct Config config = {
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
     },
-    .handshakeTimeTolerance = SECOND_TO_MILLISECOND(5),
-    .peerLatencyTolerance = SECOND_TO_MILLISECOND(5),
+    .tolerances = {
+        .handshake = SECOND_TO_MILLISECOND(8),
+        .latency = SECOND_TO_MILLISECOND(8),
+    },
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
     .maxIncoming = 125,

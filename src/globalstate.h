@@ -48,11 +48,6 @@ void add_address_as_candidate(NetworkAddress netAddr, uint32_t timestamp);
 
 void filter_peer_candidates();
 
-bool set_candidate_timestamp(PeerCandidate *ptrCandidate, uint32_t timestamp);
-bool set_candidate_services(PeerCandidate *ptrCandidate, ServiceBits bits);
-bool set_candidate_lantecy(PeerCandidate *ptrCandidate, double averageLatency);
-bool disable_candidate(PeerCandidate *ptrCandidate);
-
 bool is_peer(PeerCandidate *ptrCandidate);
 int8_t get_next_missing_block(Byte *hash);
 bool is_block_being_requested(Byte *hash);

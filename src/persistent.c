@@ -42,7 +42,7 @@ int32_t save_peers_for_human() {
 }
 
 int32_t save_peer_candidates() {
-    // filter_peer_candidates();
+    filter_peer_candidates();
     FILE *file = fopen(PEER_LIST_BINARY_FILENAME, "wb");
 
     uint8_t peerCountBytes[PEER_ADDRESS_COUNT_WIDTH] = { 0 };
@@ -56,7 +56,7 @@ int32_t save_peer_candidates() {
         file
     );
 
-    printf("Saved %u peers\n", global.peerCandidateCount);
+    printf("Saved %u peer candidates\n", global.peerCandidateCount);
 
     fclose(file);
 

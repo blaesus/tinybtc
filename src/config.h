@@ -23,10 +23,14 @@ struct Periods {
     uint64_t printNodeStatus;
 };
 
+struct Tolerances {
+    uint64_t handshake;
+    uint64_t latency;
+};
+
 struct Config {
     struct Periods periods;
-    double handshakeTimeTolerance;
-    double peerLatencyTolerance;
+    struct Tolerances tolerances;
     int32_t protocolVersion;
     uint8_t userAgent[128];
     ServiceBits services;

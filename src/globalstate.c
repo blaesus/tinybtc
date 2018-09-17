@@ -58,42 +58,6 @@ void filter_peer_candidates() {
     FREE(buffer, "filter_peer_candidates:buffer");
 }
 
-bool disable_candidate(PeerCandidate *ptrCandidate) {
-    if (ptrCandidate) {
-        ptrCandidate->status = PEER_CANDIDATE_STATUS_DISABLED;
-        return true;
-    }
-    return false;
-}
-
-bool set_candidate_timestamp(PeerCandidate *ptrCandidate, uint32_t timestamp) {
-    if (ptrCandidate) {
-        ptrCandidate->addr.timestamp = timestamp;
-        return true;
-    }
-    return false;
-}
-
-bool set_candidate_services(PeerCandidate *ptrCandidate, ServiceBits bits) {
-    if (ptrCandidate) {
-        memcpy(
-            &ptrCandidate->addr.net_addr.services,
-            &bits,
-            sizeof(ServiceBits)
-        );
-        return true;
-    }
-    return false;
-}
-
-bool set_candidate_lantecy(PeerCandidate *ptrCandidate, double averageLatency) {
-    if (ptrCandidate) {
-        ptrCandidate->averageLatency = averageLatency;
-        return true;
-    }
-    return false;
-}
-
 bool is_peer(PeerCandidate *ptrCandidate) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         if (ips_equal(global.peers[i].address.ip, ptrCandidate->addr.net_addr.ip)) {
