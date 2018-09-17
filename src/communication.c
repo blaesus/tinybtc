@@ -105,6 +105,7 @@ bool check_peer(Peer *ptrPeer) {
     bool timeoutForLatePong = latencyFullyTested && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
+        replace_peer(ptrPeer);
     }
     return false;
 }
