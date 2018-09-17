@@ -191,7 +191,7 @@ void print_node_status() {
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
 
     printf("main chain height %u; max full block %u\n",
-        global.mainTip.context.height, global.maxFullBlockHeight
+        global.mainTip.context.height, max_full_block_height_from_genesis()
     );
     print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
@@ -208,7 +208,8 @@ void terminate_main_loop(uv_timer_t *handle) {
 }
 
 void resetIBDMode() {
-    if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
+    uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
+    if (maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
         printf("\nSwitching off IBD mode\n");
         global.ibdMode = false;
     }
@@ -480,7 +481,8 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 
 void on_handshake_success(Peer *ptrPeer) {
     if (global.ibdMode) {
-        if (ptrPeer->chain_height < global.maxFullBlockHeight) {
+        uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
+        if (ptrPeer->chain_height < maxFullBlockHeight) {
             printf("Switching peer for lack of blocks\n");
             replace_peer(ptrPeer);
             return;

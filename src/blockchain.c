@@ -298,6 +298,26 @@ int8_t get_maximal_target(BlockIndex *index, TargetCompact *result) {
     return 0;
 }
 
+uint32_t max_full_block_height_from_genesis() {
+    uint32_t height = mainnet.genesisHeight;
+    SHA256_HASH hash = {0};
+    memcpy(hash, global.genesisHash, SHA256_LENGTH);
+    while (true) {
+        BlockIndex *index = GET_BLOCK_INDEX(hash);
+        if (!index || !index->meta.fullBlockAvailable) {
+            return height - 1;
+        }
+        else if (index->context.children.length == 0) {
+            return height;
+        }
+        else {
+            // TODO: handle side-chain
+            memcpy(hash, index->context.children.hashes[0], SHA256_LENGTH);
+            height++;
+        }
+    }
+}
+
 // @see GetBlockProof() in Bitcoin Core's 'chain.cpp'
 
 double calc_block_pow(TargetCompact targetBytes) {
@@ -337,9 +357,6 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         print_hash_with_description("Block saved: ", hash);
     }
     index->meta.fullBlockAvailable = true;
-    if (index->context.height > global.maxFullBlockHeight) {
-        global.maxFullBlockHeight = index->context.height;
-    }
     TxNode *p =  ptrBlock->ptrFirstTxNode;
     while (p) {
         save_tx(&p->tx);
@@ -370,9 +387,6 @@ double verify_block_indices(bool checkDB) {
         }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
-            if (ptrIndex->context.height > global.maxFullBlockHeight) {
-                global.maxFullBlockHeight = ptrIndex->context.height;
-            }
         }
     }
     FREE(keys, "recalculate_block_indices:keys");
