@@ -36,3 +36,8 @@ double average_peer_latency(Peer *ptrPeer) {
         return total / (count * 1.0);
     }
 }
+
+void record_latency(Peer *ptrPeer, double latency) {
+    ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
+    ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
+}

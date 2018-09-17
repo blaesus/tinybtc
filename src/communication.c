@@ -106,8 +106,7 @@ bool check_peer(Peer *ptrPeer) {
     else {
         latency = pong - ping;
     }
-    ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
-    ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
+    record_latency(ptrPeer, latency);
     double averageLatency = average_peer_latency(ptrPeer);
     bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
     if (latencyFullyTested) {
