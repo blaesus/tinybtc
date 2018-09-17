@@ -48,7 +48,9 @@ void on_handle_close(uv_handle_t *handle) {
 }
 
 void replace_peer(Peer *ptrPeer) {
-    printf("Replacing peer %u\n", ptrPeer->index);
+    double now = get_now();
+    double life = (now - ptrPeer->connectionStart) / SECOND_TO_MILLISECOND(1);
+    printf("Replacing peer %u (life %.1fs)\n", ptrPeer->index, life);
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
@@ -123,9 +125,22 @@ bool check_peer(Peer *ptrPeer) {
 }
 
 void check_peers_networking() {
+    double now = get_now();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         check_peer(ptrPeer);
+        if (config.tolerances.peerLife) {
+            double life = now - ptrPeer->connectionStart;
+            if (life > config.tolerances.peerLife) {
+                printf(
+                    "Timeout peer %u as life exhausted (%.1f > %llu) \n",
+                    ptrPeer->index,
+                    life,
+                    config.tolerances.peerLife
+                );
+                replace_peer(ptrPeer);
+            }
+        }
         if (peer_hand_shaken(ptrPeer)) {
             ping_peer(ptrPeer);
         }

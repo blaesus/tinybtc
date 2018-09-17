@@ -14,6 +14,7 @@ const struct Config config = {
     .tolerances = {
         .handshake = SECOND_TO_MILLISECOND(8),
         .latency = SECOND_TO_MILLISECOND(8),
+        .peerLife = SECOND_TO_MILLISECOND(120),
     },
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,

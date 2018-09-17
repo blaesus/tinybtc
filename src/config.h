@@ -26,6 +26,7 @@ struct Periods {
 struct Tolerances {
     uint64_t handshake;
     uint64_t latency;
+    uint64_t peerLife;
 };
 
 struct Config {
