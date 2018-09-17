@@ -81,30 +81,30 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
     else {
         TxPayload *txSource = CALLOC(1, sizeof(TxPayload), "is_tx_valid:txSource");
         for (uint32_t i = 0; i < tx->txInputCount; i++) {
-            TxIn input = tx->txInputs[i];
-            int8_t error = load_tx(input.previous_output.hash, txSource);
+            TxIn *input = tx->txInputs[i];
+            int8_t error = load_tx(input->previous_output.hash, txSource);
             if (error) {
                 fprintf(stderr, "Cannot load source tx\n");
-                print_object(input.previous_output.hash, SHA256_LENGTH);
+                print_object(input->previous_output.hash, SHA256_LENGTH);
                 return false;
             }
             printf("source:\n");
             print_tx_payload(txSource);
-            if (txSource->txOutputCount < input.previous_output.index + 1) {
+            if (txSource->txOutputCount < input->previous_output.index + 1) {
                 fprintf(
                     stderr,
                     "Source transaction only has %llu output, but index %u is requested\n",
                     txSource->txOutputCount,
-                    input.previous_output.index
+                    input->previous_output.index
                 );
                 return false;
             }
-            TxOut *output = &txSource->txOutputs[input.previous_output.index];
-            uint64_t programLength = input.signature_script_length + output->public_key_script_length;
+            TxOut *output = txSource->txOutputs[input->previous_output.index];
+            uint64_t programLength = input->signature_script_length + output->public_key_script_length;
 
             Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
-            memcpy(program, input.signature_script, input.signature_script_length);
-            memcpy(program+input.signature_script_length, output->public_key_script, output->public_key_script_length);
+            memcpy(program, input->signature_script, input->signature_script_length);
+            memcpy(program+input->signature_script_length, output->public_key_script, output->public_key_script_length);
             CheckSigMeta meta = {
                 .sourceOutput = output,
                 .txInputIndex = i,

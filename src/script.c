@@ -305,16 +305,16 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
     TxPayload *txCopy = CALLOC(1, sizeof(TxPayload), "make_tx_copy:txCopy");
     memcpy(txCopy, meta.currentTx, sizeof(TxPayload));
     for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
-        TxIn *txIn = &txCopy->txInputs[i];
+        TxIn *txIn = txCopy->txInputs[i];
         txIn->signature_script_length = 0;
         memset(txIn->signature_script, 0, sizeof(txIn->signature_script));
     }
     memcpy(
-        txCopy->txInputs[meta.txInputIndex].signature_script,
+        txCopy->txInputs[meta.txInputIndex]->signature_script,
         subscript,
         subscriptIndex
     );
-    txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptIndex;
+    txCopy->txInputs[meta.txInputIndex]->signature_script_length = subscriptIndex;
     FREE(subscript, "make_tx_copy:subscript");
     return txCopy;
 }
