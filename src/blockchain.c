@@ -215,7 +215,9 @@ int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
         parent->context.children.length += 1;
     }
 
-    if (index.context.chainStatus == CHAIN_STATUS_MAINCHAIN) {
+    bool isNewTip = index.context.chainStatus == CHAIN_STATUS_MAINCHAIN
+                    && index.context.chainPOW > global.mainTip.context.chainPOW;
+    if (isNewTip) {
         print_hash_with_description("Updating tip to ", index.meta.hash);
         memcpy(&global.mainTip, &index, sizeof(index));
     }
