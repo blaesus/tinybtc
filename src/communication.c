@@ -110,18 +110,22 @@ void timeout_peers() {
 }
 
 void data_exchange_with_peer(Peer *ptrPeer) {
-    printf("Executing data exchange with peer %u (%s)\n", ptrPeer->index, convert_ipv4_readable(ptrPeer->address.ip));
+    printf(
+        "\nExchanging data with peer %u(%s) - block height %u:%u\n",
+        ptrPeer->index,
+        convert_ipv4_readable(ptrPeer->address.ip),
+        global.mainTip.context.height,
+        ptrPeer->chain_height
+    );
     if (ptrPeer->chain_height > global.mainTip.context.height) {
-        printf("They have longer chain (%u < %u)\n", global.mainTip.context.height, ptrPeer->chain_height);
         send_getheaders(&ptrPeer->socket);
     }
     else if (ptrPeer->chain_height == global.mainTip.context.height) {
-        printf("Chain synced at %u\n", global.mainTip.context.height);
         if (is_hash_empty(ptrPeer->requests.block)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
             if (!status) {
-                print_hash_with_description("requesting block: ", nextMissingBlock);
+                print_hash_with_description("  requesting block: ", nextMissingBlock);
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
                 memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
             }
@@ -130,11 +134,13 @@ void data_exchange_with_peer(Peer *ptrPeer) {
             }
         }
         else {
-            print_hash_with_description("Skipped block request because already requesting ", ptrPeer->requests.block);
+            print_hash_with_description(
+                "  skipped block request because already requesting ",
+                ptrPeer->requests.block
+            );
         }
     }
     else {
-        printf("We have longer chain (%u > %u) \n", global.mainTip.context.height, ptrPeer->chain_height);
         // Peers has less data
     }
 }
