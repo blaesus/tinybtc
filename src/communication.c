@@ -63,6 +63,14 @@ void replace_peer(Peer *ptrPeer) {
     ptrData->peer = ptrPeer;
     if (uv_is_closing(ptrSocket)) {
         fprintf(stderr, "replace_peer: Socket is already closing...\n");
+        if (ptrPeer->triedClosing) {
+            fprintf(stderr, "replace_peer: already tried closing. Socket is zombie...\n");
+            global.zombieSockets[global.zombineSocketCount++] = ptrSocket; // TODO: Release?
+            connect_to_best_candidate_as_peer(ptrData->peer->index);
+        }
+        else {
+            ptrPeer->triedClosing = true;
+        }
     }
     else {
         uv_close(ptrSocket, on_handle_close);

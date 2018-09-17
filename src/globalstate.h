@@ -13,6 +13,8 @@
 #define PEER_ADDRESS_COUNT_WIDTH 4
 #define MAX_ORPHAN_COUNT 4096
 
+#define MAX_ZOMBIE_SOCKETS 1024
+
 struct GlobalState {
     bool ibdMode;
     void *timerTable;
@@ -35,6 +37,9 @@ struct GlobalState {
 
     BlockPayload genesisBlock;
     SHA256_HASH genesisHash;
+
+    void *zombieSockets[];
+    uint32_t zombineSocketCount;
 
     BlockIndex mainTip;
 };
