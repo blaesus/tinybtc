@@ -804,6 +804,23 @@ static PeerCandidate *pick_random_nonpeer_candidate() {
 }
 
 static double rate_candidate(PeerCandidate *ptrCandidate) {
+    if (ptrCandidate->status == PEER_CANDIDATE_STATUS_DISABLED) {
+        return 0;
+    }
+    double now = get_now();
+    double timestampScore = 0;
+    double deltaT = now - SECOND_TO_MILLISECOND(ptrCandidate->addr.timestamp * 1.0);
+    // Prefer recent candidates, but not those connected in last 24 hours
+    if (deltaT > DAY_TO_MILLISECOND(7)) {
+        timestampScore = 0.2;
+    }
+    else if (deltaT > DAY_TO_MILLISECOND(1)) {
+        timestampScore = 1.0;
+    }
+    else {
+        timestampScore = 0.5;
+    }
+
     double latencyScore = 0;
     if (ptrCandidate->averageLatency) {
         latencyScore = config.tolerances.latency / ptrCandidate->averageLatency;
@@ -812,29 +829,35 @@ static double rate_candidate(PeerCandidate *ptrCandidate) {
         latencyScore = 1;
     }
     double shuffleScore = random_betwen_0_1();
-    double score = latencyScore + shuffleScore;
+    double score = timestampScore + latencyScore + shuffleScore;
+    // printf("%f + %f + %f = %f\n", timestampScore, latencyScore, shuffleScore, score);
     return score;
 }
 
-static PeerCandidate *pick_best_nonpeer_candidate() {
+static PeerCandidate *pick_best_nonpeer_candidate(double *finalScore) {
     PeerCandidate *ptrBestCandidate = &global.peerCandidates[0];
-    double best_score = rate_candidate(ptrBestCandidate);
+    double bestScore = rate_candidate(ptrBestCandidate);
     for (uint32_t i = 0; i < global.peerCandidateCount; i++) {
         PeerCandidate *ptrCandidate = &global.peerCandidates[i];
         if (is_peer(ptrCandidate)) {
             continue;
         }
         double score = rate_candidate(ptrCandidate);
-        if (score > best_score) {
+        if (score > bestScore) {
             ptrBestCandidate = ptrCandidate;
-            best_score = score;
+            bestScore = score;
         }
+    }
+    if (finalScore) {
+        *finalScore = bestScore;
     }
     return ptrBestCandidate;
 }
 
 void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
-    PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate();
+    double score = 0;
+    PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate(&score);
+    printf("Selected candidate on score %f\n", score);
     initialize_peer(peerIndex, ptrCandidate);
 }
 
