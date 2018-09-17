@@ -57,6 +57,17 @@ void replace_peer(Peer *ptrPeer) {
     }
 }
 
+void ping_peer(Peer *ptrPeer) {
+    double now = get_now();
+    ptrPeer->requests.ping.nonce = random_uint64();
+    ptrPeer->requests.ping.pingSent = now;
+    ptrPeer->requests.ping.pongReceived = 0;
+    PingpongPayload ptrPayload = {
+        .nonce = ptrPeer->requests.ping.nonce
+    };
+    send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
+}
+
 void timeout_peers() {
     double now = get_now();
     for (uint32_t i = 0; i < global.peerCount; i++) {
@@ -88,6 +99,13 @@ void timeout_peers() {
                 disable_ip(ptrPeer->address.ip);
             }
             replace_peer(ptrPeer);
+        }
+    }
+
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (peer_hand_shaken(ptrPeer)) {
+            ping_peer(ptrPeer);
         }
     }
 }
@@ -158,25 +176,6 @@ void print_node_status() {
     printf("=====================\n");
 }
 
-void ping_peers() {
-    printf("Pinging peers\n");
-    // TODO: Use at least milliseconds. Seconds are too crude.
-    double now = get_now();
-    for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
-        if (!peer_hand_shaken(ptrPeer)) {
-            continue;
-        }
-        ptrPeer->requests.ping.nonce = random_uint64();
-        ptrPeer->requests.ping.pingSent = now;
-        ptrPeer->requests.ping.pongReceived = 0;
-        PingpongPayload ptrPayload = {
-            .nonce = ptrPeer->requests.ping.nonce
-        };
-        send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
-    }
-}
-
 void terminate_main_loop(uv_timer_t *handle) {
     printf("Stopping main loop...\n");
     if (handle) {
@@ -214,10 +213,6 @@ void setup_timers() {
         {
             .interval = config.periods.peerDataExchange,
             .callback = &exchange_data_with_peers,
-        },
-        {
-            .interval = config.periods.ping,
-            .callback = &ping_peers,
         },
         {
             .interval = config.periods.saveIndices,
@@ -473,6 +468,7 @@ void on_handshake_success(Peer *ptrPeer) {
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
     }
+    ping_peer(ptrPeer);
 }
 
 void handle_incoming_message(Peer *ptrPeer, Message message) {
