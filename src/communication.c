@@ -40,7 +40,6 @@ void on_handle_close(uv_handle_t *handle) {
 }
 
 void replace_peer(Peer *ptrPeer) {
-    printf("Replacing peer %u\n", ptrPeer->index);
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws

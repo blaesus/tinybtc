@@ -86,8 +86,6 @@ int32_t set_addr_timestamp(IP ip, uint32_t timestamp) {
         Byte *ipAtIndex = global.peerAddresses[index].net_addr.ip;
         if (ips_equal(ipAtIndex, ip)) {
             global.peerAddresses[index].timestamp = timestamp;
-            char *ipString = convert_ipv4_readable(ip);
-            printf("Set timestamp of ip %s to %u\n", ipString, timestamp);
         }
     }
     return 0;
