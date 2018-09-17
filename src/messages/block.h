@@ -45,5 +45,5 @@ bool hash_satisfies_target_compact(const Byte *hash, TargetCompact target);
 void target_4to32(TargetCompact targetBytes, Byte *bytes);
 void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash);
 void print_block_payload(BlockPayload *ptrBlock);
-void release_tx_in_block(BlockPayload *ptrBlock);
+void release_txs_in_block(BlockPayload *ptrBlock);
 bool is_block(Message *ptrMessage);

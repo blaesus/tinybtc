@@ -105,6 +105,7 @@ bool check_peer(Peer *ptrPeer) {
     bool timeoutForLatePong = latencyFullyTested && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
         printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
+        replace_peer(ptrPeer);
     }
     return false;
 }
@@ -142,58 +143,43 @@ void check_peers_connectivity() {
     }
 }
 
-void data_exchange_with_peer(Peer *ptrPeer) {
-    #if LOG_DATA_EXCHANGE
-    printf(
-        "\nExchanging data with peer %u(%s) - block height %u:%u\n",
-        ptrPeer->index,
-        convert_ipv4_readable(ptrPeer->address.ip),
-        global.mainTip.context.height,
-        ptrPeer->chain_height
-    );
-    #endif
-    if (ptrPeer->chain_height > global.mainTip.context.height) {
-        send_getheaders(&ptrPeer->socket);
-    }
-    // else if (ptrPeer->chain_height == global.mainTip.context.height) {
-    else if (true) {
-        if (is_hash_empty(ptrPeer->networking.requesting)) {
-            SHA256_HASH nextMissingBlock = {0};
-            int8_t status = get_next_missing_block(nextMissingBlock);
-            if (!status) {
-                #if LOG_DATA_EXCHANGE
-                print_hash_with_description("  requesting block: ", nextMissingBlock);
-                #endif
-                send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-                memcpy(ptrPeer->networking.requesting, nextMissingBlock, SHA256_LENGTH);
-            }
-            else {
-                printf("Block sync status %i\n", status);
-            }
-        }
-        else {
-            #if LOG_DATA_EXCHANGE
-            print_hash_with_description(
-                "  skipped block request because already requesting ",
-                ptrPeer->networking.requesting
-            );
-            #endif
+static bool is_peer_idle(Peer *ptrPeer) {
+    return peer_hand_shaken(ptrPeer) && is_hash_empty(ptrPeer->networking.requesting);
+}
+
+static uint32_t count_idle_peers() {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        if (is_peer_idle(ptrPeer)) {
+            count++;
         }
     }
-    else {
-        // Peers has less data
-    }
+    return count;
 }
 
 void exchange_data_with_peers() {
     printf("Exchanging data with peers...\n");
+    uint32_t idlePeers = count_idle_peers();
+    SHA256_HASH *blocksDesired = CALLOC(idlePeers, SHA256_LENGTH, "exchange_data_with_peers:hashes");
+    uint32_t blocksFound = find_missing_blocks(blocksDesired, idlePeers);
+    uint32_t blockIndex = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
-        data_exchange_with_peer(ptrPeer);
+        if (ptrPeer->chain_height > global.mainTip.context.height) {
+            send_getheaders(&ptrPeer->socket);
+        }
+        Byte *blockToRequest = NULL;
+        if (is_peer_idle(ptrPeer) && (blockIndex < blocksFound)) {
+            blockToRequest = blocksDesired[blockIndex];
+            blockIndex++;
+        }
+        send_getdata_for_block(&ptrPeer->socket, blockToRequest);
     }
+    FREE(blocksDesired, "exchange_data_with_peers:hashes");
 }
 
 void print_node_status() {
@@ -210,8 +196,11 @@ void print_node_status() {
                 printf("Peer %02u: %7.1fms\n", ptrPeer->index, averageLatency);
             }
             else {
-                printf("Peer %02u:     -\n", ptrPeer->index);
+                printf("Peer %02u:     ?ms\n", ptrPeer->index);
             }
+        }
+        else {
+            printf("Peer %02u:     <>\n", ptrPeer->index);
         }
     }
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
@@ -532,7 +521,6 @@ void on_handshake_success(Peer *ptrPeer) {
             return;
         }
     }
-    data_exchange_with_peer(ptrPeer);
     bool shouldSendGetaddr = global.peerCandidateCount < config.getaddrThreshold;
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);

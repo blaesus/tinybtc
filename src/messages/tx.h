@@ -55,10 +55,10 @@ struct TxPayload {
     Byte marker;
     Byte flag;
     VarIntMem txInputCount;
-    TxIn txInputs[MAX_TX_ITEM_PER_TX];
+    TxIn *txInputs[MAX_TX_ITEM_PER_TX];
     VarIntMem txOutputCount;
-    TxOut txOutputs[MAX_TX_ITEM_PER_TX];
-    TxWitness txWitnesses[MAX_TX_ITEM_PER_TX];
+    TxOut *txOutputs[MAX_TX_ITEM_PER_TX];
+    TxWitness *txWitnesses[MAX_TX_ITEM_PER_TX];
     uint32_t lockTime;
 };
 
@@ -79,3 +79,4 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result);
 void print_tx_payload(TxPayload *ptrTx);
 bool is_coinbase(TxPayload *ptrTx);
 bool is_tx_legal(TxPayload *ptrTx);
+void release_items_in_tx(TxPayload *tx);

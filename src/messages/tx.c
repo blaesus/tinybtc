@@ -69,17 +69,17 @@ uint64_t serialize_tx_payload(
 
     p += serialize_to_varint(ptrPayload->txInputCount, p);
     for (uint64_t i = 0; i < ptrPayload->txInputCount; i++) {
-        p += serialize_tx_in(&ptrPayload->txInputs[i], p);
+        p += serialize_tx_in(ptrPayload->txInputs[i], p);
     }
 
     p += serialize_to_varint(ptrPayload->txOutputCount, p);
     for (uint64_t i = 0; i < ptrPayload->txOutputCount; i++) {
-        p += serialize_tx_out(&ptrPayload->txOutputs[i], p);
+        p += serialize_tx_out(ptrPayload->txOutputs[i], p);
     }
 
     if (hasWitnessData) {
         for (uint64_t i = 0; i < ptrPayload->txInputCount; i++) {
-            p += serialize_tx_witness(&ptrPayload->txWitnesses[i], p);
+            p += serialize_tx_witness(ptrPayload->txWitnesses[i], p);
         }
     }
     p += SERIALIZE_TO(ptrPayload->lockTime, p);
@@ -119,6 +119,10 @@ static uint64_t parse_tx_witness(
     return p - ptrBuffer;
 }
 
+bool check_segwit_bits(Byte marker, Byte flag) {
+    return (marker == WITNESS_MARKER) && (flag == WITNESS_FLAG);
+}
+
 uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrTx->version);
@@ -127,7 +131,7 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     Byte possibleFlag = 0;
     memcpy(&possibleMarker, p, sizeof(ptrTx->marker));
     memcpy(&possibleFlag, p + sizeof(ptrTx->marker), sizeof(ptrTx->flag));
-    bool hasWitness = (possibleMarker == WITNESS_MARKER) && (possibleFlag == WITNESS_FLAG);
+    bool hasWitness = check_segwit_bits(possibleMarker, possibleFlag);
     if (hasWitness) {
         PARSE_INTO(p, &ptrTx->marker);
         PARSE_INTO(p, &ptrTx->flag);
@@ -135,17 +139,20 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
 
     p += parse_varint(p, &ptrTx->txInputCount);
     for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-        p += parse_tx_in(p, &ptrTx->txInputs[i]);
+        ptrTx->txInputs[i] = MALLOC(sizeof(TxIn), "parse_into_tx_payload:txInput");
+        p += parse_tx_in(p, ptrTx->txInputs[i]);
     }
 
     p += parse_varint(p, &ptrTx->txOutputCount);
     for (uint64_t i = 0; i < ptrTx->txOutputCount; i++) {
-        p += parse_tx_out(p, &ptrTx->txOutputs[i]);
+        ptrTx->txOutputs[i] = MALLOC(sizeof(TxOut), "parse_into_tx_payload:txOutput");
+        p += parse_tx_out(p, ptrTx->txOutputs[i]);
     }
 
     if (hasWitness) {
         for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-            p += parse_tx_witness(p, &ptrTx->txWitnesses[i]);
+            ptrTx->txWitnesses[i] = MALLOC(sizeof(TxWitness), "parse_into_tx_payload:txWitness");
+            p += parse_tx_witness(p, ptrTx->txWitnesses[i]);
         }
     }
     p += PARSE_INTO(p, &ptrTx->lockTime);
@@ -266,32 +273,32 @@ bool is_outpoint_empty(Outpoint *ptrOutpoint) {
 }
 
 bool is_coinbase(TxPayload *ptrTx) {
-    return ptrTx->txInputCount == 1 && is_outpoint_empty(&ptrTx->txInputs[0].previous_output);
+    return ptrTx->txInputCount == 1 && is_outpoint_empty(&ptrTx->txInputs[0]->previous_output);
 }
 
 bool is_tx_legal(TxPayload *ptrTx) {
     bool nonemptyIn = ptrTx->txInputCount > 0;
     bool nonemptyOut = ptrTx->txOutputCount > 0;
 
-    bool outpusLegal = true;
+    bool outputLegal = true;
     for (uint64_t i = 0; i < ptrTx->txOutputCount; i++) {
-        TxOut out = ptrTx->txOutputs[i];
-        if (out.value < 0) {
-            outpusLegal = false;
+        TxOut *out = ptrTx->txOutputs[i];
+        if (out->value < 0) {
+            outputLegal = false;
             break;
         }
     }
 
     bool inputsLegal = true;
     if (is_coinbase(ptrTx)) {
-        TxIn firstIn = ptrTx->txInputs[0];
-        inputsLegal = firstIn.signature_script_length <= mainnet.scriptSigSizeUpper
-                      && firstIn.signature_script_length >= mainnet.scriptSigSizeLower;
+        TxIn *firstIn = ptrTx->txInputs[0];
+        inputsLegal = firstIn->signature_script_length <= mainnet.scriptSigSizeUpper
+                      && firstIn->signature_script_length >= mainnet.scriptSigSizeLower;
     }
     else {
         for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-            TxIn in = ptrTx->txInputs[i];
-            if (is_outpoint_empty(&in.previous_output)) {
+            TxIn *in = ptrTx->txInputs[i];
+            if (is_outpoint_empty(&in->previous_output)) {
                 inputsLegal = false;
                 break;
             }
@@ -300,6 +307,20 @@ bool is_tx_legal(TxPayload *ptrTx) {
 
     return nonemptyIn
            && nonemptyOut
-           && outpusLegal
+           && outputLegal
            && inputsLegal;
+}
+
+void release_items_in_tx(TxPayload *tx) {
+    for (uint64_t i = 0; i < tx->txInputCount; i++) {
+        FREE(tx->txInputs[i], "parse_into_tx_payload:txInput");
+    }
+    for (uint64_t i = 0; i < tx->txOutputCount; i++) {
+        FREE(tx->txOutputs[i], "parse_into_tx_payload:txOutput");
+    }
+    if (check_segwit_bits(tx->marker, tx->flag)) {
+        for (uint64_t i = 0; i < tx->txInputCount; i++) {
+            FREE(tx->txWitnesses[i], "parse_into_tx_payload:txWitness");
+        }
+    }
 }

@@ -61,13 +61,13 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     return 0;
 }
 
-
-void release_tx_in_block(BlockPayload *ptrBlock) {
+void release_txs_in_block(BlockPayload *ptrBlock) {
     TxNode *p = ptrBlock->ptrFirstTxNode;
     TxNode *freeTarget;
     while (p) {
         freeTarget = p;
         p = p->next;
+        release_items_in_tx(&freeTarget->tx);
         FREE(freeTarget, "parse_block:TxNode");
     }
 }

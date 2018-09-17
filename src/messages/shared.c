@@ -149,7 +149,7 @@ uint64_t load_file(char *path, Byte *buffer) {
 
 void free_message_payload(Message *message) {
     if (is_block(message)) {
-        release_tx_in_block(message->ptrPayload);
+        release_txs_in_block(message->ptrPayload);
     }
     FREE(message->ptrPayload, "parse_message:payload");
 }
