@@ -348,14 +348,14 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-double recalculate_block_index_meta() {
-    printf("Reindexing block indices...\n");
+double verify_block_indices(bool checkDB) {
+    printf("Verifying block indices...\n");
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
     for (uint32_t i = 0; i < indexCount; i++) {
         if (i % 2000 == 0) {
-            printf("checking block index meta %u/%u\n", i, indexCount);
+            printf("verifying block index %u/%u\n", i, indexCount);
         }
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
@@ -365,7 +365,9 @@ double recalculate_block_index_meta() {
             continue;
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
-        ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        if (checkDB) {
+            ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
             if (ptrIndex->context.height > global.maxFullBlockHeight) {
