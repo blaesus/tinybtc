@@ -195,8 +195,11 @@ void print_node_status() {
                 printf("Peer %02u: %7.1fms\n", ptrPeer->index, averageLatency);
             }
             else {
-                printf("Peer %02u:     -\n", ptrPeer->index);
+                printf("Peer %02u:     ?ms\n", ptrPeer->index);
             }
+        }
+        else {
+            printf("Peer %02u:     <>\n", ptrPeer->index);
         }
     }
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);

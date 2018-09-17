@@ -4,10 +4,10 @@
 
 const struct Config config = {
     .periods = {
-        .autoexit = MINUTE_TO_MILLISECOND(30),
+        .autoexit = HOUR_TO_MILLISECOND(2),
         .saveIndices = MINUTE_TO_MILLISECOND(5),
-        .peerDataExchange = SECOND_TO_MILLISECOND(2),
-        .resetIBDMode = SECOND_TO_MILLISECOND(60),
+        .peerDataExchange = SECOND_TO_MILLISECOND(1),
+        .resetIBDMode = SECOND_TO_MILLISECOND(120),
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
         .ping = SECOND_TO_MILLISECOND(13),
