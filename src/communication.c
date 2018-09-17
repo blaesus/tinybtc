@@ -58,18 +58,18 @@ void replace_peer(Peer *ptrPeer) {
 }
 
 void timeout_peers() {
-    double now = getNow();
+    double now = get_now();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         bool timeoutForLateHandshake =
-            (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
+            (now - ptrPeer->connectionStart > config.peerLatencyTolerance)
             && !peer_hand_shaken(ptrPeer);
 
         double ping = ptrPeer->requests.ping.pingSent;
         double pong = ptrPeer->requests.ping.pongReceived;
         bool neverReceivedPong = pong == 0;
         double latency = neverReceivedPong ? now - ping : pong - ping;
-        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerence);
+        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerance);
 
         if (timeoutForLateHandshake || timeoutForLatePong) {
             printf(
@@ -161,7 +161,7 @@ void print_node_status() {
 void ping_peers() {
     printf("Pinging peers\n");
     // TODO: Use at least milliseconds. Seconds are too crude.
-    double now = getNow();
+    double now = get_now();
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
@@ -477,7 +477,7 @@ void on_handshake_success(Peer *ptrPeer) {
 
 void handle_incoming_message(Peer *ptrPeer, Message message) {
     print_message(&message);
-    double now = getNow();
+    double now = get_now();
     set_addr_timestamp(ptrPeer->address.ip, (uint32_t)round(now / SECOND_TO_MILLISECOND(1)));
 
     char *command = (char *)message.header.command;
@@ -672,7 +672,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
 
     reset_peer(ptrPeer);
     ptrPeer->index = peerIndex;
-    ptrPeer->connectionStart = time(NULL);
+    ptrPeer->connectionStart = get_now();
     memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
 
     // Connection request

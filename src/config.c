@@ -12,7 +12,7 @@ const struct Config config = {
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(2),
     },
-    .peerLatencyTolerence = SECOND_TO_MILLISECOND(2),
+    .peerLatencyTolerance = SECOND_TO_MILLISECOND(4),
     .protocolVersion = 70015,
     .services = SERVICE_NODE_NETWORK,
     .maxIncoming = 125,

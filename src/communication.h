@@ -6,8 +6,6 @@
 #include "datatypes.h"
 #include "parameters.h"
 
-#define PEER_CONNECTION_TIMEOUT_SEC 5
-
 struct MessageCache {
     uint64_t bufferIndex;
     Byte buffer[MESSAGE_BUFFER_LENGTH];

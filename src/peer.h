@@ -31,7 +31,7 @@ struct Peer {
     struct RequestsState requests;
 
     uv_tcp_t socket;
-    time_t connectionStart;
+    double connectionStart;
 
     uint8_t relationship;
     NetworkAddress address;

@@ -178,7 +178,7 @@ double timeval_to_double_ms(struct timeval time) {
     return 1.0 * time.tv_sec * 1000 + 1.0 * time.tv_usec / 1000;
 }
 
-double getNow() {
+double get_now() {
     struct timeval nowTimeval;
     gettimeofday(&nowTimeval, NULL);
     return timeval_to_double_ms(nowTimeval);
