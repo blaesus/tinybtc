@@ -24,6 +24,7 @@ struct Periods {
 
 struct Config {
     struct Periods periods;
+    double handshakeTimeTolerance;
     double peerLatencyTolerance;
     int32_t protocolVersion;
     uint8_t userAgent[128];

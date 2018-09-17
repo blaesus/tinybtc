@@ -6,6 +6,8 @@
 #include "datatypes.h"
 #include "hash.h"
 
+#define PEER_LATENCY_SLOT 5
+
 struct HandshakeState {
     bool acceptThem : 1;
     bool acceptUs : 1;
@@ -20,6 +22,9 @@ struct PingState {
 struct InteractionState {
     SHA256_HASH requesting;
     struct PingState ping;
+    double lastHeard;
+    double latencies[PEER_LATENCY_SLOT];
+    uint32_t lattencyIndex;
 };
 
 enum PeerRelationship {
@@ -30,7 +35,7 @@ enum PeerRelationship {
 struct Peer {
     uint32_t index;
     struct HandshakeState handshake;
-    struct InteractionState interactions;
+    struct InteractionState networking;
 
     uv_tcp_t socket;
     double connectionStart;
@@ -43,3 +48,4 @@ struct Peer {
 typedef struct Peer Peer;
 
 void reset_peer(Peer *ptrPeer);
+double average_peer_latency(Peer *ptrPeer);

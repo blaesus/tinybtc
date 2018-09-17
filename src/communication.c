@@ -58,55 +58,49 @@ void replace_peer(Peer *ptrPeer) {
 
 void ping_peer(Peer *ptrPeer) {
     double now = get_now();
-    ptrPeer->interactions.ping.nonce = random_uint64();
-    ptrPeer->interactions.ping.pingSent = now;
-    ptrPeer->interactions.ping.pongReceived = 0;
+    ptrPeer->networking.ping.nonce = random_uint64();
+    ptrPeer->networking.ping.pingSent = now;
+    ptrPeer->networking.ping.pongReceived = 0;
     PingpongPayload ptrPayload = {
-        .nonce = ptrPeer->interactions.ping.nonce
+        .nonce = ptrPeer->networking.ping.nonce
     };
     send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
 }
 
-void timeout_peers() {
+bool check_peer(Peer *ptrPeer) {
     double now = get_now();
-    uint32_t droppedPeers = 0;
-    for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
-        bool timeoutForLateHandshake =
-            (now - ptrPeer->connectionStart > config.peerLatencyTolerance)
-            && !peer_hand_shaken(ptrPeer);
 
-        double ping = ptrPeer->interactions.ping.pingSent;
-        double pong = ptrPeer->interactions.ping.pongReceived;
-        bool neverReceivedPong = pong == 0;
-        double latency = neverReceivedPong ? now - ping : pong - ping;
-        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerance);
-
-
-        if (timeoutForLateHandshake || timeoutForLatePong) {
-            printf(
-                "Timeout peer %u (reason: handshake=%u, pong=%u)",
-                i,
-                timeoutForLateHandshake,
-                timeoutForLatePong
-            );
-            if (timeoutForLatePong) {
-                printf("[latency=%.1fms]\n", latency);
-            }
-            else {
-                printf("\n");
-            }
-            if (timeoutForLateHandshake || neverReceivedPong) {
-                disable_ip(ptrPeer->address.ip);
-            }
-            replace_peer(ptrPeer);
-            droppedPeers++;
-        }
+    // Check handshake
+    double timeSinceConnection = now - ptrPeer->connectionStart;
+    bool timeoutForLateHandshake =
+        !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.handshakeTimeTolerance);
+    if (timeoutForLateHandshake) {
+        disable_ip(ptrPeer->address.ip);
+        printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->index, timeSinceConnection);
+        replace_peer(ptrPeer);
+        return true;
     }
-    printf("Dropped %u/%u peers\n", droppedPeers, global.peerCount);
 
+    // Check ping
+    double ping = ptrPeer->networking.ping.pingSent;
+    double pong = ptrPeer->networking.ping.pongReceived;
+    bool neverReceivedPong = pong == 0;
+    double latency = neverReceivedPong ? now - ping : pong - ping;
+    ptrPeer->networking.latencies[ptrPeer->networking.lattencyIndex] = latency;
+    ptrPeer->networking.lattencyIndex = (ptrPeer->networking.lattencyIndex + 1) % PEER_LATENCY_SLOT;
+    double averageLatency = average_peer_latency(ptrPeer);
+
+    bool timeoutForLatePong = ping && (averageLatency > config.peerLatencyTolerance);
+    if (timeoutForLatePong) {
+        printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
+    }
+    return false;
+}
+
+void check_peers_networking() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
+        check_peer(ptrPeer);
         if (peer_hand_shaken(ptrPeer)) {
             ping_peer(ptrPeer);
         }
@@ -126,13 +120,13 @@ void data_exchange_with_peer(Peer *ptrPeer) {
     }
     // else if (ptrPeer->chain_height == global.mainTip.context.height) {
     else if (true) {
-        if (is_hash_empty(ptrPeer->interactions.requesting)) {
+        if (is_hash_empty(ptrPeer->networking.requesting)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
             if (!status) {
                 print_hash_with_description("  requesting block: ", nextMissingBlock);
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-                memcpy(ptrPeer->interactions.requesting, nextMissingBlock, SHA256_LENGTH);
+                memcpy(ptrPeer->networking.requesting, nextMissingBlock, SHA256_LENGTH);
             }
             else {
                 printf("Block sync status %i\n", status);
@@ -141,7 +135,7 @@ void data_exchange_with_peer(Peer *ptrPeer) {
         else {
             print_hash_with_description(
                 "  skipped block request because already requesting ",
-                ptrPeer->interactions.requesting
+                ptrPeer->networking.requesting
             );
         }
     }
@@ -239,7 +233,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.timeoutPeers,
-            .callback = &timeout_peers,
+            .callback = &check_peers_networking,
         },
         {
             .interval = config.periods.printNodeStatus,
@@ -497,11 +491,16 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
         }
         ptrPeer->chain_height = ptrPayloadTyped->start_height;
         set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
+        if (peer_hand_shaken(ptrPeer)) {
+            on_handshake_success(ptrPeer);
+        }
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
         send_message(&ptrPeer->socket, CMD_VERACK, NULL);
-        on_handshake_success(ptrPeer);
+        if (peer_hand_shaken(ptrPeer)) {
+            on_handshake_success(ptrPeer);
+        }
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
         AddrPayload *ptrPayload = message.ptrPayload;
@@ -523,12 +522,14 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     }
     else if (strcmp(command, CMD_PONG) == 0) {
         PingpongPayload *ptrPayload = message.ptrPayload;
-        if (ptrPayload->nonce == ptrPeer->interactions.ping.nonce) {
-            ptrPeer->interactions.ping.pongReceived = now;
+        if (ptrPayload->nonce == ptrPeer->networking.ping.nonce) {
+            ptrPeer->networking.ping.pongReceived = now;
         }
         else {
-            printf("Unexpected pong nonce: received %llu, expecting %llu\n",
-                ptrPayload->nonce, ptrPeer->interactions.ping.nonce);
+            printf(
+                "Unexpected pong nonce: received %llu, expecting %llu\n",
+                ptrPayload->nonce, ptrPeer->networking.ping.nonce
+            );
         }
     }
     else if (strcmp(command, CMD_HEADERS) == 0) {
@@ -544,7 +545,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     else if (strcmp(command, CMD_BLOCK) == 0) {
         BlockPayload *ptrBlock = message.ptrPayload;
         process_incoming_block(ptrBlock);
-        memset(ptrPeer->interactions.requesting, 0, SHA256_LENGTH);
+        memset(ptrPeer->networking.requesting, 0, SHA256_LENGTH);
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
@@ -625,6 +626,7 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
         return;
     }
     SocketContext *ptrContext = (SocketContext *)socket->data;
+    ptrContext->peer->networking.lastHeard = get_now();
     MessageCache *ptrCache = &(ptrContext->streamCache);
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
