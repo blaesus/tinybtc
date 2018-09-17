@@ -12,32 +12,46 @@
 
 #define INSTRUCTION_KILL "kill"
 
+#define LOG_MESSAGE_LOADING false
+#define LOG_MESSAGE_SENDING false
+#define LOG_MESSAGE_SENT false
+#define LOG_DATA_EXCHANGE false
+#define LOG_PEER_REPLACE false
+
 struct Periods {
     uint64_t autoexit;
     uint64_t saveIndices;
-    uint64_t ping;
     uint64_t resetIBDMode;
     uint64_t peerDataExchange;
     uint64_t timeoutPeers;
     uint64_t printNodeStatus;
+    uint64_t ping;
+};
+
+struct Tolerances {
+    uint64_t handshake;
+    uint64_t latency;
+    uint64_t peerLife;
 };
 
 struct Config {
     struct Periods periods;
-    double peerLatencyTolerence;
+    struct Tolerances tolerances;
     int32_t protocolVersion;
     uint8_t userAgent[128];
     ServiceBits services;
     uint32_t maxIncoming;
     uint32_t maxOutgoing;
     uint32_t maxOutgoingIBD;
-    uint32_t addrLife;
+    uint32_t peerCandidateLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;
     char *dbName;
     double ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
     uint16_t apiPort;
+    char *silentIncomingMessageCommands;
+    bool deepReindexBlocks;
 };
 
 extern const struct Config config;

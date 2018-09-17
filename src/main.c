@@ -43,20 +43,20 @@ int8_t init() {
     srand((unsigned int)global.start_time);
     setup_cleanup();
     hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+    load_peer_candidates();
+    if (global.peerCandidateCount == 0) {
+        dns_bootstrap();
+    }
     int8_t dbError = init_db();
     if (dbError) {
         return -1;
     }
     load_genesis();
     load_block_indices();
-    double blockAvailability = recalculate_block_index_meta();
+    double blockAvailability = verify_block_indices(config.deepReindexBlocks);
     if (blockAvailability < config.ibdModeAvailabilityThreshold) {
         global.ibdMode = true;
         printf("Activated IBD mode\n");
-    }
-    load_peer_addresses();
-    if (global.peerAddressCount == 0) {
-        dns_bootstrap();
     }
     setup_main_event_loop();
     printf("Done initialization.\n");

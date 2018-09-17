@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define TRACE_MEMORY_USE true
+#define TRACE_MEMORY_USE false
 
 #if TRACE_MEMORY_USE
 #define CALLOC(count, size, label) (calloc_audited(count, size, label))
@@ -38,7 +38,7 @@ int8_t bytescmp(const Byte *bytesA, const Byte *bytesB, uint32_t width);
 char *date_string(time_t time);
 bool is_byte_array_empty(const Byte *hash, uint64_t length);
 double timeval_to_double_ms(struct timeval time);
-double getNow();
+double get_now();
 void *malloc_audited(size_t size, char* label);
 void *calloc_audited(size_t count, size_t size, char* label);
 void free_audited(void *ptr, char* label);

@@ -2,8 +2,8 @@
 #include <stdint.h>
 #include <messages/block.h>
 
-int32_t save_peer_addresses(void);
-int32_t load_peer_addresses(void);
+int32_t save_peer_candidates(void);
+int32_t load_peer_candidates(void);
 int32_t save_block_indices(void);
 int32_t load_block_indices(void);
 int8_t init_db();

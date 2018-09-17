@@ -298,6 +298,26 @@ int8_t get_maximal_target(BlockIndex *index, TargetCompact *result) {
     return 0;
 }
 
+uint32_t max_full_block_height_from_genesis() {
+    uint32_t height = mainnet.genesisHeight;
+    SHA256_HASH hash = {0};
+    memcpy(hash, global.genesisHash, SHA256_LENGTH);
+    while (true) {
+        BlockIndex *index = GET_BLOCK_INDEX(hash);
+        if (!index || !index->meta.fullBlockAvailable) {
+            return height - 1;
+        }
+        else if (index->context.children.length == 0) {
+            return height;
+        }
+        else {
+            // TODO: handle side-chain
+            memcpy(hash, index->context.children.hashes[0], SHA256_LENGTH);
+            height++;
+        }
+    }
+}
+
 // @see GetBlockProof() in Bitcoin Core's 'chain.cpp'
 
 double calc_block_pow(TargetCompact targetBytes) {
@@ -337,9 +357,6 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         print_hash_with_description("Block saved: ", hash);
     }
     index->meta.fullBlockAvailable = true;
-    if (index->context.height > global.maxFullBlockHeight) {
-        global.maxFullBlockHeight = index->context.height;
-    }
     TxNode *p =  ptrBlock->ptrFirstTxNode;
     while (p) {
         save_tx(&p->tx);
@@ -348,14 +365,14 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-double recalculate_block_index_meta() {
-    printf("Reindexing block indices...\n");
+double verify_block_indices(bool checkDB) {
+    printf("Verifying block indices...\n");
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
     for (uint32_t i = 0; i < indexCount; i++) {
         if (i % 2000 == 0) {
-            printf("checking block index meta %u/%u\n", i, indexCount);
+            printf("verifying block index %u/%u\n", i, indexCount);
         }
         Byte key[SHA256_LENGTH] = {0};
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
@@ -365,12 +382,11 @@ double recalculate_block_index_meta() {
             continue;
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
-        ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        if (checkDB) {
+            ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+        }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
-            if (ptrIndex->context.height > global.maxFullBlockHeight) {
-                global.maxFullBlockHeight = ptrIndex->context.height;
-            }
         }
     }
     FREE(keys, "recalculate_block_indices:keys");

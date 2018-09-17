@@ -51,7 +51,7 @@ static int32_t test_version_messages() {
             .acceptThem = false,
             .acceptUs = false,
         },
-        .relationship = REL_MY_SERVER,
+        .relationship = PEER_RELATIONSHIP_OUR_SERVER,
         .address = {
             .services = 0x9,
             .ip = {0},

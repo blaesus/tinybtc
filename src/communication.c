@@ -33,14 +33,26 @@ void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 int32_t setup_api_socket(void);
 
+bool disable_candidate(PeerCandidate *ptrCandidate) {
+    if (ptrCandidate) {
+        ptrCandidate->status = PEER_CANDIDATE_STATUS_DISABLED;
+        return true;
+    }
+    return false;
+}
+
 void on_handle_close(uv_handle_t *handle) {
     SocketContext *data = (SocketContext *)handle->data;
-    connect_to_random_addr_for_peer(data->peer->index);
+    connect_to_best_candidate_as_peer(data->peer->index);
     FREE(handle->data, "SocketContext");
 }
 
 void replace_peer(Peer *ptrPeer) {
-    printf("Replacing peer %u\n", ptrPeer->index);
+    #if LOG_PEER_REPLACE
+    double now = get_now();
+    double life = (now - ptrPeer->connectionStart) / SECOND_TO_MILLISECOND(1);
+    printf("Replacing peer %u (life %.1fs)\n", ptrPeer->index, life);
+    #endif
     uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
     if (ptrSocket->data) {
         // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
@@ -57,67 +69,118 @@ void replace_peer(Peer *ptrPeer) {
     }
 }
 
-void timeout_peers() {
-    double now = getNow();
+void ping_peer(Peer *ptrPeer) {
+    if (ptrPeer->networking.ping.pingSent && !ptrPeer->networking.ping.pongReceived) {
+        double now = get_now();
+        fprintf(stderr, "ping: unfinished ping before...\n");
+        record_latency(ptrPeer, now - ptrPeer->networking.ping.pingSent);
+    }
+    ptrPeer->networking.ping.nonce = random_uint64();
+    ptrPeer->networking.ping.pongReceived = 0;
+    // networking.ping.pingSent is recorded in on_message_attempted
+    PingpongPayload ptrPayload = {
+        .nonce = ptrPeer->networking.ping.nonce
+    };
+    send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
+}
+
+bool check_peer(Peer *ptrPeer) {
+    double now = get_now();
+
+    // Check handshake
+    double timeSinceConnection = now - ptrPeer->handshake.handshakeStart;
+    bool timeoutForLateHandshake =
+        !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.tolerances.handshake);
+    if (timeoutForLateHandshake) {
+        disable_candidate(ptrPeer->candidacy);
+        printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->index, timeSinceConnection);
+        replace_peer(ptrPeer);
+        return true;
+    }
+
+    // Check ping
+    bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
+    double averageLatency = average_peer_latency(ptrPeer);
+
+    bool timeoutForLatePong = latencyFullyTested && (averageLatency > config.tolerances.latency);
+    if (timeoutForLatePong) {
+        printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
+    }
+    return false;
+}
+
+void check_peer_life(Peer *ptrPeer) {
+    double now = get_now();
+    double life = now - ptrPeer->connectionStart;
+    if (life > config.tolerances.peerLife) {
+        printf(
+            "Timeout peer %u as life exhausted (%.1f > %llu) \n",
+            ptrPeer->index,
+            life,
+            config.tolerances.peerLife
+        );
+        replace_peer(ptrPeer);
+    }
+}
+
+void ping_peers() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = &global.peers[i];
-        bool timeoutForLateHandshake =
-            (now - ptrPeer->connectionStart > PEER_CONNECTION_TIMEOUT_SEC)
-            && !peer_hand_shaken(ptrPeer);
+        if (peer_hand_shaken(ptrPeer)) {
+            ping_peer(ptrPeer);
+        }
+    }
+}
 
-        double ping = ptrPeer->requests.ping.pingSent;
-        double pong = ptrPeer->requests.ping.pongReceived;
-        bool neverReceivedPong = pong == 0;
-        double latency = neverReceivedPong ? now - ping : pong - ping;
-        bool timeoutForLatePong = ping && (latency > config.peerLatencyTolerence);
-
-        if (timeoutForLateHandshake || timeoutForLatePong) {
-            printf(
-                "Timeout peer %u (reason: handshake=%u, pong=%u)",
-                i,
-                timeoutForLateHandshake,
-                timeoutForLatePong
-            );
-            if (timeoutForLatePong) {
-                printf("[latency=%.1fms]\n", latency);
-            }
-            else {
-                printf("\n");
-            }
-            if (timeoutForLateHandshake || neverReceivedPong) {
-                disable_ip(ptrPeer->address.ip);
-            }
-            replace_peer(ptrPeer);
+void check_peers_connectivity() {
+    for (uint32_t i = 0; i < global.peerCount; i++) {
+        Peer *ptrPeer = &global.peers[i];
+        check_peer(ptrPeer);
+        if (config.tolerances.peerLife) {
+            check_peer_life(ptrPeer);
         }
     }
 }
 
 void data_exchange_with_peer(Peer *ptrPeer) {
-    printf("Executing data exchange with peer %u (%s)\n", ptrPeer->index, convert_ipv4_readable(ptrPeer->address.ip));
+    #if LOG_DATA_EXCHANGE
+    printf(
+        "\nExchanging data with peer %u(%s) - block height %u:%u\n",
+        ptrPeer->index,
+        convert_ipv4_readable(ptrPeer->address.ip),
+        global.mainTip.context.height,
+        ptrPeer->chain_height
+    );
+    #endif
     if (ptrPeer->chain_height > global.mainTip.context.height) {
-        printf("They have longer chain (%u < %u)\n", global.mainTip.context.height, ptrPeer->chain_height);
         send_getheaders(&ptrPeer->socket);
     }
-    else if (ptrPeer->chain_height == global.mainTip.context.height) {
-        printf("Chain synced at %u\n", global.mainTip.context.height);
-        if (is_hash_empty(ptrPeer->requests.block)) {
+    // else if (ptrPeer->chain_height == global.mainTip.context.height) {
+    else if (true) {
+        if (is_hash_empty(ptrPeer->networking.requesting)) {
             SHA256_HASH nextMissingBlock = {0};
             int8_t status = get_next_missing_block(nextMissingBlock);
             if (!status) {
-                print_hash_with_description("requesting block: ", nextMissingBlock);
+                #if LOG_DATA_EXCHANGE
+                print_hash_with_description("  requesting block: ", nextMissingBlock);
+                #endif
                 send_getdata_for_block(&ptrPeer->socket, nextMissingBlock);
-                memcpy(ptrPeer->requests.block, nextMissingBlock, SHA256_LENGTH);
+                memcpy(ptrPeer->networking.requesting, nextMissingBlock, SHA256_LENGTH);
             }
             else {
                 printf("Block sync status %i\n", status);
             }
         }
         else {
-            print_hash_with_description("Skipped block request because already requesting ", ptrPeer->requests.block);
+            #if LOG_DATA_EXCHANGE
+            print_hash_with_description(
+                "  skipped block request because already requesting ",
+                ptrPeer->networking.requesting
+            );
+            #endif
         }
     }
     else {
-        printf("We have longer chain (%u > %u) \n", global.mainTip.context.height, ptrPeer->chain_height);
         // Peers has less data
     }
 }
@@ -136,45 +199,28 @@ void exchange_data_with_peers() {
 void print_node_status() {
     printf("\n==== Node status ====\n");
 
-    printf("peers handshake: ");
+    printf("Peers: \n");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (peer_hand_shaken(&global.peers[i])) {
+        Peer *ptrPeer = &global.peers[i];
+        if (peer_hand_shaken(ptrPeer)) {
             validPeers++;
-            printf("O ");
-        }
-        else {
-            printf("X ");
+            if (is_latency_fully_tested(ptrPeer)) {
+                double averageLatency = average_peer_latency(ptrPeer);
+                printf("Peer %02u: %7.1fms\n", ptrPeer->index, averageLatency);
+            }
+            else {
+                printf("Peer %02u:     -\n", ptrPeer->index);
+            }
         }
     }
-    printf(" (%u/%u)\n", validPeers, global.peerCount);
-    printf("%u addresses\n", global.peerAddressCount);
-
+    printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
 
     printf("main chain height %u; max full block %u\n",
-        global.mainTip.context.height, global.maxFullBlockHeight
+        global.mainTip.context.height, max_full_block_height_from_genesis()
     );
     print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
     printf("=====================\n");
-}
-
-void ping_peers() {
-    printf("Pinging peers\n");
-    // TODO: Use at least milliseconds. Seconds are too crude.
-    double now = getNow();
-    for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
-        if (!peer_hand_shaken(ptrPeer)) {
-            continue;
-        }
-        ptrPeer->requests.ping.nonce = random_uint64();
-        ptrPeer->requests.ping.pingSent = now;
-        ptrPeer->requests.ping.pongReceived = 0;
-        PingpongPayload ptrPayload = {
-            .nonce = ptrPeer->requests.ping.nonce
-        };
-        send_message(&ptrPeer->socket, CMD_PING, &ptrPayload);
-    }
 }
 
 void terminate_main_loop(uv_timer_t *handle) {
@@ -188,7 +234,8 @@ void terminate_main_loop(uv_timer_t *handle) {
 }
 
 void resetIBDMode() {
-    if (global.maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
+    uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
+    if (maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
         printf("\nSwitching off IBD mode\n");
         global.ibdMode = false;
     }
@@ -216,10 +263,6 @@ void setup_timers() {
             .callback = &exchange_data_with_peers,
         },
         {
-            .interval = config.periods.ping,
-            .callback = &ping_peers,
-        },
-        {
             .interval = config.periods.saveIndices,
             .callback = &save_chain_data,
         },
@@ -234,7 +277,11 @@ void setup_timers() {
         },
         {
             .interval = config.periods.timeoutPeers,
-            .callback = &timeout_peers,
+            .callback = &check_peers_connectivity,
+        },
+        {
+            .interval = config.periods.ping,
+            .callback = &ping_peers,
         },
         {
             .interval = config.periods.printNodeStatus,
@@ -347,11 +394,25 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         return;
     }
     else {
-        printf("message sent to %s", ipString);
         Message msg = get_empty_message();
         int32_t error = parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
-        if (!error) {
-            print_message_header(msg.header);
+        if (error) {
+            #if LOG_MESSAGE_SENT
+            printf("unknown message sent to %s\n", msg.header.command);
+            #endif
+        }
+        else {
+            #if LOG_MESSAGE_SENT
+            printf("%s message sent to %s\n", msg.header.command, ipString);
+            #endif
+            if (strcmp((char *)msg.header.command, CMD_PING) == 0) {
+                double now = get_now();
+                ptrContext->peer->networking.ping.pingSent = now;
+            }
+            else if (strcmp((char *)msg.header.command, CMD_VERSION) == 0) {
+                double now = get_now();
+                ptrContext->peer->handshake.handshakeStart = now;
+            }
         }
         if (msg.ptrPayload) {
             free_message_payload(&msg);
@@ -449,11 +510,13 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
         print_object((Byte *)uvBuffer.base, uvBuffer.len);
     }
     else {
+        #if LOG_MESSAGE_SENDING
         printf(
             "Sending message %s to peer %s\n",
             message.header.command,
             ipString
         );
+        #endif
     }
     write_buffer_to_socket(&uvBuffer, socket);
     release_resources:
@@ -462,23 +525,32 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 
 void on_handshake_success(Peer *ptrPeer) {
     if (global.ibdMode) {
-        if (ptrPeer->chain_height < global.maxFullBlockHeight) {
+        uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
+        if (ptrPeer->chain_height < maxFullBlockHeight) {
             printf("Switching peer for lack of blocks\n");
             replace_peer(ptrPeer);
             return;
         }
     }
     data_exchange_with_peer(ptrPeer);
-    bool shouldSendGetaddr = global.peerAddressCount < config.getaddrThreshold;
+    bool shouldSendGetaddr = global.peerCandidateCount < config.getaddrThreshold;
     if (shouldSendGetaddr) {
         send_message(&ptrPeer->socket, CMD_GETADDR, NULL);
     }
+    ping_peer(ptrPeer);
+}
+
+bool should_skip_print(char *command) {
+    return strstr(config.silentIncomingMessageCommands, command) != NULL;
 }
 
 void handle_incoming_message(Peer *ptrPeer, Message message) {
-    print_message(&message);
-    double now = getNow();
-    set_addr_timestamp(ptrPeer->address.ip, (uint32_t)round(now / SECOND_TO_MILLISECOND(1)));
+    if (!should_skip_print((char *)message.header.command)) {
+        print_message(&message);
+    }
+    double now = get_now();
+    uint32_t timestamp = (uint32_t) round(now / SECOND_TO_MILLISECOND(1));
+    ptrPeer->candidacy->addr.timestamp = timestamp;
 
     char *command = (char *)message.header.command;
 
@@ -488,12 +560,17 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
             ptrPeer->handshake.acceptThem = true;
         }
         ptrPeer->chain_height = ptrPayloadTyped->start_height;
-        set_addr_services(ptrPeer->address.ip, ptrPayloadTyped->services);
+        ptrPeer->candidacy->addr.net_addr.services = ptrPayloadTyped->services;
+        if (peer_hand_shaken(ptrPeer)) {
+            on_handshake_success(ptrPeer);
+        }
     }
     else if (strcmp(command, CMD_VERACK) == 0) {
         ptrPeer->handshake.acceptUs = true;
         send_message(&ptrPeer->socket, CMD_VERACK, NULL);
-        on_handshake_success(ptrPeer);
+        if (peer_hand_shaken(ptrPeer)) {
+            on_handshake_success(ptrPeer);
+        }
     }
     else if (strcmp(command, CMD_ADDR) == 0) {
         AddrPayload *ptrPayload = message.ptrPayload;
@@ -502,25 +579,34 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
             struct AddrRecord *record = &ptrPayload->addr_list[i];
             if (is_ipv4(record->net_addr.ip)) {
                 uint32_t timestampForRecord = record->timestamp - HOUR_TO_SECOND(2);
-                add_peer_address(record->net_addr, timestampForRecord);
+                add_address_as_candidate(record->net_addr, timestampForRecord);
             }
             else {
                 skipped++;
             }
         }
-        printf("Skipped %llu IPs\n", skipped);
     }
     else if (strcmp(command, CMD_PING) == 0) {
         send_message(&ptrPeer->socket, CMD_PONG, message.ptrPayload);
     }
     else if (strcmp(command, CMD_PONG) == 0) {
         PingpongPayload *ptrPayload = message.ptrPayload;
-        if (ptrPayload->nonce == ptrPeer->requests.ping.nonce) {
-            ptrPeer->requests.ping.pongReceived = now;
+        if (ptrPayload->nonce == ptrPeer->networking.ping.nonce) {
+            ptrPeer->networking.ping.pongReceived = now;
+            double ping = ptrPeer->networking.ping.pingSent;
+            double latency = now - ping;
+            record_latency(ptrPeer, latency);
+            bool latencyFullyTested = is_latency_fully_tested(ptrPeer);
+            if (latencyFullyTested) {
+                double averageLatency = average_peer_latency(ptrPeer);
+                ptrPeer->candidacy->averageLatency = averageLatency;
+            }
         }
         else {
-            printf("Unexpected pong nonce: received %llu, expecting %llu\n",
-                ptrPayload->nonce, ptrPeer->requests.ping.nonce);
+            printf(
+                "Unexpected pong nonce: received %llu, expecting %llu\n",
+                ptrPayload->nonce, ptrPeer->networking.ping.nonce
+            );
         }
     }
     else if (strcmp(command, CMD_HEADERS) == 0) {
@@ -536,7 +622,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     else if (strcmp(command, CMD_BLOCK) == 0) {
         BlockPayload *ptrBlock = message.ptrPayload;
         process_incoming_block(ptrBlock);
-        memset(ptrPeer->requests.block, 0, SHA256_LENGTH);
+        memset(ptrPeer->networking.requesting, 0, SHA256_LENGTH);
     }
     else if (strcmp(command, CMD_INV) == 0) {
         // send_message(ptrPeer->connection, CMD_GETDATA, message.ptrPayload);
@@ -574,11 +660,13 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
         Header header = get_empty_header();
         parse_message_header(ptrCache->buffer, &header);
         uint64_t messageSize = sizeof(Header) + header.length;
+        #if LOG_MESSAGE_LOADING
         printf("Message loading from %s: (%llu/%llu)\n",
-            convert_ipv4_readable(ptrPeer->address.ip),
-            ptrCache->bufferIndex,
-            messageSize
-        );
+                   convert_ipv4_readable(ptrPeer->address.ip),
+                   ptrCache->bufferIndex,
+                   messageSize
+            );
+        #endif
         if (ptrCache->bufferIndex >= messageSize) {
             Message message = get_empty_message();
             if (!checksum_match(ptrCache->buffer)) {
@@ -588,7 +676,6 @@ void extract_message_from_stream_buffer(MessageCache *ptrCache, Peer *ptrPeer) {
             else {
                 int32_t error = parse_buffer_into_message(ptrCache->buffer, &message);
                 if (error) {
-                    printf("Cannot parse message (%u)\n", error);
                     free_message_payload(&message);
                 }
                 else {
@@ -617,6 +704,7 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
         return;
     }
     SocketContext *ptrContext = (SocketContext *)socket->data;
+    ptrContext->peer->networking.lastHeard = get_now();
     MessageCache *ptrCache = &(ptrContext->streamCache);
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
@@ -643,8 +731,8 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
             uv_strerror(error),
             error
         );
-        if (ptrContext->peer->relationship == REL_MY_SERVER) {
-            disable_ip(ptrContext->peer->address.ip);
+        if (ptrContext->peer->relationship == PEER_RELATIONSHIP_OUR_SERVER) {
+            disable_candidate(ptrContext->peer->candidacy);
             replace_peer(ptrContext->peer);
         }
     }
@@ -661,19 +749,23 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     FREE(ptrContext, "initialize_peer:ConnectContext");
 }
 
-int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
+int32_t initialize_peer(uint32_t peerIndex, PeerCandidate *ptrCandidate)  {
+    NetworkAddress *netAddr = &ptrCandidate->addr.net_addr;
     printf(
         "Initializing peer %u with IP %s \n",
         peerIndex,
-        convert_ipv4_readable(addr.ip)
+        convert_ipv4_readable(netAddr->ip)
     );
 
     Peer *ptrPeer = &global.peers[peerIndex];
 
     reset_peer(ptrPeer);
+    double now = get_now();
     ptrPeer->index = peerIndex;
-    ptrPeer->connectionStart = time(NULL);
-    memcpy(ptrPeer->address.ip, addr.ip, sizeof(IP));
+    ptrPeer->connectionStart = now;
+    ptrPeer->handshake.handshakeStart = now; // to be updated in on_message_attempted
+    memcpy(ptrPeer->address.ip, netAddr->ip, sizeof(IP));
+    ptrPeer->candidacy = ptrCandidate;
 
     // Connection request
     struct ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "initialize_peer:ConnectContext");
@@ -686,7 +778,7 @@ int32_t initialize_peer(uint32_t peerIndex, NetworkAddress addr)  {
 
     // Connection request
     struct sockaddr_in remoteAddress;
-    uv_ip4_addr(convert_ipv4_readable(addr.ip), htons(addr.port), &remoteAddress);
+    uv_ip4_addr(convert_ipv4_readable(netAddr->ip), htons(netAddr->port), &remoteAddress);
     uv_tcp_connect(
         ptrConnectRequest,
         &ptrPeer->socket,
@@ -752,29 +844,85 @@ int32_t setup_api_socket() {
     return 0;
 }
 
-static NetworkAddress pick_random_addr() {
-    uint32_t index = random_range(0, global.peerAddressCount - 1);
-    return global.peerAddresses[index].net_addr;
+static PeerCandidate *pick_random_addr() {
+    uint32_t index = random_range(0, global.peerCandidateCount - 1);
+    return &global.peerCandidates[index];
 }
 
-static NetworkAddress pick_random_nonpeer_addr() {
-    NetworkAddress addr;
+static PeerCandidate *pick_random_nonpeer_candidate() {
+    PeerCandidate *ptrCandidate;
     do {
-        addr = pick_random_addr();
-    } while (is_peer(addr.ip));
-    return addr;
+        ptrCandidate = pick_random_addr();
+    } while (is_peer(ptrCandidate));
+    return ptrCandidate;
 }
 
-void connect_to_random_addr_for_peer(uint32_t peerIndex) {
-    NetworkAddress addr = pick_random_nonpeer_addr();
-    initialize_peer(peerIndex, addr);
+static double rate_candidate(PeerCandidate *ptrCandidate) {
+    double now = get_now();
+
+    double statusScore;
+    if (ptrCandidate->status == PEER_CANDIDATE_STATUS_DISABLED) {
+        statusScore = -10;
+    }
+    else {
+        statusScore = 0;
+    }
+    double timestampScore = 0;
+    double deltaT = now - SECOND_TO_MILLISECOND(ptrCandidate->addr.timestamp * 1.0);
+    // Prefer recent candidates, but not those connected in last 24 hours
+    if (deltaT > DAY_TO_MILLISECOND(7)) {
+        timestampScore = 0.8;
+    }
+    else if (deltaT > DAY_TO_MILLISECOND(1)) {
+        timestampScore = 1.0;
+    }
+    else {
+        timestampScore = 0.5;
+    }
+
+    double latencyScore = 0;
+    if (ptrCandidate->averageLatency) {
+        latencyScore = config.tolerances.latency / ptrCandidate->averageLatency;
+    }
+    else {
+        latencyScore = 1;
+    }
+    double shuffleScore = random_betwen_0_1() * 2;
+    double score = statusScore + timestampScore + latencyScore + shuffleScore;
+    return score;
+}
+
+static PeerCandidate *pick_best_nonpeer_candidate(double *finalScore) {
+    PeerCandidate *ptrBestCandidate = &global.peerCandidates[0];
+    double bestScore = rate_candidate(ptrBestCandidate);
+    for (uint32_t i = 0; i < global.peerCandidateCount; i++) {
+        PeerCandidate *ptrCandidate = &global.peerCandidates[i];
+        if (is_peer(ptrCandidate)) {
+            continue;
+        }
+        double score = rate_candidate(ptrCandidate);
+        if (score > bestScore) {
+            ptrBestCandidate = ptrCandidate;
+            bestScore = score;
+        }
+    }
+    if (finalScore) {
+        *finalScore = bestScore;
+    }
+    return ptrBestCandidate;
+}
+
+void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
+    double score = 0;
+    PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate(&score);
+    initialize_peer(peerIndex, ptrCandidate);
 }
 
 int32_t connect_to_initial_peers() {
     uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
-    uint32_t outgoing = min(outgoingConfig, global.peerAddressCount);
+    uint32_t outgoing = min(outgoingConfig, global.peerCandidateCount);
     for (uint32_t i = 0; i < outgoing; i++) {
-        connect_to_random_addr_for_peer(i);
+        connect_to_best_candidate_as_peer(i);
         global.peerCount += 1;
     }
     return 0;
