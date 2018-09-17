@@ -347,11 +347,13 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         return;
     }
     else {
-        printf("message sent to %s", ipString);
         Message msg = get_empty_message();
         int32_t error = parse_buffer_into_message((Byte *)ptrContext->buf.base, &msg);
-        if (!error) {
-            print_message_header(msg.header);
+        if (error) {
+            printf("unknown message sent to %s\n", msg.header.command);
+        }
+        else {
+            printf("%s message sent to %s\n", msg.header.command, ipString);
         }
         if (msg.ptrPayload) {
             free_message_payload(&msg);
