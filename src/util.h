@@ -2,9 +2,9 @@
 #include <stdint.h>
 #include "datatypes.h"
 
-#define TRACE_MEMORY_USE
+#define TRACE_MEMORY_USE true
 
-#ifdef TRACE_MEMORY_USE
+#if TRACE_MEMORY_USE
 #define CALLOC(count, size, label) (calloc_audited(count, size, label))
 #define MALLOC(size, label) (malloc_audited(size, label))
 #define FREE(ptr, label) (free_audited(ptr, label))
