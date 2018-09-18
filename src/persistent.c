@@ -15,6 +15,15 @@
 
 #define BLOCK_INDICES_FILENAME "block_indices.dat"
 
+#define PREFIXED_HASH_KEY_LENGTH (SHA256_HEXSTR_LENGTH + 1)
+
+enum Prefix {
+    BLOCK_PREFIX = 'L',
+    TX_PREFIX = 'T',
+};
+
+typedef enum Prefix Prefix;
+
 static bool file_exist(char *filename) {
     struct stat buffer;
     return stat(filename, &buffer) == 0;
@@ -151,10 +160,11 @@ int32_t load_block_indices(void) {
     return 0;
 }
 
-int8_t save_data_by_hash(Byte *hash, Byte *value, uint64_t valueLength) {
-    uint32_t keyLength = SHA256_HEXSTR_LENGTH;
-    char key[SHA256_HEXSTR_LENGTH] = {0};
-    hash_binary_to_hex(hash, key);
+int8_t save_data_by_hash(Byte *hash, Prefix prefix, Byte *value, uint64_t valueLength) {
+    uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
+    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
+    key[0] = prefix;
+    hash_binary_to_hex(hash, key+1);
     char *error = NULL;
     leveldb_writeoptions_t *writeOptions = leveldb_writeoptions_create();
     leveldb_put(
@@ -173,10 +183,11 @@ int8_t save_data_by_hash(Byte *hash, Byte *value, uint64_t valueLength) {
     return 0;
 }
 
-int8_t load_data_by_hash(Byte *hash, Byte *output) {
-    const uint32_t keyLength = SHA256_HEXSTR_LENGTH;
-    char key[SHA256_HEXSTR_LENGTH] = {0};
-    hash_binary_to_hex(hash, key);
+int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
+    const uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
+    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
+    key[0] = prefix;
+    hash_binary_to_hex(hash, key+1);
 
     size_t read_len;
     char *error;
@@ -199,42 +210,24 @@ int8_t load_data_by_hash(Byte *hash, Byte *output) {
     return 0;
 }
 
-bool check_existence_by_hash(Byte *hash) {
-    uint32_t keyLength = SHA256_HEXSTR_LENGTH;
-    char key[SHA256_HEXSTR_LENGTH] = {0};
-    hash_binary_to_hex(hash, key);
-
-    size_t read_len;
-    char *error;
-    leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
-    leveldb_get(
-        global.db, readOptions,
-        (char*)key, keyLength,
-        &read_len,
-        &error
-    );
-
-    if (error != NULL) {
-        return false;
-    }
-    leveldb_free(error);
-    leveldb_free(readOptions);
-    return read_len > 0;
-}
-
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_block:buffer");
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
-    save_data_by_hash(hash, buffer, width);
+    reverse_endian(hash, SHA256_LENGTH);
+    save_data_by_hash(hash, BLOCK_PREFIX, buffer, width);
     FREE(buffer, "save_block:buffer");
     return 0;
 }
 
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
+    SHA256_HASH key = {0};
+    memcpy(key, hash, SHA256_LENGTH);
+    reverse_endian(key, SHA256_LENGTH);
+
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
-    load_data_by_hash(hash, buffer);
+    load_data_by_hash(key, BLOCK_PREFIX, buffer);
     parse_into_block_payload(buffer, ptrBlock);
     FREE(buffer, "load_block:buffer");
     return 0;
@@ -245,7 +238,7 @@ int8_t save_tx(TxPayload *ptrTx) {
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
     SHA256_HASH hash = {0};
     dsha256(buffer, (uint32_t)width, hash);
-    save_data_by_hash(hash, buffer, width);
+    save_data_by_hash(hash, TX_PREFIX, buffer, width);
     FREE(buffer, "save_tx:buffer");
     return 0;
 }
@@ -253,14 +246,36 @@ int8_t save_tx(TxPayload *ptrTx) {
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
 
-    load_data_by_hash(hash, buffer);
+    load_data_by_hash(hash, TX_PREFIX, buffer);
     parse_into_tx_payload(buffer, ptrPayload);
     FREE(buffer, "load_tx:buffer");
     return 0;
 }
 
-bool check_block_existence(Byte *hash) {
-    return check_existence_by_hash(hash);
+uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]) {
+    uint64_t count = 0;
+    leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
+    leveldb_iterator_t *iter = leveldb_create_iterator(global.db, readOptions);
+    for (leveldb_iter_seek_to_first(iter); leveldb_iter_valid(iter); leveldb_iter_next(iter)) {
+        size_t keyLength;
+        const char *ptrKey = leveldb_iter_key(iter, &keyLength);
+        if (keyLength != PREFIXED_HASH_KEY_LENGTH) {
+            fprintf(stderr, "Unexpected key length %lu\n", keyLength);
+            continue;
+        }
+        char prefix = ptrKey[0];
+        if (prefix != BLOCK_PREFIX) {
+            continue;
+        }
+        SHA256_HASH hash = {0};
+        sha256_hex_to_binary(ptrKey+1, hash);
+        reverse_endian(hash, SHA256_LENGTH);
+        memcpy(hashes[count], hash, sizeof(hash));
+        count++;
+    }
+    leveldb_free(readOptions);
+    leveldb_free(iter);
+    return count;
 }
 
 

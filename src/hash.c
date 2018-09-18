@@ -65,7 +65,7 @@ void sharipe(void *data, uint32_t length, SHA256_HASH result) {
     RIPEMD160_Final(result, &context);
 }
 
-void sha256_hex_to_binary(char *str, Byte *hash) {
+void sha256_hex_to_binary(const char *str, Byte *hash) {
     char byteString[3] = {0};
     for (uint16_t i = 0; i < SHA256_LENGTH; i++) {
         memcpy(byteString, str + 2*i, 2);
