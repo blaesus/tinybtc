@@ -213,10 +213,12 @@ void print_node_status() {
     }
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
 
-    printf("main chain height %u; max full block %u\n",
-        global.mainHeaderTip.context.height, max_full_block_height_from_genesis()
-    );
-    print_hash_with_description("main chain tip at ", global.mainHeaderTip.meta.hash);
+    printf("Header tip at height %u", global.mainHeaderTip.context.height);
+    print_sha256_reverse(global.mainHeaderTip.meta.hash);
+    printf("\n");
+    printf("Validated tip at height %u", global.mainValidatedTip.context.height);
+    print_sha256_reverse(global.mainValidatedTip.meta.hash);
+    printf("\n");
     printf("=====================\n");
 }
 

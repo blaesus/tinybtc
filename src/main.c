@@ -53,6 +53,7 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
+    load_genesis();
     double blockAvailability = verify_block_indices(config.deepReindexBlocks);
     if (blockAvailability < config.ibdModeAvailabilityThreshold) {
         global.ibdMode = true;
