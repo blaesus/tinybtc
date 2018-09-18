@@ -253,7 +253,7 @@ int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     return status;
 }
 
-uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]) {
+uint64_t get_binary_keys_by_prefix(SHA256_HASH hashes[], Prefix desiredPrefix) {
     uint64_t count = 0;
     leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
     leveldb_iterator_t *iter = leveldb_create_iterator(global.db, readOptions);
@@ -264,8 +264,8 @@ uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]) {
             fprintf(stderr, "Unexpected key length %lu\n", keyLength);
             continue;
         }
-        char prefix = ptrKey[0];
-        if (prefix != BLOCK_PREFIX) {
+        Prefix prefix = ptrKey[0];
+        if (prefix != desiredPrefix) {
             continue;
         }
         SHA256_HASH hash = {0};
@@ -279,6 +279,9 @@ uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]) {
     return count;
 }
 
+uint64_t get_hash_keys_of_blocks(SHA256_HASH *hashes) {
+    return get_binary_keys_by_prefix(hashes, BLOCK_PREFIX);
+}
 
 void save_chain_data() {
     printf("Saving chain data...\n");
