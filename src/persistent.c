@@ -191,8 +191,8 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
     key[0] = prefix;
     hash_binary_to_hex(hash, key+1);
 
-    size_t read_len;
-    char *error;
+    size_t read_len = 0;
+    char *error = NULL;
     leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
     char *read = leveldb_get(
         global.db, readOptions,
