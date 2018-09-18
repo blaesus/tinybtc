@@ -177,7 +177,7 @@ void exchange_data_with_peers() {
         if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
-        if (ptrPeer->chain_height > global.mainTip.context.height) {
+        if (ptrPeer->chain_height > global.mainHeaderTip.context.height) {
             send_getheaders(&ptrPeer->socket);
         }
         Byte *blockToRequest = NULL;
@@ -214,9 +214,9 @@ void print_node_status() {
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
 
     printf("main chain height %u; max full block %u\n",
-        global.mainTip.context.height, max_full_block_height_from_genesis()
+        global.mainHeaderTip.context.height, max_full_block_height_from_genesis()
     );
-    print_hash_with_description("main chain tip at ", global.mainTip.meta.hash);
+    print_hash_with_description("main chain tip at ", global.mainHeaderTip.meta.hash);
     printf("=====================\n");
 }
 
@@ -232,7 +232,7 @@ void terminate_main_loop(uv_timer_t *handle) {
 
 void resetIBDMode() {
     uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
-    if (maxFullBlockHeight * 1.0 / global.mainTip.context.height > config.ibdModeAvailabilityThreshold) {
+    if (maxFullBlockHeight * 1.0 / global.mainHeaderTip.context.height > config.ibdModeAvailabilityThreshold) {
         printf("\nSwitching off IBD mode\n");
         global.ibdMode = false;
     }
@@ -321,7 +321,7 @@ void send_getheaders(uv_tcp_t *socket) {
         .hashCount = hashCount,
         .hashStop = {0}
     };
-    memcpy(&payload.blockLocatorHash[0], global.mainTip.meta.hash, SHA256_LENGTH);
+    memcpy(&payload.blockLocatorHash[0], global.mainHeaderTip.meta.hash, SHA256_LENGTH);
 
     send_message(socket, CMD_GETHEADERS, &payload);
 }

@@ -22,7 +22,7 @@ uint64_t serialize_version_payload(
     p += serialize_network_address(&ptrPayload->addr_from, p);
     p += SERIALIZE_TO(ptrPayload->nonce, p);
     p += serialize_varstr(&ptrPayload->user_agent, p);
-    p += SERIALIZE_TO(global.mainTip.context.height, p);
+    p += SERIALIZE_TO(global.mainHeaderTip.context.height, p);
     p += SERIALIZE_TO(ptrPayload->relay, p);
     return p - ptrBuffer;
 }
@@ -44,7 +44,7 @@ uint32_t make_version_payload(
     ptrPayload->addr_from = global.myAddress;
     ptrPayload->nonce = nonce;
     ptrPayload->user_agent.length = userAgentDataLength;
-    ptrPayload->start_height = global.mainTip.context.height;
+    ptrPayload->start_height = global.mainHeaderTip.context.height;
     strcpy((char *)ptrPayload->user_agent.string, (char *)config.userAgent);
     ptrPayload->relay = true;
 

@@ -41,7 +41,7 @@ struct GlobalState {
     void *zombieSockets[MAX_ZOMBIE_SOCKETS];
     uint32_t zombineSocketCount;
 
-    BlockIndex mainTip;
+    BlockIndex mainHeaderTip;
 };
 
 typedef struct GlobalState GlobalState;

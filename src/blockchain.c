@@ -189,7 +189,7 @@ int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
         }
 
         if (index.context.chainStatus == CHAIN_STATUS_SIDECHAIN) {
-            if (global.mainTip.context.chainPOW < index.context.chainPOW) {
+            if (global.mainHeaderTip.context.chainPOW < index.context.chainPOW) {
                 printf("Side chain overtaking main chain: should reorg...\n");
             }
             // TODO: Handle reorg
@@ -216,10 +216,10 @@ int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
     }
 
     bool isNewTip = index.context.chainStatus == CHAIN_STATUS_MAINCHAIN
-                    && index.context.chainPOW > global.mainTip.context.chainPOW;
+                    && index.context.chainPOW > global.mainHeaderTip.context.chainPOW;
     if (isNewTip) {
         print_hash_with_description("Updating tip to ", index.meta.hash);
-        memcpy(&global.mainTip, &index, sizeof(index));
+        memcpy(&global.mainHeaderTip, &index, sizeof(index));
     }
 
     int8_t setError = SET_BLOCK_INDEX(hash, index);

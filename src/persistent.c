@@ -116,7 +116,7 @@ int8_t init_db() {
 
 int32_t save_block_indices(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
-    fwrite(&global.mainTip, sizeof(global.mainTip), 1, file);
+    fwrite(&global.mainHeaderTip, sizeof(global.mainHeaderTip), 1, file);
 
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
@@ -147,7 +147,7 @@ int32_t load_block_indices(void) {
         return -1;
     }
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "rb");
-    fread(&global.mainTip, sizeof(global.mainTip), 1, file);
+    fread(&global.mainHeaderTip, sizeof(global.mainHeaderTip), 1, file);
     uint32_t headersCount = 0;
     fread(&headersCount, sizeof(headersCount), 1, file);
     for (uint32_t i = 0; i < headersCount; i++) {
