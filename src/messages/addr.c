@@ -10,19 +10,12 @@ void parse_addr_payload(
     AddrPayload *ptrPayload
 ) {
     Byte *p = ptrBuffer;
-    uint8_t countWidth = parse_varint(ptrBuffer, &ptrPayload->count);
-    p += countWidth;
+    p += parse_varint(ptrBuffer, &ptrPayload->count);
 
     for (uint64_t i = 0; i < ptrPayload->count; i++) {
         AddrRecord *record = &ptrPayload->addr_list[i];
-
-        memcpy(&record->timestamp, p, sizeof(uint32_t));
-        p += sizeof(uint32_t);
-        uint64_t networkAddressWidth = parse_network_address(
-            p,
-            &record->net_addr
-        );
-        p += networkAddressWidth;
+        p += PARSE_INTO(p, &record->timestamp);
+        p += parse_network_address(p, &record->net_addr);
     }
 }
 

@@ -34,17 +34,14 @@ static uint64_t parse_iv_payload(
     Byte *ptrBuffer,
     GenericIVPayload *ptrPayload
 ) {
+    Byte *p = ptrBuffer;
     uint64_t count = 0;
-    uint8_t countWidth = parse_varint(ptrBuffer, &count);
+    p += parse_varint(p, &count);
     ptrPayload->count = count;
     for (uint64_t index = 0; index < count; index++) {
-        memcpy(
-            &ptrPayload->inventory[index],
-            ptrBuffer + countWidth + index * sizeof(InventoryVector),
-            sizeof(InventoryVector)
-        );
+        p += PARSE_INTO(p, &ptrPayload->inventory[index]);
     }
-    return countWidth + count * sizeof(InventoryVector);
+    return p - ptrBuffer;
 }
 
 static uint64_t serialize_iv_payload(
@@ -52,15 +49,11 @@ static uint64_t serialize_iv_payload(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-    uint64_t countWidth = serialize_to_varint(ptrPayload->count, p);
-    p += countWidth;
-
+    p += serialize_to_varint(ptrPayload->count, p);
     for (uint64_t i = 0; i < ptrPayload->count; i++) {
         InventoryVector iv = ptrPayload->inventory[i];
-        memcpy(p, &iv.type, sizeof(iv.type));
-        p += sizeof(iv.type);
-        memcpy(p, &iv.hash, sizeof(iv.hash));
-        p += sizeof(iv.hash);
+        p += SERIALIZE_TO(iv.type, p);
+        p += SERIALIZE_TO(iv.hash, p);
     }
     return p - ptrBuffer;
 }
@@ -69,13 +62,10 @@ uint64_t serialize_iv_message(
     Message *ptrMessage,
     uint8_t *ptrBuffer
 ) {
-    uint64_t messageHeaderSize = sizeof(ptrMessage->header);
-    memcpy(ptrBuffer, ptrMessage, messageHeaderSize);
-    serialize_iv_payload(
-        (GenericIVPayload *)ptrMessage->ptrPayload,
-        ptrBuffer+messageHeaderSize
-    );
-    return messageHeaderSize + ptrMessage->header.length;
+    Byte *p = ptrBuffer;
+    p += SERIALIZE_TO(ptrMessage->header, p);
+    p += serialize_iv_payload((GenericIVPayload *)ptrMessage->ptrPayload, p);
+    return p - ptrBuffer;
 }
 
 int32_t parse_into_iv_message(
