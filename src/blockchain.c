@@ -78,8 +78,6 @@ bool is_normal_tx_valid(TxPayload *tx) {
             fprintf(stderr, "Cannot load source tx\n");
             return false;
         }
-        printf("source:\n");
-        print_tx_payload(txSource);
         if (txSource->txOutputCount < input->previous_output.index + 1) {
             fprintf(
                 stderr,
@@ -355,24 +353,26 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (is_block_valid(ptrBlock, index)) {
-        index->meta.fullBlockValidated = true;
-        bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
-        bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
-        bool shouldMoveTip = onMainchain && morePOW;
-        if (shouldMoveTip) {
-            global.mainValidatedTip = *index;
-            print_hash_with_description(
-                "Valid incoming block: move validated tip to ", index->meta.hash
-            );
+    if (!global.ibdMode) {
+        if (is_block_valid(ptrBlock, index)) {
+            index->meta.fullBlockValidated = true;
+            bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
+            bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
+            bool shouldMoveTip = onMainchain && morePOW;
+            if (shouldMoveTip) {
+                global.mainValidatedTip = *index;
+                print_hash_with_description(
+                    "Valid incoming block: move validated tip to ", index->meta.hash
+                );
+            }
+            else {
+                printf("Valid incoming block: not moving tip\n");
+            }
         }
         else {
-            printf("Valid incoming block: not moving tip\n");
+            index->meta.fullBlockValidated = false;
+            fprintf(stderr, "Block invalid\n");
         }
-    }
-    else {
-        index->meta.fullBlockValidated = false;
-        fprintf(stderr, "Block invalid\n");
     }
 
     printf("handle incoming block: %.1fms\n", get_now() - start);

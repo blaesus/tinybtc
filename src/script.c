@@ -378,7 +378,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_CHECKSIG: {
                     // Decude public key
                     if (runtimeStack.height < 2) {
-                        fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
+                        fprintf(stderr, "OP_CHECKSIG: insufficient frame[tx]version=1; 1 TxIns; 2 TxOutss\n");
                         goto immediate_fail;
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
