@@ -76,7 +76,6 @@ bool is_normal_tx_valid(TxPayload *tx) {
         int8_t error = load_tx(input->previous_output.hash, txSource);
         if (error) {
             fprintf(stderr, "Cannot load source tx\n");
-            print_object(input->previous_output.hash, SHA256_LENGTH);
             return false;
         }
         printf("source:\n");
@@ -355,18 +354,23 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (is_block_valid(ptrBlock, index)) {
-        bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
-        bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
-        index->meta.fullBlockValidated = true;
-        if (onMainchain && morePOW) {
-            global.mainValidatedTip = *index;
-            print_hash_with_description("Move validated tip to ", index->meta.hash);
+    if (!global.ibdMode) {
+        if (is_block_valid(ptrBlock, index)) {
+            index->meta.fullBlockValidated = true;
+            bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
+            bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
+            if (onMainchain && morePOW) {
+                global.mainValidatedTip = *index;
+                print_hash_with_description(
+                    "Valid incoming block: move validated tip to ", index->meta.hash
+                );
+            }
         }
-    }
-    else {
-        fprintf(stderr, "Block invalid\n");
-        return -2;
+        else {
+            index->meta.fullBlockValidated = false;
+            fprintf(stderr, "Block invalid\n");
+            return -2;
+        }
     }
 
     // Persistence
