@@ -38,7 +38,7 @@ struct GlobalState {
     BlockPayload genesisBlock;
     SHA256_HASH genesisHash;
 
-    void *zombieSockets[];
+    void *zombieSockets[MAX_ZOMBIE_SOCKETS];
     uint32_t zombineSocketCount;
 
     BlockIndex mainTip;
