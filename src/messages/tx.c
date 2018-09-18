@@ -261,7 +261,7 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
 
 void print_tx_payload(TxPayload *ptrTx) {
     printf(
-        "[tx]version=%u; %llu TxIns; %llu TxOuts.",
+        "[tx]version=%u; %llu TxIns; %llu TxOuts.\n",
         ptrTx->version,
         ptrTx->txInputCount,
         ptrTx->txOutputCount
