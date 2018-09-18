@@ -197,8 +197,7 @@ int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
     }
     else {
         // We don't know new block's parent
-        memcpy(global.orphans[global.orphanCount], hash, SHA256_LENGTH);
-        global.orphanCount++;
+        memcpy(global.orphans[global.orphanCount++], hash, SHA256_LENGTH);
         index.context.chainPOW = calc_block_pow(index.header.target);
     }
 
@@ -421,12 +420,15 @@ double verify_block_indices(bool checkDB) {
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
         }
+        if (ptrIndex->context.chainStatus == CHAIN_STATUS_ORPHAN) {
+            memcpy(global.orphans[global.orphanCount++], ptrIndex->meta.hash, SHA256_LENGTH);
+        }
     }
     FREE(keys, "recalculate_block_indices:keys");
     if (blockHashes) {
         FREE(blockHashes, "verify_block_indices:blockHashes");
     }
-    printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
+    printf("%u block indices; %u full blocks available; %u orphans\n", indexCount, fullBlockAvailable, global.orphanCount);
     printf("Done.\n");
     return fullBlockAvailable * 1.0 / indexCount;
 }
