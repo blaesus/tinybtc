@@ -14,3 +14,4 @@ int8_t save_tx(TxPayload *ptrTx);
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload);
 void load_genesis();
 uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]);
+void migrate();

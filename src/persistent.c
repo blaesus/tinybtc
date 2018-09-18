@@ -191,23 +191,26 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
     key[0] = prefix;
     hash_binary_to_hex(hash, key+1);
 
-    size_t read_len = 0;
+    size_t readLength = 0;
     char *error = NULL;
     leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
     char *read = leveldb_get(
         global.db, readOptions,
         key, keyLength,
-        &read_len,
+        &readLength,
         &error
     );
+    leveldb_free(readOptions);
 
-    if (error != NULL) {
+    if (read == NULL) {
+        printf("leveldb: key not found %s\n", key);
+    }
+    else if (error != NULL) {
+        leveldb_free(error);
         fprintf(stderr, "leveldb: Read fail on key %s\n", key);
         return -1;
     }
-    leveldb_free(error);
-    leveldb_free(readOptions);
-    memcpy(output, read, read_len);
+    memcpy(output, read, readLength);
     return 0;
 }
 
@@ -270,7 +273,9 @@ uint64_t get_binary_keys_by_prefix(SHA256_HASH hashes[], Prefix desiredPrefix) {
         }
         SHA256_HASH hash = {0};
         sha256_hex_to_binary(ptrKey+1, hash);
-        reverse_endian(hash, SHA256_LENGTH);
+        if (desiredPrefix == BLOCK_PREFIX) {
+            reverse_endian(hash, SHA256_LENGTH);
+        }
         memcpy(hashes[count], hash, sizeof(hash));
         count++;
     }
@@ -301,3 +306,16 @@ void load_genesis() {
     printf("Done.\n");
 }
 
+void migrate() {
+    init_db();
+    SHA256_HASH *hashes = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "migrate:hashes");
+    uint64_t count = get_binary_keys_by_prefix(hashes, BLOCK_PREFIX);
+    printf("count = %llu", count);
+    for (uint64_t i = 0; i < count; i++) {
+        Byte *hash = hashes[i];
+        TxPayload tx;
+        load_tx(hash, &tx);
+        print_tx_payload(&tx);
+        printf("\n");
+    }
+}
