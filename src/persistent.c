@@ -204,6 +204,7 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
 
     if (read == NULL) {
         printf("leveldb: key not found %s\n", key);
+        return -1;
     }
     else if (error != NULL) {
         leveldb_free(error);
