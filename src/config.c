@@ -31,5 +31,5 @@ const struct Config config = {
     .ibdPeerMaxBlockDifference = 100,
     .apiPort = 9494,
     .silentIncomingMessageCommands = "inv,pong,ping,addr",
-    .deepReindexBlocks = false,
+    .deepReindexBlocks = true,
 };
