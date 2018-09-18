@@ -42,6 +42,7 @@ struct GlobalState {
     uint32_t zombineSocketCount;
 
     BlockIndex mainHeaderTip;
+    BlockIndex mainValidatedTip;
 };
 
 typedef struct GlobalState GlobalState;
