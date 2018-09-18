@@ -354,6 +354,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     if (is_block_valid(ptrBlock, index)) {
         bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
         bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
+        index->meta.fullBlockValidated = true;
         if (onMainchain && morePOW) {
             global.mainValidatedTip = *index;
             print_hash_with_description("Move validated tip to ", index->meta.hash);
