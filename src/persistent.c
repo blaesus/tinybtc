@@ -202,8 +202,7 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
     );
 
     if (error != NULL) {
-        fprintf(stderr, "Read fail: %s\n", error);
-        print_object(error, 5);
+        fprintf(stderr, "leveldb: Read fail on key %s\n", key);
         return -1;
     }
     leveldb_free(error);
