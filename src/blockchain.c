@@ -218,7 +218,7 @@ int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader) {
     bool isNewTip = index.context.chainStatus == CHAIN_STATUS_MAINCHAIN
                     && index.context.chainPOW > global.mainHeaderTip.context.chainPOW;
     if (isNewTip) {
-        print_hash_with_description("Updating tip to ", index.meta.hash);
+        print_hash_with_description("Updating header tip to ", index.meta.hash);
         memcpy(&global.mainHeaderTip, &index, sizeof(index));
     }
 
@@ -350,6 +350,21 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         fprintf(stderr, "process_incoming_block: cannot find block index\n");
         return -30;
     }
+
+    if (is_block_valid(ptrBlock, index)) {
+        bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
+        bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
+        if (onMainchain && morePOW) {
+            global.mainValidatedTip = *index;
+            print_hash_with_description("Move validated tip to ", index->meta.hash);
+        }
+    }
+    else {
+        fprintf(stderr, "Block invalid\n");
+        return -2;
+    }
+
+    // Persistence
     int8_t saveError = save_block(ptrBlock);
     if (saveError) {
         fprintf(stderr, "save block error\n");
@@ -357,8 +372,8 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     }
     else {
         print_hash_with_description("Block saved: ", hash);
+        index->meta.fullBlockAvailable = true;
     }
-    index->meta.fullBlockAvailable = true;
     TxNode *p =  ptrBlock->ptrFirstTxNode;
     while (p) {
         save_tx(&p->tx);
