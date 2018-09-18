@@ -26,7 +26,7 @@ struct VersionPayload {
 typedef struct VersionPayload VersionPayload;
 
 uint64_t serialize_version_message(
-    struct Message *ptrMessage,
+    Message *ptrMessage,
     uint8_t *ptrBuffer
 );
 

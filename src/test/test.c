@@ -59,12 +59,14 @@ static int32_t test_version_messages() {
         }
     };
     memcpy(fixturePeer.address.ip, fixturePeerIp, sizeof(IP));
-
-    uint8_t messageBuffer[MESSAGE_BUFFER_LENGTH] = {0};
-
     make_version_message(&message, &fixturePeer);
+
+    Byte *messageBuffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "test_version_messages:buffer");
+
     uint64_t dataSize = serialize_version_message(&message, messageBuffer);
     print_object(messageBuffer, dataSize);
+
+    FREE(messageBuffer, "test_version_messages:buffer");
 
     return 0;
 }
@@ -422,10 +424,10 @@ void test_hash() {
 }
 
 void test() {
-    // test_version_messages()
+    test_version_messages();
     // test_genesis();
     // test_block();
-    test_block_parsing_and_serialization();
+    // test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
     // test_getheaders();
