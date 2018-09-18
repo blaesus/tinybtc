@@ -17,6 +17,7 @@
 #define LOG_MESSAGE_SENT false
 #define LOG_DATA_EXCHANGE false
 #define LOG_PEER_REPLACE false
+#define LOG_SCRIPT_STACKS false
 
 struct Periods {
     uint64_t autoexit;

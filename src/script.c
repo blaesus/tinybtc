@@ -6,6 +6,7 @@
 #include "parameters.h"
 #include "hash.h"
 #include "util.h"
+#include "config.h"
 
 #define UNKNOWN_OPCODE "UNKNOWN_OPCODE"
 
@@ -217,6 +218,9 @@ void print_frame(StackFrame *frame) {
 }
 
 void print_stack_with_label(struct Stack *stack, char *label) {
+    if (!LOG_SCRIPT_STACKS) {
+        return;
+    }
     if (label) {
         printf("\n=== %s Stack (height=%llu) ===\n", label, stack->height);
     }
