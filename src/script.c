@@ -75,6 +75,10 @@ void push(Stack *stack, StackFrame data) {
 }
 
 StackFrame top(Stack *stack) {
+    if (stack->height == 0) {
+        fprintf(stderr, "\nattempting to top an empty stack; returning empty frame...\n");
+        return get_empty_frame();
+    }
     return *stack->frames[stack->height - 1];
 }
 
@@ -336,10 +340,18 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
             Byte op = inputFrame->data[0];
             switch (op) {
                 case OP_DUP: {
+                    if (runtimeStack.height == 0) {
+                        fprintf(stderr, "OP_DUP: empty stack\n");
+                        goto immediate_fail;
+                    }
                     push(&runtimeStack, top(&runtimeStack));
                     break;
                 }
                 case OP_HASH160: {
+                    if (runtimeStack.height == 0) {
+                        fprintf(stderr, "OP_HASH160: empty stack\n");
+                        goto immediate_fail;
+                    }
                     StackFrame currentTop = pop(&runtimeStack);
                     StackFrame newFrame = {
                         .type = FRAME_TYPE_DATA,
@@ -365,6 +377,10 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_CHECKSIG: {
                     // Decude public key
+                    if (runtimeStack.height < 2) {
+                        fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
+                        goto immediate_fail;
+                    }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
                     if (pubkeyFrame.dataWidth < 65) {
                         fprintf(stderr, "Unimplemented: compressed public key");
