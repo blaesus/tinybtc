@@ -369,7 +369,6 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         else {
             index->meta.fullBlockValidated = false;
             fprintf(stderr, "Block invalid\n");
-            return -2;
         }
     }
 
