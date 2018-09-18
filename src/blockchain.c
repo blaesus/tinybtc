@@ -334,6 +334,7 @@ double calc_block_pow(TargetCompact targetBytes) {
 }
 
 int8_t process_incoming_block(BlockPayload *ptrBlock) {
+    double start = get_now();
     if (!is_block_legal(ptrBlock)) {
         fprintf(stderr, "Illegal block\n");
         return -1;
@@ -354,23 +355,27 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (!global.ibdMode) {
-        if (is_block_valid(ptrBlock, index)) {
-            index->meta.fullBlockValidated = true;
-            bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
-            bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
-            if (onMainchain && morePOW) {
-                global.mainValidatedTip = *index;
-                print_hash_with_description(
-                    "Valid incoming block: move validated tip to ", index->meta.hash
-                );
-            }
+    if (is_block_valid(ptrBlock, index)) {
+        index->meta.fullBlockValidated = true;
+        bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
+        bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
+        bool shouldMoveTip = onMainchain && morePOW;
+        if (shouldMoveTip) {
+            global.mainValidatedTip = *index;
+            print_hash_with_description(
+                "Valid incoming block: move validated tip to ", index->meta.hash
+            );
         }
         else {
-            index->meta.fullBlockValidated = false;
-            fprintf(stderr, "Block invalid\n");
+            printf("Valid incoming block: not moving tip\n");
         }
     }
+    else {
+        index->meta.fullBlockValidated = false;
+        fprintf(stderr, "Block invalid\n");
+    }
+
+    printf("handle incoming block: %.1fms\n", get_now() - start);
 
     // Persistence
     int8_t saveError = save_block(ptrBlock);
