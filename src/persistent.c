@@ -228,10 +228,10 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     reverse_endian(key, SHA256_LENGTH);
 
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
-    load_data_by_hash(key, BLOCK_PREFIX, buffer);
+    int8_t status = load_data_by_hash(key, BLOCK_PREFIX, buffer);
     parse_into_block_payload(buffer, ptrBlock);
     FREE(buffer, "load_block:buffer");
-    return 0;
+    return status;
 }
 
 int8_t save_tx(TxPayload *ptrTx) {
@@ -247,10 +247,10 @@ int8_t save_tx(TxPayload *ptrTx) {
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
 
-    load_data_by_hash(hash, TX_PREFIX, buffer);
+    int8_t status = load_data_by_hash(hash, TX_PREFIX, buffer);
     parse_into_tx_payload(buffer, ptrPayload);
     FREE(buffer, "load_tx:buffer");
-    return 0;
+    return status;
 }
 
 uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]) {
