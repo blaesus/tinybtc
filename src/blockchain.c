@@ -372,6 +372,14 @@ double verify_block_indices(bool checkDB) {
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
+
+    SHA256_HASH *blockHashes = NULL;
+    uint64_t dbBlockCount = 0;
+    if (checkDB) {
+        blockHashes = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "verify_block_indices:blockHashes");
+        dbBlockCount = get_hash_keys_of_blocks(blockHashes);
+    }
+
     for (uint32_t i = 0; i < indexCount; i++) {
         if (i % 2000 == 0) {
             printf("verifying block index %u/%u\n", i, indexCount);
@@ -385,13 +393,23 @@ double verify_block_indices(bool checkDB) {
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
         if (checkDB) {
-            ptrIndex->meta.fullBlockAvailable = check_block_existence(ptrIndex->meta.hash);
+            ptrIndex->meta.fullBlockAvailable = false;
+            for (uint64_t hashIndex = 0; hashIndex < dbBlockCount; hashIndex++) {
+                Byte *hash = blockHashes[hashIndex];
+                if (memcmp(hash, ptrIndex->meta.hash, SHA256_LENGTH) == 0) {
+                    ptrIndex->meta.fullBlockAvailable = true;
+                    break;
+                }
+            }
         }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
         }
     }
     FREE(keys, "recalculate_block_indices:keys");
+    if (blockHashes) {
+        FREE(blockHashes, "verify_block_indices:blockHashes");
+    }
     printf("%u block indices; %u full blocks available\n", indexCount, fullBlockAvailable);
     printf("Done.\n");
     return fullBlockAvailable * 1.0 / indexCount;

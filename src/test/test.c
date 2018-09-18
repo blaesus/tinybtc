@@ -383,7 +383,7 @@ void test_script() {
     uint64_t validCount = 0;
 
     for (uint32_t i = 0; i < sizeof(targets) / sizeof(char*); i ++) {
-        char *targetBlock = targets[i];
+        const char *targetBlock = targets[i];
         SHA256_HASH targetHash = {0};
         sha256_hex_to_binary(targetBlock, targetHash);
         reverse_endian(targetHash, sizeof(targetHash));

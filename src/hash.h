@@ -18,5 +18,5 @@ void print_sha256_reverse(Byte *hash);
 void print_sha256_short(Byte *hash);
 void print_hash_with_description(char *description, Byte *hash);
 bool is_hash_empty(Byte *hash);
-void sha256_hex_to_binary(char *str, Byte *hash);
+void sha256_hex_to_binary(const char *str, Byte *hash);
 void hash_binary_to_hex(Byte *hash, char *hex);
