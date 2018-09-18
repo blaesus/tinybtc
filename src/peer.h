@@ -53,6 +53,7 @@ struct Peer {
 
     uv_tcp_t socket;
     double connectionStart;
+    bool triedClosing;
 
     enum PeerRelationship relationship;
     NetworkAddress address;
