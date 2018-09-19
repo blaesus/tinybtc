@@ -394,6 +394,7 @@ void test_script() {
             return;
         }
         BlockPayload block;
+        memset(&block, 0, sizeof(block));
         load_block(targetHash, &block);
         print_block_payload(&block);
         bool valid = is_block_valid(&block, index);
@@ -424,7 +425,7 @@ void test_hash() {
 }
 
 void test() {
-    test_version_messages();
+    // test_version_messages();
     // test_genesis();
     // test_block();
     // test_block_parsing_and_serialization();
@@ -439,6 +440,6 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    // test_script();
+    test_script();
     // test_hash();
 }

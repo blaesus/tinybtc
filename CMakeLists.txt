@@ -3,9 +3,11 @@ project(tinybtc)
 
 set(CMAKE_C_STANDARD 11)
 
-list(APPEND cflags -Wall -Wextra)
 list(APPEND cflags -O3 -march=native)
-list(APPEND cflags -Wno-unused-function) # A lot of unused functions in test
+
+list(APPEND cflags -Wall -Wextra)
+list(APPEND cflags -Wno-unused-function -Wno-unused-parameter)
+
 
 add_subdirectory(deps/libuv)
 add_subdirectory(deps/leveldb)
