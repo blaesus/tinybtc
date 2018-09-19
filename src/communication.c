@@ -399,7 +399,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
     char *ipString = get_ip_from_context(ptrContext);
     if (status) {
         fprintf(stderr, "failed to send message to %s: %s \n", ipString, uv_strerror(status));
-        return;
+        goto cleanup;
     }
     else {
         Message msg = get_empty_message();
@@ -427,6 +427,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
             msg.ptrPayload = NULL;
         }
     }
+    cleanup:
     FREE(ptrContext->buf.base, "send_message:buffer");
     FREE(ptrContext, "write_buffer_to_socket:WriteContext");
     FREE(writeRequest, "write_buffer_to_socket:WriteRequest");
