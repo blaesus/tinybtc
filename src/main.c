@@ -1,8 +1,5 @@
 #include <stdlib.h>
 
-#include "leveldb/c.h"
-#include "libuv/include/uv.h"
-
 #include "communication.h"
 #include "networking.h"
 #include "persistent.h"
@@ -16,7 +13,7 @@ void cleanup() {
     printf("\nCleaning up\n");
     uv_loop_close(uv_default_loop());
     save_chain_data();
-    leveldb_close(global.db);
+    cleanup_db();
     release_sockets();
     printf("\nGood byte!\n");
 }

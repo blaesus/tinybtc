@@ -114,6 +114,10 @@ int8_t init_db() {
     return 0;
 }
 
+void cleanup_db() {
+    leveldb_close(global.db);
+}
+
 int32_t save_block_indices(void) {
     FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
     fwrite(&global.mainHeaderTip, sizeof(global.mainHeaderTip), 1, file);

@@ -17,3 +17,4 @@ int8_t load_tx(Byte *hash, TxPayload *ptrPayload);
 void load_genesis();
 uint64_t get_hash_keys_of_blocks(SHA256_HASH hashes[]);
 void migrate();
+void cleanup_db();
