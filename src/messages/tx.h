@@ -80,3 +80,4 @@ void print_tx_payload(TxPayload *ptrTx);
 bool is_coinbase(TxPayload *ptrTx);
 bool is_tx_legal(TxPayload *ptrTx);
 void release_items_in_tx(TxPayload *tx);
+void clone_tx(TxPayload *txFrom, TxPayload *txTo);

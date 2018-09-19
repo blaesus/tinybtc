@@ -133,8 +133,8 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     memcpy(&possibleFlag, p + sizeof(ptrTx->marker), sizeof(ptrTx->flag));
     bool hasWitness = check_segwit_bits(possibleMarker, possibleFlag);
     if (hasWitness) {
-        PARSE_INTO(p, &ptrTx->marker);
-        PARSE_INTO(p, &ptrTx->flag);
+        p += PARSE_INTO(p, &ptrTx->marker);
+        p += PARSE_INTO(p, &ptrTx->flag);
     }
 
     p += parse_varint(p, &ptrTx->txInputCount);
@@ -266,6 +266,12 @@ void print_tx_payload(TxPayload *ptrTx) {
         ptrTx->txInputCount,
         ptrTx->txOutputCount
     );
+    TxIn *in = NULL;
+    for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
+        in = ptrTx->txInputs[i];
+        printf("  input %llu: SigScript %llu bytes, ", i, in->signature_script_length);
+        print_hash_with_description("previous output=", in->previous_output.hash);
+    }
 }
 
 bool is_outpoint_empty(Outpoint *ptrOutpoint) {
@@ -323,4 +329,11 @@ void release_items_in_tx(TxPayload *tx) {
             FREE(tx->txWitnesses[i], "parse_into_tx_payload:txWitness");
         }
     }
+}
+
+void clone_tx(TxPayload *txFrom, TxPayload *txTo) {
+    Byte *cloneBuffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "clone_tx:buffer");
+    serialize_tx_payload(txFrom, cloneBuffer);
+    parse_into_tx_payload(cloneBuffer, txTo); // Is that you, JSON.parse(JSON.stringify(obj))?
+    FREE(cloneBuffer, "clone_tx:buffer");
 }

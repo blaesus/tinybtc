@@ -231,22 +231,18 @@ void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash) {
 
 
 void print_block_payload(BlockPayload *ptrBlock) {
-    printf("[block]\n");
+    printf("----- block -----\n");
     printf("version: %u\n", ptrBlock->header.version);
     printf("merkle root:");
     print_object(ptrBlock->header.merkle_root, SHA256_LENGTH);
     TxNode *ptrTxNode = ptrBlock->ptrFirstTxNode;
     for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
-        printf("\nTransaction %u\n", i+1);
+        printf("\n## TX %u\n", i);
         TxPayload tx = ptrTxNode->tx;
-        printf(
-            "  version = %u, tx_in_count = %llu, tx_out_count = %llu\n",
-            tx.version,
-            tx.txInputCount,
-            tx.txOutputCount
-        );
+        print_tx_payload(&tx);
         ptrTxNode = ptrTxNode->next;
     }
+    printf("----------------\n");
 }
 
 bool is_block(Message *ptrMessage) {
