@@ -105,9 +105,9 @@ int8_t init_db() {
     db = leveldb_open(options, config.dbName, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
+        leveldb_free(error);
         return -1;
     }
-    leveldb_free(error);
     leveldb_free(options);
     global.db = db;
     printf("Done.\n");
@@ -178,9 +178,9 @@ int8_t save_data_by_hash(Byte *hash, Prefix prefix, Byte *value, uint64_t valueL
 
     if (error != NULL) {
         fprintf(stderr, "Write fail: %s\n", error);
+        leveldb_free(error);
         return -1;
     }
-    leveldb_free(error);
     leveldb_free(writeOptions);
     return 0;
 }
@@ -218,6 +218,28 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output, size_t *output
     return 0;
 }
 
+int8_t remove_data_by_hash(Byte *hash, Prefix prefix) {
+    uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
+    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
+    key[0] = prefix;
+    hash_binary_to_hex(hash, key+1);
+    char *error = NULL;
+    leveldb_writeoptions_t *writeOptions = leveldb_writeoptions_create();
+    leveldb_delete(
+        global.db, writeOptions,
+        key, keyLength,
+        &error
+    );
+
+    if (error != NULL) {
+        fprintf(stderr, "Delete fail: %s\n", error);
+        leveldb_free(error);
+        return -1;
+    }
+    leveldb_free(writeOptions);
+    return 0;
+}
+
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
@@ -247,11 +269,13 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
         print_hash_with_description("requested: ", hash);
         print_hash_with_description("actual: ", actualHash);
         mark_block_as_unavailable(hash);
+        remove_data_by_hash(hash, BLOCK_PREFIX);
         status = ERROR_BAD_DATA;
     }
     else if (!is_block_legal(ptrBlock)) {
         fprintf(stderr, "load_block: fetched illegal block, probably DB corruption...\n");
         mark_block_as_unavailable(hash);
+        remove_data_by_hash(hash, BLOCK_PREFIX);
         status = ERROR_BAD_DATA;
     }
     FREE(buffer, "load_block:buffer");
@@ -278,6 +302,7 @@ int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     dsha256(buffer, (uint32_t)outputLength, actualHash);
     if (memcmp(hash, actualHash, SHA256_LENGTH) != 0) {
         fprintf(stderr, "load_tx: hashes mismatch\n");
+        remove_data_by_hash(hash, TX_PREFIX);
         status = ERROR_BAD_DATA;
     }
 
@@ -348,3 +373,4 @@ void migrate() {
         printf("\n");
     }
 }
+
