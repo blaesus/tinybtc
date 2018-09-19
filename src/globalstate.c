@@ -112,3 +112,11 @@ uint32_t count_hand_shaken_peers() {
     }
     return count;
 }
+
+void add_orphan(Byte *hash) {
+    if (global.orphanCount >= MAX_ORPHAN_COUNT) {
+        printf("Orphanage exhausted; wrapping...\n");
+        global.orphanCount = 0;
+    }
+    memcpy(global.orphans[global.orphanCount++], hash, SHA256_LENGTH);
+}

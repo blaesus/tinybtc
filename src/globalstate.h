@@ -58,3 +58,4 @@ uint32_t find_missing_blocks(SHA256_HASH *hashes, uint32_t desiredCount);
 bool is_block_being_requested(Byte *hash);
 uint32_t count_hand_shaken_peers();
 bool peer_hand_shaken(Peer *ptrPeer);
+void add_orphan(Byte *hash);
