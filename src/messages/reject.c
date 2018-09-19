@@ -35,8 +35,11 @@ int32_t parse_into_reject_message(
 void print_reject_message(Message *ptrMessage) {
     print_message_header(ptrMessage->header);
     RejectPayload *ptrPayload = (RejectPayload *)ptrMessage->ptrPayload;
+    char *reason = CALLOC(1, MAX_VARIABLE_LENGTH_STRING_LENGTH, "print_reject_message:reason");
+    memcpy(ptrPayload->reason.string, reason, ptrPayload->reason.length);
     printf("payload: ccode=%u, reason is '%s'\n",
            ptrPayload->ccode,
-           ptrPayload->reason.string
+           reason
     );
+    FREE(reason, "print_reject_message:reason");
 }
