@@ -184,8 +184,8 @@ void exchange_data_with_peers() {
         if (is_peer_idle(ptrPeer) && (blockIndex < blocksFound)) {
             blockToRequest = blocksDesired[blockIndex];
             blockIndex++;
+            send_getdata_for_block(&ptrPeer->socket, blockToRequest);
         }
-        send_getdata_for_block(&ptrPeer->socket, blockToRequest);
     }
     FREE(blocksDesired, "exchange_data_with_peers:hashes");
 }
