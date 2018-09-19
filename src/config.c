@@ -4,7 +4,7 @@
 
 const struct Config config = {
     .periods = {
-        .autoexit = HOUR_TO_MILLISECOND(2),
+        .autoexit = 0,
         .saveIndices = MINUTE_TO_MILLISECOND(5),
         .peerDataExchange = SECOND_TO_MILLISECOND(1),
         .resetIBDMode = SECOND_TO_MILLISECOND(120),
@@ -31,5 +31,5 @@ const struct Config config = {
     .ibdPeerMaxBlockDifference = 100,
     .apiPort = 9494,
     .silentIncomingMessageCommands = "inv,pong,ping,addr",
-    .deepReindexBlocks = false,
+    .deepReindexBlocks = true,
 };
