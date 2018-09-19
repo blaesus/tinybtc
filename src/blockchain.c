@@ -455,6 +455,9 @@ double verify_block_indices(bool checkDB) {
 }
 
 void validate_new_blocks() {
+    if (!global.ibdMode) {
+        return;
+    }
     printf("Validating new blocks...\n");
     SHA256_HASH blockHash = {0};
     memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
