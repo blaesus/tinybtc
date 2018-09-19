@@ -247,7 +247,12 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
         print_hash_with_description("requested: ", hash);
         print_hash_with_description("actual: ", actualHash);
         mark_block_as_unavailable(hash);
-        return ERROR_BAD_DATA;
+        status = ERROR_BAD_DATA;
+    }
+    else if (!is_block_legal(ptrBlock)) {
+        fprintf(stderr, "load_block: fetched illegal block, probably DB corruption...\n");
+        mark_block_as_unavailable(hash);
+        status = ERROR_BAD_DATA;
     }
     FREE(buffer, "load_block:buffer");
     return status;
