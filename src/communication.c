@@ -709,16 +709,17 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
         else {
             // file ended; noop
         }
-        return;
+        goto cleanup;
     }
     SocketContext *ptrContext = (SocketContext *)socket->data;
     ptrContext->peer->networking.lastHeard = get_now();
     MessageCache *ptrCache = &(ptrContext->streamCache);
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
-    FREE(buf->base, "allocate_read_buffer:bufBase");
     ptrContext->peer->networking.incomingBytes += nread;
     extract_message_from_stream_buffer(ptrCache, ptrContext->peer);
+    cleanup:
+    FREE(buf->base, "allocate_read_buffer:bufBase");
 }
 
 void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
