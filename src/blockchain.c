@@ -445,3 +445,45 @@ double verify_block_indices(bool checkDB) {
     printf("Done.\n");
     return fullBlockAvailable * 1.0 / indexCount;
 }
+
+void validate_new_blocks() {
+    printf("Validating new blocks...\n");
+    SHA256_HASH blockHash = {0};
+    memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
+    while (true) {
+        BlockIndex *index = GET_BLOCK_INDEX(blockHash);
+        if (!index) {
+            return;
+        }
+        if (index->context.children.length == 0) {
+            return;
+        }
+        BlockIndex *childIndex = GET_BLOCK_INDEX(index->context.children.hashes[0]); // TODO: Handle side-chain
+        if (!childIndex) {
+            return;
+        }
+        BlockPayload *child = CALLOC(1, sizeof(*child), "validate_new_blocks:block");
+        int8_t status = load_block(childIndex->meta.hash, child);
+        bool continueScanning = false;
+        if (!status) {
+            if (is_block_valid(child, childIndex)) {
+                print_hash_with_description("Move validated tip to ", childIndex->meta.hash);
+                childIndex->meta.fullBlockValidated = true;
+                global.mainValidatedTip = *childIndex;
+                memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
+                continueScanning = true;
+            }
+            else {
+                printf("Block invalid\n");
+            }
+        }
+        else {
+            printf("Cannot load block\n");
+        }
+        release_txs_in_block(child);
+        FREE(child, "validate_new_blocks:block");
+        if (!continueScanning) {
+            return;
+        }
+    }
+}

@@ -27,6 +27,7 @@ struct Periods {
     uint64_t timeoutPeers;
     uint64_t printNodeStatus;
     uint64_t ping;
+    uint64_t validateNewBlocks;
 };
 
 struct Tolerances {

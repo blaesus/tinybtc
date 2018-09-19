@@ -286,6 +286,10 @@ void setup_timers() {
             .interval = config.periods.printNodeStatus,
             .callback = &print_node_status,
         },
+        {
+            .interval = config.periods.validateNewBlocks,
+            .callback = &validate_new_blocks
+        }
     };
     uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);
 
