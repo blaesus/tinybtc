@@ -278,6 +278,9 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
         remove_data_by_hash(hash, BLOCK_PREFIX);
         status = ERROR_BAD_DATA;
     }
+    else {
+        print_hash_with_description("load_block: OK ", hash);
+    }
     FREE(buffer, "load_block:buffer");
     return status;
 }

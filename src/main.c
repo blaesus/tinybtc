@@ -53,7 +53,7 @@ int8_t init() {
     }
     load_genesis();
     load_block_indices();
-    double blockAvailability = verify_block_indices(config.deepReindexBlocks);
+    double blockAvailability = verify_block_indices(config.verifyBlocks);
     if (blockAvailability < config.ibdModeAvailabilityThreshold) {
         global.ibdMode = true;
         printf("Activated IBD mode\n");

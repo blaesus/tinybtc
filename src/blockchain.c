@@ -404,8 +404,10 @@ double verify_block_indices(bool checkDB) {
     SHA256_HASH *blockHashes = NULL;
     uint64_t dbBlockCount = 0;
     if (checkDB) {
+        printf("Loading all keys to available blocks...");
         blockHashes = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "verify_block_indices:blockHashes");
         dbBlockCount = get_hash_keys_of_blocks(blockHashes);
+        printf("Done\n");
     }
 
     for (uint32_t i = 0; i < indexCount; i++) {
@@ -429,6 +431,10 @@ double verify_block_indices(bool checkDB) {
                     break;
                 }
             }
+            BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "verify_block_indices:block");
+            load_block(ptrIndex->meta.hash, ptrBlock);
+            release_txs_in_block(ptrBlock);
+            FREE(ptrBlock, "verify_block_indices:block");
         }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;

@@ -52,7 +52,7 @@ struct Config {
     uint16_t ibdPeerMaxBlockDifference;
     uint16_t apiPort;
     char *silentIncomingMessageCommands;
-    bool deepReindexBlocks;
+    bool verifyBlocks;
 };
 
 extern const struct Config config;
