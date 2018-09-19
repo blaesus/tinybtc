@@ -201,10 +201,15 @@ void print_node_status() {
             validPeers++;
             if (is_latency_fully_tested(ptrPeer)) {
                 double averageLatency = average_peer_latency(ptrPeer);
-                printf("Peer %02u: %7.1fms\n", ptrPeer->index, averageLatency);
+                printf(
+                    "Peer %02u: %7.1fms (%llu KB)\n",
+                    ptrPeer->index,
+                    averageLatency,
+                    ptrPeer->networking.incomingBytes / 1024
+                );
             }
             else {
-                printf("Peer %02u:     ?ms\n", ptrPeer->index);
+                printf("Peer %02u:     ?ms (%llu KB)\n", ptrPeer->index, ptrPeer->networking.incomingBytes / 1024);
             }
         }
         else {
@@ -711,6 +716,7 @@ void on_incoming_segment(uv_stream_t *socket, ssize_t nread, const uv_buf_t *buf
     memcpy(ptrCache->buffer + ptrCache->bufferIndex, buf->base, buf->len);
     ptrCache->bufferIndex += nread;
     FREE(buf->base, "allocate_read_buffer:bufBase");
+    ptrContext->peer->networking.incomingBytes += nread;
     extract_message_from_stream_buffer(ptrCache, ptrContext->peer);
 }
 

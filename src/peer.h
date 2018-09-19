@@ -39,6 +39,7 @@ struct InteractionState {
     double lastHeard;
     double latencies[PEER_LATENCY_SLOT];
     uint32_t lattencyIndex;
+    uint64_t incomingBytes;
 };
 
 enum PeerRelationship {
