@@ -431,10 +431,12 @@ double verify_block_indices(bool checkDB) {
                     break;
                 }
             }
-            BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "verify_block_indices:block");
-            load_block(ptrIndex->meta.hash, ptrBlock);
-            release_txs_in_block(ptrBlock);
-            FREE(ptrBlock, "verify_block_indices:block");
+            if (ptrIndex->meta.fullBlockAvailable) {
+                BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "verify_block_indices:block");
+                load_block(ptrIndex->meta.hash, ptrBlock);
+                release_txs_in_block(ptrBlock);
+                FREE(ptrBlock, "verify_block_indices:block");
+            }
         }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
