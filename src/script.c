@@ -311,7 +311,7 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
     );
     subscriptIndex += meta.sourceOutput->public_key_script_length;
     TxPayload *txCopy = CALLOC(1, sizeof(TxPayload), "make_tx_copy:txCopy");
-    memcpy(txCopy, meta.currentTx, sizeof(TxPayload));
+    clone_tx(meta.currentTx, txCopy);
     for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
         TxIn *txIn = txCopy->txInputs[i];
         txIn->signature_script_length = 0;
@@ -415,6 +415,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     );
 
                     push(&runtimeStack, get_boolean_frame(verification == 1));
+                    release_items_in_tx(txCopy);
                     FREE(txCopy, "make_tx_copy:txCopy");
                     EC_KEY_free(ptrPubKey);
                     break;
