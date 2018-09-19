@@ -1,8 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "datatypes.h"
-
-#define TRACE_MEMORY_USE false
+#include "config.h"
 
 #if TRACE_MEMORY_USE
 #define CALLOC(count, size, label) (calloc_audited(count, size, label))

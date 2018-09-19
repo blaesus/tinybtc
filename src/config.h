@@ -18,6 +18,8 @@
 #define LOG_PEER_REPLACE false
 #define LOG_SCRIPT_STACKS false
 
+#define TRACE_MEMORY_USE false
+
 struct Periods {
     uint64_t autoexit;
     uint64_t saveIndices;
