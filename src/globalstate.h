@@ -59,3 +59,4 @@ bool is_block_being_requested(Byte *hash);
 uint32_t count_hand_shaken_peers();
 bool peer_hand_shaken(Peer *ptrPeer);
 void add_orphan(Byte *hash);
+void mark_block_as_unavailable(Byte *hash);

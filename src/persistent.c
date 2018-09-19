@@ -185,7 +185,7 @@ int8_t save_data_by_hash(Byte *hash, Prefix prefix, Byte *value, uint64_t valueL
     return 0;
 }
 
-int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
+int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output, size_t *outputLength) {
     const uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
     char key[PREFIXED_HASH_KEY_LENGTH] = {0};
     key[0] = prefix;
@@ -212,6 +212,9 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output) {
         return -1;
     }
     memcpy(output, read, readLength);
+    if (outputLength) {
+        *outputLength = readLength;
+    }
     return 0;
 }
 
@@ -232,8 +235,20 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     reverse_endian(key, SHA256_LENGTH);
 
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
-    int8_t status = load_data_by_hash(key, BLOCK_PREFIX, buffer);
+    size_t outputLength = 0;
+    int8_t status = load_data_by_hash(key, BLOCK_PREFIX, buffer, &outputLength);
     parse_into_block_payload(buffer, ptrBlock);
+    SHA256_HASH actualHash = {0};
+    Byte hashBuffer[1000] = {0};
+    uint64_t width = serialize_block_payload_header(&ptrBlock->header, hashBuffer);
+    dsha256(hashBuffer, (uint32_t)width, actualHash);
+    if (memcmp(actualHash, hash, SHA256_LENGTH) != 0) {
+        fprintf(stderr, "load_block: hashes mismatch for %li bytes\n", outputLength);
+        print_hash_with_description("requested: ", hash);
+        print_hash_with_description("actual: ", actualHash);
+        mark_block_as_unavailable(hash);
+        return ERROR_BAD_DATA;
+    }
     FREE(buffer, "load_block:buffer");
     return status;
 }
@@ -251,8 +266,16 @@ int8_t save_tx(TxPayload *ptrTx) {
 int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
 
-    int8_t status = load_data_by_hash(hash, TX_PREFIX, buffer);
+    size_t outputLength = 0;
+    int8_t status = load_data_by_hash(hash, TX_PREFIX, buffer, &outputLength);
     parse_into_tx_payload(buffer, ptrPayload);
+    SHA256_HASH actualHash = {0};
+    dsha256(buffer, (uint32_t)outputLength, actualHash);
+    if (memcmp(hash, actualHash, SHA256_LENGTH) != 0) {
+        fprintf(stderr, "load_tx: hashes mismatch\n");
+        status = ERROR_BAD_DATA;
+    }
+
     FREE(buffer, "load_tx:buffer");
     return status;
 }

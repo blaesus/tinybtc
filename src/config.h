@@ -15,7 +15,6 @@
 #define LOG_MESSAGE_LOADING false
 #define LOG_MESSAGE_SENDING false
 #define LOG_MESSAGE_SENT false
-#define LOG_DATA_EXCHANGE false
 #define LOG_PEER_REPLACE false
 #define LOG_SCRIPT_STACKS false
 

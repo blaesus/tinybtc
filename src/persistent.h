@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <messages/block.h>
 
+#define ERROR_BAD_DATA -99;
+
 int32_t save_peer_candidates(void);
 int32_t load_peer_candidates(void);
 int32_t save_block_indices(void);

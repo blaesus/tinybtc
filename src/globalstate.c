@@ -120,3 +120,14 @@ void add_orphan(Byte *hash) {
     }
     memcpy(global.orphans[global.orphanCount++], hash, SHA256_LENGTH);
 }
+
+void mark_block_as_unavailable(Byte *hash) {
+    BlockIndex *index = GET_BLOCK_INDEX(hash);
+    if (index) {
+        index->meta.fullBlockAvailable = false;
+        index->meta.fullBlockValidated = false;
+    }
+    else {
+        print_hash_with_description("cannot mark hash as unavailable:", hash);
+    }
+}
