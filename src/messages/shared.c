@@ -150,6 +150,7 @@ uint64_t load_file(char *path, Byte *buffer) {
 void free_message_payload(Message *message) {
     if (is_block(message)) {
         release_block(message->ptrPayload);
+        return;
     }
     FREE(message->ptrPayload, "parse_message:payload");
 }
