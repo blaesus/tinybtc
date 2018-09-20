@@ -144,7 +144,7 @@ bool is_block_legal(BlockPayload *ptrBlock) {
     bool firstTxIsCoinbase = is_coinbase(&ptrBlock->txs[0]);
 
     bool onlyOneCoinbase = true;
-    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+    for (uint64_t i = 1; i < ptrBlock->txCount; i++) {
         if (is_coinbase(&ptrBlock->txs[i])) {
             onlyOneCoinbase = false;
             break;
