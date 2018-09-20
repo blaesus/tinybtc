@@ -401,15 +401,6 @@ double verify_block_indices(bool checkDB) {
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
 
-    SHA256_HASH *blockHashes = NULL;
-    uint64_t dbBlockCount = 0;
-    if (checkDB) {
-        printf("Loading all keys to available blocks...");
-        blockHashes = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "verify_block_indices:blockHashes");
-        dbBlockCount = get_hash_keys_of_blocks(blockHashes);
-        printf("Done\n");
-    }
-
     for (uint32_t i = 0; i < indexCount; i++) {
         if (i % 2000 == 0) {
             printf("verifying block index %u/%u\n", i, indexCount);
@@ -423,17 +414,13 @@ double verify_block_indices(bool checkDB) {
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
         if (checkDB) {
-            ptrIndex->meta.fullBlockAvailable = false;
-            for (uint64_t hashIndex = 0; hashIndex < dbBlockCount; hashIndex++) {
-                Byte *hash = blockHashes[hashIndex];
-                if (memcmp(hash, ptrIndex->meta.hash, SHA256_LENGTH) == 0) {
-                    ptrIndex->meta.fullBlockAvailable = true;
-                    break;
-                }
-            }
             if (ptrIndex->meta.fullBlockAvailable) {
+                ptrIndex->meta.fullBlockAvailable = false;
                 BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "verify_block_indices:block");
-                load_block(ptrIndex->meta.hash, ptrBlock);
+                int8_t status = load_block(ptrIndex->meta.hash, ptrBlock);
+                if (!status) {
+                    ptrIndex->meta.fullBlockAvailable = true;
+                }
                 release_txs_in_block(ptrBlock);
                 FREE(ptrBlock, "verify_block_indices:block");
             }
@@ -446,9 +433,6 @@ double verify_block_indices(bool checkDB) {
         }
     }
     FREE(keys, "recalculate_block_indices:keys");
-    if (blockHashes) {
-        FREE(blockHashes, "verify_block_indices:blockHashes");
-    }
     printf("%u block indices; %u full blocks available; %u orphans\n", indexCount, fullBlockAvailable, global.orphanCount);
     printf("Done.\n");
     return fullBlockAvailable * 1.0 / indexCount;
