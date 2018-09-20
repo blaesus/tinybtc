@@ -72,7 +72,7 @@ bool is_coinbase_tx_valid(TxPayload *tx) {
 bool is_normal_tx_valid(TxPayload *tx) {
     TxPayload *txSource = CALLOC(1, sizeof(TxPayload), "is_tx_valid:txSource");
     for (uint32_t i = 0; i < tx->txInputCount; i++) {
-        TxIn *input = tx->txInputs[i];
+        TxIn *input = &tx->txInputs[i];
         int8_t error = load_tx(input->previous_output.hash, txSource);
         if (error) {
             fprintf(stderr, "Cannot load source tx\n");
@@ -87,7 +87,7 @@ bool is_normal_tx_valid(TxPayload *tx) {
             );
             return false;
         }
-        TxOut *output = txSource->txOutputs[input->previous_output.index];
+        TxOut *output = &txSource->txOutputs[input->previous_output.index];
         uint64_t programLength = input->signature_script_length + output->public_key_script_length;
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");

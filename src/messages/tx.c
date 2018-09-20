@@ -69,17 +69,17 @@ uint64_t serialize_tx_payload(
 
     p += serialize_to_varint(ptrPayload->txInputCount, p);
     for (uint64_t i = 0; i < ptrPayload->txInputCount; i++) {
-        p += serialize_tx_in(ptrPayload->txInputs[i], p);
+        p += serialize_tx_in(&ptrPayload->txInputs[i], p);
     }
 
     p += serialize_to_varint(ptrPayload->txOutputCount, p);
     for (uint64_t i = 0; i < ptrPayload->txOutputCount; i++) {
-        p += serialize_tx_out(ptrPayload->txOutputs[i], p);
+        p += serialize_tx_out(&ptrPayload->txOutputs[i], p);
     }
 
     if (hasWitnessData) {
         for (uint64_t i = 0; i < ptrPayload->txInputCount; i++) {
-            p += serialize_tx_witness(ptrPayload->txWitnesses[i], p);
+            p += serialize_tx_witness(&ptrPayload->txWitnesses[i], p);
         }
     }
     p += SERIALIZE_TO(ptrPayload->lockTime, p);
@@ -138,21 +138,21 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
     }
 
     p += parse_varint(p, &ptrTx->txInputCount);
+    ptrTx->txInputs = CALLOC(ptrTx->txInputCount, sizeof(TxIn), "parse_into_tx_payload:txInputs");
     for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-        ptrTx->txInputs[i] = MALLOC(sizeof(TxIn), "parse_into_tx_payload:txInput");
-        p += parse_tx_in(p, ptrTx->txInputs[i]);
+        p += parse_tx_in(p, &ptrTx->txInputs[i]);
     }
 
     p += parse_varint(p, &ptrTx->txOutputCount);
+    ptrTx->txOutputs = CALLOC(ptrTx->txOutputCount, sizeof(TxOut), "parse_into_tx_payload:txOutputs");
     for (uint64_t i = 0; i < ptrTx->txOutputCount; i++) {
-        ptrTx->txOutputs[i] = MALLOC(sizeof(TxOut), "parse_into_tx_payload:txOutput");
-        p += parse_tx_out(p, ptrTx->txOutputs[i]);
+        p += parse_tx_out(p, &ptrTx->txOutputs[i]);
     }
 
     if (hasWitness) {
+        ptrTx->txWitnesses = CALLOC(ptrTx->txInputCount, sizeof(TxWitness), "parse_into_tx_payload:txWitnesses");
         for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-            ptrTx->txWitnesses[i] = MALLOC(sizeof(TxWitness), "parse_into_tx_payload:txWitness");
-            p += parse_tx_witness(p, ptrTx->txWitnesses[i]);
+            p += parse_tx_witness(p, &ptrTx->txWitnesses[i]);
         }
     }
     p += PARSE_INTO(p, &ptrTx->lockTime);
@@ -268,7 +268,7 @@ void print_tx_payload(TxPayload *ptrTx) {
     );
     TxIn *in = NULL;
     for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-        in = ptrTx->txInputs[i];
+        in = &ptrTx->txInputs[i];
         printf("  input %llu: SigScript %llu bytes, ", i, in->signature_script_length);
         print_hash_with_description("previous output=", in->previous_output.hash);
     }
@@ -279,7 +279,7 @@ bool is_outpoint_empty(Outpoint *ptrOutpoint) {
 }
 
 bool is_coinbase(TxPayload *ptrTx) {
-    return ptrTx->txInputCount == 1 && is_outpoint_empty(&ptrTx->txInputs[0]->previous_output);
+    return ptrTx->txInputCount == 1 && is_outpoint_empty(&ptrTx->txInputs->previous_output);
 }
 
 bool is_tx_legal(TxPayload *ptrTx) {
@@ -288,7 +288,7 @@ bool is_tx_legal(TxPayload *ptrTx) {
 
     bool outputLegal = true;
     for (uint64_t i = 0; i < ptrTx->txOutputCount; i++) {
-        TxOut *out = ptrTx->txOutputs[i];
+        TxOut *out = &ptrTx->txOutputs[i];
         if (out->value < 0) {
             outputLegal = false;
             break;
@@ -297,13 +297,13 @@ bool is_tx_legal(TxPayload *ptrTx) {
 
     bool inputsLegal = true;
     if (is_coinbase(ptrTx)) {
-        TxIn *firstIn = ptrTx->txInputs[0];
+        TxIn *firstIn = ptrTx->txInputs;
         inputsLegal = firstIn->signature_script_length <= mainnet.scriptSigSizeUpper
                       && firstIn->signature_script_length >= mainnet.scriptSigSizeLower;
     }
     else {
         for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-            TxIn *in = ptrTx->txInputs[i];
+            TxIn *in = &ptrTx->txInputs[i];
             if (is_outpoint_empty(&in->previous_output)) {
                 inputsLegal = false;
                 break;
@@ -318,16 +318,10 @@ bool is_tx_legal(TxPayload *ptrTx) {
 }
 
 void release_items_in_tx(TxPayload *tx) {
-    for (uint64_t i = 0; i < tx->txInputCount; i++) {
-        FREE(tx->txInputs[i], "parse_into_tx_payload:txInput");
-    }
-    for (uint64_t i = 0; i < tx->txOutputCount; i++) {
-        FREE(tx->txOutputs[i], "parse_into_tx_payload:txOutput");
-    }
+    FREE(tx->txInputs, "parse_into_tx_payload:txInputs");
+    FREE(tx->txOutputs, "parse_into_tx_payload:txOutputs");
     if (check_segwit_bits(tx->marker, tx->flag)) {
-        for (uint64_t i = 0; i < tx->txInputCount; i++) {
-            FREE(tx->txWitnesses[i], "parse_into_tx_payload:txWitness");
-        }
+        FREE(tx->txWitnesses, "parse_into_tx_payload:txWitnesses");
     }
 }
 

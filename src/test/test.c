@@ -135,6 +135,7 @@ static void test_merkle_on_path(char *path) {
     SHA256_HASH merkleRoot = {0};
     BlockPayload *ptrPayload = message.ptrPayload;
     compute_merkle_root(ptrPayload->ptrFirstTxNode, merkleRoot);
+    release_txs_in_block(ptrPayload);
     print_object(merkleRoot, SHA256_LENGTH);
 }
 
@@ -430,7 +431,7 @@ void test() {
     // test_genesis();
     // test_block();
     // test_block_parsing_and_serialization();
-    // test_merkles();
+    test_merkles();
     // test_mine();
     // test_getheaders();
     // test_checksum();
@@ -441,6 +442,6 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    test_script();
+    // test_script();
     // test_hash();
 }

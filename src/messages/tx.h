@@ -15,8 +15,6 @@
 #define MAX_PK_SCRIPT_LENGTH 4096
 #define MAX_WITNESS_DATA_LENGTH 4096
 
-#define MAX_TX_ITEM_PER_TX 4096
-
 struct Outpoint {
     SHA256_HASH hash;
     uint32_t index;
@@ -55,10 +53,10 @@ struct TxPayload {
     Byte marker;
     Byte flag;
     VarIntMem txInputCount;
-    TxIn *txInputs[MAX_TX_ITEM_PER_TX];
+    TxIn *txInputs;
     VarIntMem txOutputCount;
-    TxOut *txOutputs[MAX_TX_ITEM_PER_TX];
-    TxWitness *txWitnesses[MAX_TX_ITEM_PER_TX];
+    TxOut *txOutputs;
+    TxWitness *txWitnesses;
     uint32_t lockTime;
 };
 
