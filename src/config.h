@@ -18,7 +18,7 @@
 #define LOG_PEER_REPLACE false
 #define LOG_SCRIPT_STACKS false
 
-#define TRACE_MEMORY_USE false
+#define TRACE_MEMORY_USE true
 
 struct Periods {
     uint64_t autoexit;

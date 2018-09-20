@@ -2,13 +2,6 @@
 #include "peer.h"
 #include "util.h"
 
-void reset_peer(Peer *ptrPeer) {
-    if (ptrPeer->socket.data) {
-        FREE(ptrPeer->socket.data, "SocketContext");
-    }
-    memset(ptrPeer, 0, sizeof(*ptrPeer));
-}
-
 bool is_latency_fully_tested(Peer *ptrPeer) {
     for (uint32_t i = 0; i < PEER_LATENCY_SLOT; i++) {
         double latency = ptrPeer->networking.latencies[i];

@@ -41,40 +41,13 @@ bool disable_candidate(PeerCandidate *ptrCandidate) {
     return false;
 }
 
-void on_handle_close(uv_handle_t *handle) {
-    SocketContext *data = (SocketContext *)handle->data;
-    connect_to_best_candidate_as_peer(data->peer->index);
-    FREE(handle->data, "SocketContext");
-}
-
 void replace_peer(Peer *ptrPeer) {
     #if LOG_PEER_REPLACE
     double now = get_now();
     double life = (now - ptrPeer->connectionStart) / SECOND_TO_MILLISECOND(1);
     printf("Replacing peer %u (life %.1fs)\n", ptrPeer->index, life);
     #endif
-    uv_handle_t *ptrSocket = (uv_handle_t *) &ptrPeer->socket;
-    if (ptrSocket->data) {
-        // free(ptrSocket->data); // [FREE] on_peer_connect:SocketContext // TODO: Throws
-        ptrSocket->data = NULL;
-    }
-    ptrSocket->data = CALLOC(1, sizeof(SocketContext), "SocketContext");
-    SocketContext *ptrData = ptrSocket->data;
-    ptrData->peer = ptrPeer;
-    if (uv_is_closing(ptrSocket)) {
-        fprintf(stderr, "replace_peer: Socket is already closing...\n");
-        if (ptrPeer->triedClosing) {
-            fprintf(stderr, "replace_peer: already tried closing. Socket is zombie...\n");
-            global.zombieSockets[global.zombineSocketCount++] = ptrSocket; // TODO: Release?
-            connect_to_best_candidate_as_peer(ptrData->peer->index);
-        }
-        else {
-            ptrPeer->triedClosing = true;
-        }
-    }
-    else {
-        uv_close(ptrSocket, on_handle_close);
-    }
+    connect_to_best_candidate_as_peer(ptrPeer->slot);
 }
 
 void ping_peer(Peer *ptrPeer) {
@@ -101,7 +74,7 @@ bool check_peer(Peer *ptrPeer) {
         !peer_hand_shaken(ptrPeer) && (timeSinceConnection > config.tolerances.handshake);
     if (timeoutForLateHandshake) {
         disable_candidate(ptrPeer->candidacy);
-        printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->index, timeSinceConnection);
+        printf("Timeout peer %02u: no handshake after %.1fms\n", ptrPeer->slot, timeSinceConnection);
         replace_peer(ptrPeer);
         return true;
     }
@@ -112,7 +85,7 @@ bool check_peer(Peer *ptrPeer) {
 
     bool timeoutForLatePong = latencyFullyTested && (averageLatency > config.tolerances.latency);
     if (timeoutForLatePong) {
-        printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->index, averageLatency);
+        printf("Timeout peer %02u: average latency=%.1fms\n", ptrPeer->slot, averageLatency);
         replace_peer(ptrPeer);
     }
     return false;
@@ -124,7 +97,7 @@ void check_peer_life(Peer *ptrPeer) {
     if (life > config.tolerances.peerLife) {
         printf(
             "Timeout peer %u as life exhausted (%.1f > %llu) \n",
-            ptrPeer->index,
+            ptrPeer->slot,
             life,
             config.tolerances.peerLife
         );
@@ -134,7 +107,7 @@ void check_peer_life(Peer *ptrPeer) {
 
 void ping_peers() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
+        Peer *ptrPeer = global.peers[i];
         if (peer_hand_shaken(ptrPeer)) {
             ping_peer(ptrPeer);
         }
@@ -143,7 +116,7 @@ void ping_peers() {
 
 void check_peers_connectivity() {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
+        Peer *ptrPeer = global.peers[i];
         check_peer(ptrPeer);
         if (config.tolerances.peerLife) {
             check_peer_life(ptrPeer);
@@ -158,7 +131,7 @@ static bool is_peer_idle(Peer *ptrPeer) {
 static uint32_t count_idle_peers() {
     uint32_t count = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
+        Peer *ptrPeer = global.peers[i];
         if (is_peer_idle(ptrPeer)) {
             count++;
         }
@@ -173,7 +146,7 @@ void exchange_data_with_peers() {
     uint32_t blocksFound = find_missing_blocks(blocksDesired, idlePeers);
     uint32_t blockIndex = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
+        Peer *ptrPeer = global.peers[i];
         if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
@@ -196,24 +169,24 @@ void print_node_status() {
     printf("Peers: \n");
     uint16_t validPeers = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Peer *ptrPeer = &global.peers[i];
+        Peer *ptrPeer = global.peers[i];
         if (peer_hand_shaken(ptrPeer)) {
             validPeers++;
             if (is_latency_fully_tested(ptrPeer)) {
                 double averageLatency = average_peer_latency(ptrPeer);
                 printf(
                     "Peer %02u: %7.1fms (%llu KB)\n",
-                    ptrPeer->index,
+                    ptrPeer->slot,
                     averageLatency,
                     ptrPeer->networking.incomingBytes / 1024
                 );
             }
             else {
-                printf("Peer %02u:     ?ms (%llu KB)\n", ptrPeer->index, ptrPeer->networking.incomingBytes / 1024);
+                printf("Peer %02u:     ?ms (%llu KB)\n", ptrPeer->slot, ptrPeer->networking.incomingBytes / 1024);
             }
         }
         else {
-            printf("Peer %02u:     <>\n", ptrPeer->index);
+            printf("Peer %02u:     <>\n", ptrPeer->slot);
         }
     }
     printf("%u/%u valid peers, out of %u candidates\n", validPeers, global.peerCount, global.peerCandidateCount);
@@ -759,32 +732,62 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     FREE(ptrContext, "initialize_peer:ConnectContext");
 }
 
-int32_t initialize_peer(uint32_t peerIndex, PeerCandidate *ptrCandidate)  {
+void on_socket_closed(uv_handle_t *socket) {
+    SocketContext *data = (SocketContext *)socket->data;
+    FREE(data->peer, "Peer");
+    FREE(data, "SocketContext");
+}
+
+void release_peer(Peer *ptrPeer) {
+    if (!ptrPeer) {
+        return;
+    }
+    global.peers[ptrPeer->slot] = NULL;
+    uv_handle_t *socket = (uv_handle_t *) &ptrPeer->socket;
+    if (uv_is_closing(socket)) {
+        fprintf(stderr, "release_peer: Socket is already closing...\n");
+        global.zombieSockets[global.zombineSocketCount++] = socket; // TODO: Release somewhere else?
+    }
+    else {
+        uv_close(socket, on_socket_closed);
+    }
+}
+
+Peer *create_peer(PeerCandidate* ptrCandidate) {
+    Peer *ptrPeer = CALLOC(1, sizeof(Peer), "Peer");
+    double now = get_now();
+    ptrPeer->connectionStart = now;
+    ptrPeer->handshake.handshakeStart = now; // to be updated in on_message_attempted
+    memcpy(ptrPeer->address.ip, ptrCandidate->addr.net_addr.ip, sizeof(IP));
+    ptrPeer->candidacy = ptrCandidate;
+
+    SocketContext *socketContext = CALLOC(1, sizeof(SocketContext), "SocketContext");
+    socketContext->peer = ptrPeer;
+
+    ptrPeer->socket.data = socketContext;
+
+    uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
+    return ptrPeer;
+}
+
+int32_t connect_peer_candidate(PeerCandidate *ptrCandidate, uint32_t peerSlot)  {
     NetworkAddress *netAddr = &ptrCandidate->addr.net_addr;
     printf(
         "Initializing peer %u with IP %s \n",
-        peerIndex,
+        peerSlot,
         convert_ipv4_readable(netAddr->ip)
     );
 
-    Peer *ptrPeer = &global.peers[peerIndex];
+    release_peer(global.peers[peerSlot]);
 
-    reset_peer(ptrPeer);
-    double now = get_now();
-    ptrPeer->index = peerIndex;
-    ptrPeer->connectionStart = now;
-    ptrPeer->handshake.handshakeStart = now; // to be updated in on_message_attempted
-    memcpy(ptrPeer->address.ip, netAddr->ip, sizeof(IP));
-    ptrPeer->candidacy = ptrCandidate;
+    Peer *ptrPeer = create_peer(ptrCandidate);
+    ptrPeer->slot = peerSlot;
+    global.peers[ptrPeer->slot] = ptrPeer;
 
-    // Connection request
     struct ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "initialize_peer:ConnectContext");
     ptrContext->peer = ptrPeer;
     uv_connect_t *ptrConnectRequest = CALLOC(1, sizeof(uv_connect_t), "initialize_peer:ConnectRequest");
     ptrConnectRequest->data = ptrContext;
-
-    // TCP socket
-    uv_tcp_init(uv_default_loop(), &ptrPeer->socket);
 
     // Connection request
     struct sockaddr_in remoteAddress;
@@ -925,7 +928,7 @@ static PeerCandidate *pick_best_nonpeer_candidate(double *finalScore) {
 void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
     double score = 0;
     PeerCandidate *ptrCandidate = pick_best_nonpeer_candidate(&score);
-    initialize_peer(peerIndex, ptrCandidate);
+    connect_peer_candidate(ptrCandidate, peerIndex);
 }
 
 int32_t connect_to_initial_peers() {
@@ -941,12 +944,8 @@ int32_t connect_to_initial_peers() {
 int32_t release_sockets() {
     printf("Closing sockets...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
-        struct Peer *peer = &global.peers[peerIndex];
-        uv_handle_t* socket = (uv_handle_t*)&peer->socket;
-        if (!uv_is_closing(socket)) {
-            uv_read_stop((uv_stream_t *)&peer->socket);
-            uv_close(socket, NULL);
-        }
+        struct Peer *peer = global.peers[peerIndex];
+        release_peer(peer);
     }
     printf("Done.\n");
     return 0;

@@ -4,7 +4,7 @@
 
 const struct Config config = {
     .periods = {
-        .autoexit = 0,
+        .autoexit = MINUTE_TO_MILLISECOND(2),
         .saveIndices = MINUTE_TO_MILLISECOND(5),
         .peerDataExchange = SECOND_TO_MILLISECOND(1),
         .resetIBDMode = SECOND_TO_MILLISECOND(120),

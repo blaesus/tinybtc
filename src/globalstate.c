@@ -60,7 +60,7 @@ void filter_peer_candidates() {
 
 bool is_peer(PeerCandidate *ptrCandidate) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (ips_equal(global.peers[i].address.ip, ptrCandidate->addr.net_addr.ip)) {
+        if (ips_equal(global.peers[i]->address.ip, ptrCandidate->addr.net_addr.ip)) {
             return true;
         }
     }
@@ -91,7 +91,7 @@ uint32_t find_missing_blocks(SHA256_HASH *hashes, uint32_t desiredCount) {
 
 bool is_block_being_requested(Byte *hash) {
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        Byte *requesting = global.peers[i].networking.requesting;
+        Byte *requesting = global.peers[i]->networking.requesting;
         if (memcmp(requesting, hash, SHA256_LENGTH) == 0) {
             return true;
         }
@@ -106,7 +106,7 @@ bool peer_hand_shaken(Peer *ptrPeer) {
 uint32_t count_hand_shaken_peers() {
     uint32_t count = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
-        if (peer_hand_shaken(&global.peers[i])) {
+        if (peer_hand_shaken(global.peers[i])) {
             count++;
         }
     }

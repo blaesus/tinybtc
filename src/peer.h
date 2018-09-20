@@ -48,13 +48,12 @@ enum PeerRelationship {
 };
 
 struct Peer {
-    uint32_t index;
+    uint32_t slot;
     struct HandshakeState handshake;
     struct InteractionState networking;
 
     uv_tcp_t socket;
     double connectionStart;
-    bool triedClosing;
 
     enum PeerRelationship relationship;
     NetworkAddress address;

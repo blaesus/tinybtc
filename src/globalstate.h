@@ -25,7 +25,7 @@ struct GlobalState {
     PeerCandidate peerCandidates[MAX_PEER_CANDIDATES];
     uint32_t peerCandidateCount;
 
-    Peer peers[MAX_PEERS];
+    Peer *peers[MAX_PEERS];
     uint32_t peerCount;
 
     time_t start_time;
