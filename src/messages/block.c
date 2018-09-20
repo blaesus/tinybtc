@@ -33,30 +33,19 @@ int32_t parse_into_block_payload(Byte *ptrBuffer, BlockPayload *ptrBlock) {
     p += PARSE_INTO(p, &ptrBlock->header);
     p += parse_varint(p, &ptrBlock->txCount);
 
-    TxNode *ptrPreviousNode = NULL;
+    ptrBlock->txs = CALLOC(ptrBlock->txCount, sizeof(TxPayload), "parse_block:txs");
     for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
-        TxNode *ptrNewNode = CALLOC(1, sizeof(TxNode), "parse_block:TxNode");
-        p += parse_into_tx_payload(p, &ptrNewNode->tx);
-        if (!ptrBlock->ptrFirstTxNode) {
-            ptrBlock->ptrFirstTxNode = ptrNewNode;
-        }
-        if (ptrPreviousNode) {
-            ptrPreviousNode->next = ptrNewNode;
-        }
-        ptrPreviousNode = ptrNewNode;
+        p += parse_into_tx_payload(p, &ptrBlock->txs[i]);
     }
     return 0;
 }
 
-void release_txs_in_block(BlockPayload *ptrBlock) {
-    TxNode *p = ptrBlock->ptrFirstTxNode;
-    TxNode *freeTarget;
-    while (p) {
-        freeTarget = p;
-        p = p->next;
-        release_items_in_tx(&freeTarget->tx);
-        FREE(freeTarget, "parse_block:TxNode");
+void release_block(BlockPayload *ptrBlock) {
+    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+        release_items_in_tx(&ptrBlock->txs[i]);
     }
+    FREE(ptrBlock->txs, "parse_block:txs");
+    FREE(ptrBlock, "load_block_message:payload");
 }
 
 uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer) {
@@ -67,10 +56,8 @@ uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer) {
     p += serialize_block_payload_header(ptrHeader, p);
     p += serialize_to_varint(ptrPayload->txCount, p);
 
-    TxNode *txNode = ptrPayload->ptrFirstTxNode;
     for (uint64_t i = 0; i < ptrPayload->txCount; i++) {
-        p += serialize_tx_payload(&txNode->tx, p);
-        txNode = txNode->next;
+        p += serialize_tx_payload(&ptrPayload->txs[i], p);
     }
 
     return p - ptrBuffer;
@@ -113,7 +100,7 @@ uint64_t load_block_message(char *path, Message *ptrMessage) {
     Byte *buffer = MALLOC(payloadLength, "load_block_message:buffer");
     fread(buffer, payloadLength, 1, file);
 
-    ptrMessage->ptrPayload = CALLOC(1, sizeof(BlockPayload), "load_block_message:paylaod");
+    ptrMessage->ptrPayload = CALLOC(1, sizeof(BlockPayload), "load_block_message:payload");
     parse_into_block_payload(buffer, ptrMessage->ptrPayload);
     fclose(file);
     FREE(buffer, "load_block_message:buffer");
@@ -154,26 +141,22 @@ bool is_block_legal(BlockPayload *ptrBlock) {
 
     bool timestampLegal = ptrBlock->header.timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
 
-    bool firstTxIsCoinbase = is_coinbase(&ptrBlock->ptrFirstTxNode->tx);
+    bool firstTxIsCoinbase = is_coinbase(&ptrBlock->txs[0]);
 
     bool onlyOneCoinbase = true;
-    TxNode *p = ptrBlock->ptrFirstTxNode->next;
-    while (p) {
-        if (is_coinbase(&p->tx)) {
+    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+        if (is_coinbase(&ptrBlock->txs[i])) {
             onlyOneCoinbase = false;
             break;
         }
-        p = p->next;
     }
 
     bool allTxLegal = true;
-    p = ptrBlock->ptrFirstTxNode;
-    while (p) {
-        if (!is_tx_legal(&p->tx)) {
+    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+        if (!is_tx_legal(&ptrBlock->txs[i])) {
             allTxLegal = false;
             break;
         }
-        p = p->next;
     }
 
     bool hashSatisfiesTarget;
@@ -183,7 +166,7 @@ bool is_block_legal(BlockPayload *ptrBlock) {
 
     bool merkleMatch;
     SHA256_HASH computedMerkle = {0};
-    compute_merkle_root(ptrBlock->ptrFirstTxNode, computedMerkle);
+    compute_merkle_root(ptrBlock->txs, ptrBlock->txCount, computedMerkle);
     merkleMatch = memcmp(computedMerkle, ptrBlock->header.merkle_root, SHA256_LENGTH) == 0;
 
     /*
@@ -235,12 +218,9 @@ void print_block_payload(BlockPayload *ptrBlock) {
     printf("version: %u\n", ptrBlock->header.version);
     printf("merkle root:");
     print_object(ptrBlock->header.merkle_root, SHA256_LENGTH);
-    TxNode *ptrTxNode = ptrBlock->ptrFirstTxNode;
     for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
         printf("\n## TX %u\n", i);
-        TxPayload tx = ptrTxNode->tx;
-        print_tx_payload(&tx);
-        ptrTxNode = ptrTxNode->next;
+        print_tx_payload(&ptrBlock->txs[i]);
     }
     printf("----------------\n");
 }

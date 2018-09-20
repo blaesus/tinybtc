@@ -112,12 +112,11 @@ bool is_normal_tx_valid(TxPayload *tx) {
     return true;
 }
 
-bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
+bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {
     if (blockIndex == NULL) {
         fprintf(stderr, "No block index\n");
         return false;
     }
-    TxPayload *tx = &ptrNode->tx;
 
     if (is_coinbase(tx)) {
         return is_coinbase_tx_valid(tx);
@@ -129,13 +128,11 @@ bool is_tx_valid(TxNode *ptrNode, BlockIndex *blockIndex) {
 
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
     bool allTxValid = true;
-    TxNode *p = ptrCandidate->ptrFirstTxNode;
-    while (p) {
-        if (!is_tx_valid(p, ptrIndex)) {
+    for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
+        if (!is_tx_valid(&ptrCandidate->txs[i], ptrIndex)) {
             allTxValid = false;
             break;
         }
-        p = p->next;
     }
     return allTxValid;
 }
@@ -387,10 +384,9 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         print_hash_with_description("Block saved: ", hash);
         index->meta.fullBlockAvailable = true;
     }
-    TxNode *p =  ptrBlock->ptrFirstTxNode;
-    while (p) {
-        save_tx(&p->tx);
-        p = p->next;
+
+    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+        save_tx(&ptrBlock->txs[i]);
     }
     return 0;
 }
@@ -421,7 +417,7 @@ double verify_block_indices(bool checkDB) {
                 if (!status) {
                     ptrIndex->meta.fullBlockAvailable = true;
                 }
-                release_txs_in_block(ptrBlock);
+                release_block(ptrBlock);
                 FREE(ptrBlock, "verify_block_indices:block");
             }
         }
@@ -475,7 +471,7 @@ void validate_new_blocks() {
         else {
             printf("Cannot load block\n");
         }
-        release_txs_in_block(child);
+        release_block(child);
         FREE(child, "validate_new_blocks:block");
         if (!continueScanning) {
             return;

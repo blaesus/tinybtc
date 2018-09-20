@@ -62,18 +62,11 @@ struct TxPayload {
 
 typedef struct TxPayload TxPayload;
 
-struct TxNode {
-    TxPayload tx;
-    struct TxNode *next;
-};
-
-typedef struct TxNode TxNode;
-
 uint64_t serialize_tx_payload(TxPayload *ptrPayload, Byte *ptrBuffer);
 uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx);
 uint64_t serialize_tx_message(Message *ptrPayload, Byte *ptrBuffer);
 int32_t make_tx_message(Message *ptrMessage, TxPayload *ptrPayload);
-int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result);
+int32_t compute_merkle_root(TxPayload txs[], uint64_t txCount, SHA256_HASH result);
 void print_tx_payload(TxPayload *ptrTx);
 bool is_coinbase(TxPayload *ptrTx);
 bool is_tx_legal(TxPayload *ptrTx);

@@ -211,18 +211,13 @@ typedef struct HashNode HashNode;
 
 // @see https://en.bitcoin.it/wiki/Getblocktemplate#How_to_build_merkle_root
 
-int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
-    if (!ptrFirstTxNode) {
-        return -1;
-    }
-
+int32_t compute_merkle_root(TxPayload txs[], uint64_t txCount, SHA256_HASH result) {
     // Hash the linked tx list
     HashNode *ptrFirstHashNode = NULL;
     HashNode *ptrPreviousHashNode = NULL;
-    TxNode *ptrTxNode = ptrFirstTxNode;
-    while (ptrTxNode) {
+    for (uint64_t i = 0; i < txCount; i++) {
         HashNode *newHashNode = CALLOC(1, sizeof(HashNode), "compute_merkle_root:HashNode");
-        hash_tx(&ptrTxNode->tx, newHashNode->hash);
+        hash_tx(&txs[i], newHashNode->hash);
         if (!ptrFirstHashNode) {
             ptrFirstHashNode = newHashNode;
         }
@@ -230,7 +225,10 @@ int32_t compute_merkle_root(TxNode *ptrFirstTxNode, SHA256_HASH result) {
             ptrPreviousHashNode->next = newHashNode;
         }
         ptrPreviousHashNode = newHashNode;
-        ptrTxNode = ptrTxNode->next;
+    }
+
+    if (!ptrFirstHashNode) {
+        return 1;
     }
 
     while (ptrFirstHashNode->next) {

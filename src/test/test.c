@@ -134,8 +134,8 @@ static void test_merkle_on_path(char *path) {
     load_block_message(path, &message);
     SHA256_HASH merkleRoot = {0};
     BlockPayload *ptrPayload = message.ptrPayload;
-    compute_merkle_root(ptrPayload->ptrFirstTxNode, merkleRoot);
-    release_txs_in_block(ptrPayload);
+    compute_merkle_root(ptrPayload->txs, ptrPayload->txCount, merkleRoot);
+    release_block(ptrPayload);
     print_object(merkleRoot, SHA256_LENGTH);
 }
 
@@ -350,7 +350,7 @@ void test_db() {
     BlockPayload *ptrBlockLoaded = MALLOC(sizeof(BlockPayload), "test_redis:payload");
     load_block(genesisHash, ptrBlockLoaded);
     print_block_payload(ptrBlockLoaded);
-    release_txs_in_block(ptrBlockLoaded);
+    release_block(ptrBlockLoaded);
     FREE(ptrBlockLoaded, "test_redis:payload");
 }
 
@@ -430,8 +430,8 @@ void test() {
     // test_version_messages();
     // test_genesis();
     // test_block();
-    // test_block_parsing_and_serialization();
-    test_merkles();
+    test_block_parsing_and_serialization();
+    // test_merkles();
     // test_mine();
     // test_getheaders();
     // test_checksum();
