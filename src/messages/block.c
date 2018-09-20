@@ -123,13 +123,11 @@ void print_block_message(Message *ptrMessage) {
 
 int32_t parse_into_block_message(Byte *ptrBuffer, Message *ptrMessage) {
     Header header = get_empty_header();
-    BlockPayload payload;
-    memset(&payload, 0, sizeof(payload));
     parse_message_header(ptrBuffer, &header);
-    parse_into_block_payload(ptrBuffer + sizeof(header), &payload);
     memcpy(ptrMessage, &header, sizeof(header));
-    ptrMessage->ptrPayload = MALLOC(sizeof(BlockPayload), "parse_message:payload");
-    memcpy(ptrMessage->ptrPayload, &payload, sizeof(payload));
+
+    ptrMessage->ptrPayload = CALLOC(1, sizeof(BlockPayload), "parse_message:payload");
+    parse_into_block_payload(ptrBuffer + sizeof(header), ptrMessage->ptrPayload);
     return 0;
 }
 
