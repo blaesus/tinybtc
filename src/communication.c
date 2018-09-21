@@ -732,10 +732,14 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     FREE(ptrContext, "initialize_peer:ConnectContext");
 }
 
-void on_socket_closed(uv_handle_t *socket) {
+void release_socket_context(uv_handle_t *socket) {
     SocketContext *data = (SocketContext *)socket->data;
     FREE(data->peer, "Peer");
     FREE(data, "SocketContext");
+}
+
+void on_socket_closed(uv_handle_t *socket) {
+    release_socket_context(socket);
 }
 
 void release_peer(Peer *ptrPeer) {
@@ -746,7 +750,11 @@ void release_peer(Peer *ptrPeer) {
     uv_handle_t *socket = (uv_handle_t *) &ptrPeer->socket;
     if (uv_is_closing(socket)) {
         fprintf(stderr, "release_peer: Socket is already closing...\n");
-        global.zombieSockets[global.zombineSocketCount++] = socket; // TODO: Release somewhere else?
+        uv_tcp_t *backupSocket = MALLOC(sizeof(*backupSocket), "release_peer:zombieSocket");
+        memcpy(backupSocket, socket, sizeof(*socket));
+        global.zombieSockets[global.zombineSocketCount] = backupSocket;
+        global.zombineSocketCount = (global.zombineSocketCount + 1) % MAX_ZOMBIE_SOCKETS;
+        release_socket_context(socket);
     }
     else {
         uv_close(socket, on_socket_closed);
