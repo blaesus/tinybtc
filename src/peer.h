@@ -6,7 +6,7 @@
 #include "datatypes.h"
 #include "hash.h"
 
-#define PEER_LATENCY_SLOT 5
+#define PEER_LATENCY_SLOT 3
 
 enum PeerCandidateStatus {
     PEER_CANDIDATE_STATUS_NORMAL,
