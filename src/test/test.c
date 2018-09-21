@@ -388,11 +388,11 @@ void test_script() {
         const char *targetBlock = targets[i];
         SHA256_HASH targetHash = {0};
         sha256_hex_to_binary(targetBlock, targetHash);
-        reverse_endian(targetHash, sizeof(targetHash));
+        reverse_endian(targetHash, SHA256_LENGTH);
 
         BlockIndex *index = GET_BLOCK_INDEX(targetHash);
         if (!index) {
-            print_hash_with_description("Block not found: ", targetHash);
+            print_hash_with_description("Block index not found: ", targetHash);
             return;
         }
         BlockPayload block;
@@ -420,7 +420,6 @@ void test_hash() {
     BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
     SHA256_HASH genesisHash = {0};
     dsha256(&ptrBlock->header, sizeof(ptrBlock->header), genesisHash);
-    reverse_endian(genesisHash, SHA256_LENGTH);
     char s[2 * SHA256_LENGTH] = {0};
     hash_binary_to_hex(genesisHash, s);
     printf("s=%s", s);
@@ -430,7 +429,7 @@ void test() {
     // test_version_messages();
     // test_genesis();
     // test_block();
-    test_block_parsing_and_serialization();
+    // test_block_parsing_and_serialization();
     // test_merkles();
     // test_mine();
     // test_getheaders();
@@ -442,6 +441,6 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    // test_script();
+    test_script();
     // test_hash();
 }

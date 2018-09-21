@@ -386,7 +386,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     }
 
     for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
-        save_tx(&ptrBlock->txs[i]);
+        save_tx_location(&ptrBlock->txs[i], index->meta.hash);
     }
     return 0;
 }

@@ -20,6 +20,7 @@
 enum Prefix {
     BLOCK_PREFIX = 'L',
     TX_PREFIX = 'T',
+    TX_LOCATION_PREFIX = 'R',
 };
 
 typedef enum Prefix Prefix;
@@ -249,7 +250,6 @@ int8_t save_block(BlockPayload *ptrBlock) {
     hash_block_header(&ptrBlock->header, hash);
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_block:buffer");
     uint64_t width = serialize_block_payload(ptrBlock, buffer);
-    reverse_endian(hash, SHA256_LENGTH);
     save_data_by_hash(hash, BLOCK_PREFIX, buffer, width);
     FREE(buffer, "save_block:buffer");
     return 0;
@@ -258,7 +258,6 @@ int8_t save_block(BlockPayload *ptrBlock) {
 int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     SHA256_HASH key = {0};
     memcpy(key, hash, SHA256_LENGTH);
-    reverse_endian(key, SHA256_LENGTH);
 
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
     size_t outputLength = 0;
@@ -289,30 +288,45 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     return status;
 }
 
-int8_t save_tx(TxPayload *ptrTx) {
+int8_t save_tx_location(TxPayload *ptrTx, Byte *blockHash) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_tx:buffer");
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
-    SHA256_HASH hash = {0};
-    dsha256(buffer, (uint32_t)width, hash);
-    save_data_by_hash(hash, TX_PREFIX, buffer, width);
+    SHA256_HASH txHash = {0};
+    dsha256(buffer, (uint32_t)width, txHash);
+    save_data_by_hash(txHash, TX_LOCATION_PREFIX, blockHash, SHA256_LENGTH);
     FREE(buffer, "save_tx:buffer");
     return 0;
 }
 
-int8_t load_tx(Byte *hash, TxPayload *ptrPayload) {
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
-
-    size_t outputLength = 0;
-    int8_t status = load_data_by_hash(hash, TX_PREFIX, buffer, &outputLength);
-    parse_into_tx_payload(buffer, ptrPayload);
-    SHA256_HASH actualHash = {0};
-    dsha256(buffer, (uint32_t)outputLength, actualHash);
-    if (memcmp(hash, actualHash, SHA256_LENGTH) != 0) {
-        fprintf(stderr, "load_tx: hashes mismatch\n");
-        remove_data_by_hash(hash, TX_PREFIX);
-        status = ERROR_BAD_DATA;
+int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
+    int8_t status = 0;
+    SHA256_HASH blockHash = {0};
+    size_t hashWidth = 0;
+    status = load_data_by_hash(targetHash, TX_LOCATION_PREFIX, blockHash, &hashWidth);
+    if (status) {
+        fprintf(stderr, "Cannot load block reference\n");
     }
 
+    size_t blockLength = 0;
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
+    status = load_data_by_hash(blockHash, BLOCK_PREFIX, buffer, &blockLength);
+    if (status) {
+        fprintf(stderr, "Cannot load block itself\n");
+    }
+    BlockPayload *block = CALLOC(1, sizeof(*block), "load_tx:block");
+    parse_into_block_payload(buffer, block);
+
+    SHA256_HASH txHash = {0};
+    for (uint64_t i = 0; i < block->txCount; i++) {
+        uint64_t width = serialize_tx_payload(&block->txs[i], buffer);
+        dsha256(buffer, (uint32_t)width, txHash);
+        if (memcmp(txHash, targetHash, SHA256_LENGTH) == 0) {
+            parse_into_tx_payload(buffer, ptrPayload);
+            status = 0;
+        }
+    }
+
+    release_block(block);
     FREE(buffer, "load_tx:buffer");
     return status;
 }
@@ -334,9 +348,6 @@ uint64_t get_binary_keys_by_prefix(SHA256_HASH hashes[], Prefix desiredPrefix) {
         }
         SHA256_HASH hash = {0};
         sha256_hex_to_binary(ptrKey+1, hash);
-        if (desiredPrefix == BLOCK_PREFIX) {
-            reverse_endian(hash, SHA256_LENGTH);
-        }
         memcpy(hashes[count], hash, sizeof(hash));
         count++;
     }
@@ -368,16 +379,21 @@ void load_genesis() {
 }
 
 void migrate() {
-    init_db();
-    SHA256_HASH *hashes = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "migrate:hashes");
-    uint64_t count = get_binary_keys_by_prefix(hashes, BLOCK_PREFIX);
-    printf("count = %llu", count);
-    for (uint64_t i = 0; i < count; i++) {
-        Byte *hash = hashes[i];
-        TxPayload tx;
-        load_tx(hash, &tx);
-        print_tx_payload(&tx);
-        printf("\n");
+    hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+    load_genesis();
+    load_block_indices();
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
+    uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    for (uint32_t i = 0; i < indexCount; i++) {
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
+        ptrIndex->meta.fullBlockAvailable = false;
+        ptrIndex->meta.fullBlockValidated = false;
     }
+    BlockIndex *genesisIndex = GET_BLOCK_INDEX(global.genesisHash);
+    global.mainValidatedTip = *genesisIndex;
+    global.mainHeaderTip = *genesisIndex;
+    save_block_indices();
 }
 
