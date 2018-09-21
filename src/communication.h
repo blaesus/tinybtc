@@ -34,9 +34,11 @@ int32_t setup_listen_socket(void);
 int32_t connect_to_initial_peers(void);
 void connect_to_local(void);
 int32_t release_sockets(void);
+void terminate_sockets();
 void connect_to_best_candidate_as_peer(uint32_t peerIndex);
 void send_message(
     uv_tcp_t *socket,
     char *command,
     void *data
 );
+void terminate_execution();

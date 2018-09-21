@@ -9,28 +9,18 @@
 
 #include "test/test.h"
 
-void cleanup() {
-    printf("\nCleaning up\n");
-    uv_loop_close(uv_default_loop());
-    save_chain_data();
-    cleanup_db();
-    release_sockets();
-    printf("\nGood byte!\n");
-}
-
 int32_t run_main_loop() {
     return uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 }
 
 void setup_cleanup() {
-    atexit(&cleanup);
+    atexit(&terminate_execution);
     struct sigaction sa = {
-        .sa_handler = &cleanup,
+        .sa_handler = &terminate_execution,
         .sa_flags = 0,
     };
     sigemptyset(&sa.sa_mask);
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGKILL, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 }
 
 int8_t init() {

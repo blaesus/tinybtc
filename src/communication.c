@@ -200,16 +200,6 @@ void print_node_status() {
     printf("=====================\n");
 }
 
-void terminate_main_loop(uv_timer_t *handle) {
-    printf("Stopping main loop...\n");
-    if (handle) {
-        uv_timer_stop(handle);
-    }
-    uv_stop(uv_default_loop());
-    uv_loop_close(uv_default_loop());
-    printf("Done.\n");
-}
-
 void resetIBDMode() {
     uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
     if (maxFullBlockHeight * 1.0 / global.mainHeaderTip.context.height > config.ibdModeAvailabilityThreshold) {
@@ -245,7 +235,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.autoexit,
-            .callback = &terminate_main_loop,
+            .callback = &terminate_execution,
             .onlyOnce = true,
         },
         {
@@ -822,7 +812,7 @@ void on_incoming_segment_to_api(uv_stream_t *socket, ssize_t nread, const uv_buf
     }
     printf("\nIncoming segment to API socket\n");
     if (memcmp(buf->base, INSTRUCTION_KILL, strlen(INSTRUCTION_KILL)) == 0) {
-        terminate_main_loop(NULL);
+        terminate_execution();
     }
     FREE(buf->base, "allocate_read_buffer:bufBase");
 }
@@ -949,12 +939,42 @@ int32_t connect_to_initial_peers() {
     return 0;
 }
 
-int32_t release_sockets() {
+void terminate_sockets() {
     printf("Closing sockets...");
     for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
         struct Peer *peer = global.peers[peerIndex];
         release_peer(peer);
     }
     printf("Done.\n");
-    return 0;
+}
+
+bool ready_to_end() {
+    bool result = true;
+    for (uint64_t i = 0; i < global.peerCount; i++) {
+        if (global.peers[i]) {
+            result = false;
+        }
+    }
+    return result;
+}
+
+void check_to_cleanup() {
+    if (ready_to_end()) {
+        printf("\nCleaning up\n");
+        uv_stop(uv_default_loop());
+        uv_loop_close(uv_default_loop());
+        save_chain_data();
+        cleanup_db();
+        printf("\nGood byte!\n");
+    }
+    else {
+        printf("\nNot ready yet...\n");
+    }
+}
+
+void terminate_execution() {
+    terminate_sockets();
+    uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
+    uv_timer_init(uv_default_loop(), timer);
+    uv_timer_start(timer, check_to_cleanup, 0, 500);
 }
