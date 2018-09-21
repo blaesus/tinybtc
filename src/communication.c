@@ -356,6 +356,13 @@ int32_t parse_buffer_into_message(uint8_t *ptrBuffer, Message *ptrMessage) {
     }
 }
 
+void free_write_request(uv_write_t *writeRequest) {
+    struct WriteContext *ptrContext = writeRequest->data;
+    FREE(ptrContext->buf.base, "send_message:buffer");
+    FREE(ptrContext, "write_buffer_to_socket:WriteContext");
+    FREE(writeRequest, "write_buffer_to_socket:WriteRequest");
+}
+
 void on_message_attempted(uv_write_t *writeRequest, int status) {
     struct WriteContext *ptrContext = writeRequest->data;
 
@@ -391,9 +398,7 @@ void on_message_attempted(uv_write_t *writeRequest, int status) {
         }
     }
     cleanup:
-    FREE(ptrContext->buf.base, "send_message:buffer");
-    FREE(ptrContext, "write_buffer_to_socket:WriteContext");
-    FREE(writeRequest, "write_buffer_to_socket:WriteRequest");
+    free_write_request(writeRequest);
 }
 
 void write_buffer_to_socket(
@@ -407,7 +412,11 @@ void write_buffer_to_socket(
     uv_write_t *ptrWriteReq = CALLOC(1, sizeof(uv_write_t), "write_buffer_to_socket:WriteRequest");
     uint8_t bufferCount = 1;
     ptrWriteReq->data = ptrWriteContext;
-    uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_attempted);
+    int32_t writeError = uv_write(ptrWriteReq, (uv_stream_t *)socket, ptrUvBuffer, bufferCount, &on_message_attempted);
+    if (writeError) {
+        fprintf(stderr, "uv_write failed with %s(%i)\n", uv_strerror(writeError), writeError);
+        free_write_request(ptrWriteReq);
+    }
 }
 
 void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
@@ -711,12 +720,11 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     }
     else {
         printf("connected with peer %s \n", ipString);
-
-        SocketContext *socketContext = CALLOC(1, sizeof(*socketContext), "SocketContext");
-        socketContext->peer = ptrContext->peer;
-        connectRequest->handle->data = socketContext;
         send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
-        uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
+        int32_t readError = uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
+        if (readError) {
+            fprintf(stderr, "uv_read failed %s(%i)", uv_strerror(readError), readError);
+        }
     }
     FREE(connectRequest, "initialize_peer:ConnectRequest");
     FREE(ptrContext, "initialize_peer:ConnectContext");
