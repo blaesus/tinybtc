@@ -18,7 +18,12 @@
 #include "blockchain.h"
 #include "config.h"
 #include "persistent.h"
-#include "util.h"
+
+#include "utils/memory.h"
+#include "utils/data.h"
+#include "utils/integers.h"
+#include "utils/strings.h"
+#include "utils/random.h"
 
 
 static int32_t test_version_messages() {

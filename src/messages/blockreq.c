@@ -2,7 +2,8 @@
 
 #include "messages/shared.h"
 #include "blockreq.h"
-#include "util.h"
+
+#include "utils/memory.h"
 
 uint64_t serialize_blockreq_payload(
     BlockRequestPayload *ptrPayload,

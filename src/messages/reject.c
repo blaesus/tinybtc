@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "util.h"
 #include "messages/shared.h"
 #include "reject.h"
+#include "utils/memory.h"
 
 uint64_t parse_reject_payload(
     Byte *ptrBuffer,

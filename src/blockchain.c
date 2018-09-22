@@ -5,10 +5,11 @@
 #include "blockchain.h"
 #include "globalstate.h"
 #include "hash.h"
-#include "util.h"
 #include "units.h"
 #include "persistent.h"
 #include "script.h"
+#include "utils/memory.h"
+#include "utils/datetime.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);

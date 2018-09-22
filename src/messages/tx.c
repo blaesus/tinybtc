@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "tx.h"
-#include "util.h"
+#include "utils/memory.h"
 
 static uint64_t parse_outpoint(Byte *ptrBuffer, Outpoint *ptrOutpoint) {
     Byte *p = ptrBuffer;

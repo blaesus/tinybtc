@@ -1,8 +1,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "shared.h"
-#include "util.h"
 #include "block.h"
+#include "utils/integers.h"
+#include "utils/file.h"
+#include "utils/memory.h"
 
 uint8_t calc_number_varint_width(uint64_t number) {
     if (number < VAR_INT_CHECKPOINT_8) {
@@ -127,7 +129,7 @@ Message get_empty_message() {
 
 uint64_t load_file(char *path, Byte *buffer) {
     FILE *file = fopen(path, "rb");
-    int64_t filesize = getFileSize(file);
+    int64_t filesize = get_file_size(file);
     fread(buffer, (size_t)filesize, 1, file);
     fclose(file);
     return (uint64_t) filesize;

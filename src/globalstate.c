@@ -2,11 +2,14 @@
 #include <stdbool.h>
 
 #include "globalstate.h"
-#include "util.h"
 #include "networking.h"
 #include "config.h"
 #include "persistent.h"
 #include "blockchain.h"
+
+#include "utils/memory.h"
+#include "utils/ip.h"
+#include "utils/datetime.h"
 
 GlobalState global;
 

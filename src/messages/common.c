@@ -3,7 +3,7 @@
 
 #include "messages/common.h"
 #include "messages/shared.h"
-#include "util.h"
+#include "utils/memory.h"
 
 int32_t make_header_only_message(
     Message *ptrMessage,

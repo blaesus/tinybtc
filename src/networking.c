@@ -13,8 +13,9 @@
 
 #include "globalstate.h"
 #include "networking.h"
-#include "util.h"
 #include "config.h"
+
+#include <utils/strings.h>
 
 uint32_t get_v4_binary_representation(const IP ip) {
     const uint32_t number = (ip[12] << 3 * BITS_IN_BYTE)

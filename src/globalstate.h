@@ -15,6 +15,9 @@
 
 #define MAX_ZOMBIE_SOCKETS 1024
 
+#define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
+#define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
+
 struct GlobalState {
     bool ibdMode;
     void *timerTable;

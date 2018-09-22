@@ -8,7 +8,6 @@
 #include "communication.h"
 #include "globalstate.h"
 #include "networking.h"
-#include "util.h"
 #include "units.h"
 #include "blockchain.h"
 #include "config.h"
@@ -28,6 +27,12 @@
 #include "messages/pingpong.h"
 #include "messages/headers.h"
 #include "messages/print.h"
+
+#include "utils/datetime.h"
+#include "utils/random.h"
+#include "utils/memory.h"
+#include "utils/data.h"
+#include "utils/integers.h"
 
 void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);

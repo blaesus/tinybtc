@@ -3,6 +3,7 @@
 #include <util.h>
 #include "pingpong.h"
 #include "messages/shared.h"
+#include "utils/memory.h"
 
 int32_t make_pingpong_message(
     Message *ptrMessage,

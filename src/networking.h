@@ -6,7 +6,6 @@
 #include <arpa/inet.h>
 
 #include "datatypes.h"
-#include "util.h"
 
 #define MAX_IP_PER_DNS 100
 

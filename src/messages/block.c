@@ -3,7 +3,9 @@
 #include <units.h>
 
 #include "messages/block.h"
-#include "util.h"
+#include "utils/memory.h"
+#include "utils/datetime.h"
+#include "utils/data.h"
 
 uint64_t parse_block_payload_header(Byte *ptrBuffer, BlockPayloadHeader *ptrHeader) {
     Byte *p = ptrBuffer;

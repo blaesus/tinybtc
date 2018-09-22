@@ -1,6 +1,5 @@
 #include "stdlib.h"
 #include "peer.h"
-#include "util.h"
 
 bool is_latency_fully_tested(Peer *ptrPeer) {
     for (uint32_t i = 0; i < PEER_LATENCY_SLOT; i++) {

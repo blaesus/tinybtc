@@ -2,9 +2,9 @@
 #include <sys/time.h>
 
 #include "messages/block.h"
-#include "util.h"
 #include "mine.h"
 #include "blockchain.h"
+#include "utils/data.h"
 
 #define LOG_INTERVAL 1000000
 

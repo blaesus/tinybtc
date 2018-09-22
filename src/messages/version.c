@@ -7,8 +7,9 @@
 #include "shared.h"
 #include "globalstate.h"
 #include "peer.h"
-#include "util.h"
 #include "config.h"
+#include "utils/random.h"
+#include "utils/memory.h"
 
 uint64_t serialize_version_payload(
     struct VersionPayload *ptrPayload,

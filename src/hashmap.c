@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include "hashmap.h"
 #include "hash.h"
-#include "util.h"
+
+#include "utils/integers.h"
+#include "utils/memory.h"
 
 static uint64_t calculate_index(Byte *key, uint32_t keyWidth, uint64_t bucketCount);
 

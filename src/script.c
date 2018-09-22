@@ -5,8 +5,9 @@
 #include "datatypes.h"
 #include "parameters.h"
 #include "hash.h"
-#include "util.h"
 #include "config.h"
+#include "utils/memory.h"
+#include "utils/data.h"
 
 #define UNKNOWN_OPCODE "UNKNOWN_OPCODE"
 

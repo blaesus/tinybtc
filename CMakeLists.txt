@@ -19,6 +19,7 @@ include_directories(deps/openssl/include)
 file(GLOB SOURCES ${SOURCES} "src/*.c")
 file(GLOB SOURCES ${SOURCES} "src/messages/*.c")
 file(GLOB SOURCES ${SOURCES} "src/test/*.c")
+file(GLOB SOURCES ${SOURCES} "src/utils/*.c")
 
 add_executable(tinybtc ${SOURCES})
 target_compile_options(tinybtc PRIVATE ${cflags})
