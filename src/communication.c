@@ -702,8 +702,21 @@ void allocate_read_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *
     buf->len = suggested_size;
 }
 
-void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
-    struct ConnectContext *ptrContext = (struct ConnectContext *)connectRequest->data;
+uv_connect_t *create_connect_request(Peer *ptrPeer) {
+    ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "create_connect_request:ConnectContext");
+    ptrContext->peer = ptrPeer;
+    uv_connect_t *ptrConnectRequest = CALLOC(1, sizeof(uv_connect_t), "create_connect_request:ConnectRequest");
+    ptrConnectRequest->data = ptrContext;
+    return ptrConnectRequest;
+}
+
+void free_connect_request(uv_connect_t *connectRequest) {
+    FREE(connectRequest, "create_connect_request:ConnectRequest");
+    FREE(connectRequest->data, "create_connect_request:ConnectContext");
+}
+
+void on_peer_connect(uv_connect_t* connectionRequest, int32_t error) {
+    ConnectContext *ptrContext = (ConnectContext *)connectionRequest->data;
     char *ipString = convert_ipv4_readable(ptrContext->peer->address.ip);
     if (error) {
         fprintf(
@@ -720,14 +733,13 @@ void on_peer_connect(uv_connect_t* connectRequest, int32_t error) {
     }
     else {
         printf("connected with peer %s \n", ipString);
-        send_message((uv_tcp_t *)connectRequest->handle, CMD_VERSION, NULL);
-        int32_t readError = uv_read_start(connectRequest->handle, allocate_read_buffer, on_incoming_segment);
+        send_message((uv_tcp_t *)connectionRequest->handle, CMD_VERSION, NULL);
+        int32_t readError = uv_read_start(connectionRequest->handle, allocate_read_buffer, on_incoming_segment);
         if (readError) {
             fprintf(stderr, "uv_read failed %s(%i)", uv_strerror(readError), readError);
         }
     }
-    FREE(connectRequest, "initialize_peer:ConnectRequest");
-    FREE(ptrContext, "initialize_peer:ConnectContext");
+    free_connect_request(connectionRequest);
 }
 
 void release_socket_context(uv_handle_t *socket) {
@@ -778,11 +790,7 @@ Peer *create_peer(PeerCandidate* ptrCandidate) {
 
 int32_t connect_peer_candidate(PeerCandidate *ptrCandidate, uint32_t peerSlot)  {
     NetworkAddress *netAddr = &ptrCandidate->addr.net_addr;
-    printf(
-        "Initializing peer %u with IP %s \n",
-        peerSlot,
-        convert_ipv4_readable(netAddr->ip)
-    );
+    printf("Initializing peer %u with IP %s \n", peerSlot, convert_ipv4_readable(netAddr->ip));
 
     release_peer(global.peers[peerSlot]);
 
@@ -790,20 +798,22 @@ int32_t connect_peer_candidate(PeerCandidate *ptrCandidate, uint32_t peerSlot)  
     ptrPeer->slot = peerSlot;
     global.peers[ptrPeer->slot] = ptrPeer;
 
-    struct ConnectContext *ptrContext = CALLOC(1, sizeof(*ptrContext), "initialize_peer:ConnectContext");
-    ptrContext->peer = ptrPeer;
-    uv_connect_t *ptrConnectRequest = CALLOC(1, sizeof(uv_connect_t), "initialize_peer:ConnectRequest");
-    ptrConnectRequest->data = ptrContext;
+    uv_connect_t *ptrConnectRequest = create_connect_request(ptrPeer);
 
     // Connection request
     struct sockaddr_in remoteAddress;
     uv_ip4_addr(convert_ipv4_readable(netAddr->ip), htons(netAddr->port), &remoteAddress);
-    uv_tcp_connect(
+    int32_t connectError = uv_tcp_connect(
         ptrConnectRequest,
         &ptrPeer->socket,
         (const struct sockaddr*)&remoteAddress,
         &on_peer_connect
     );
+    if (connectError) {
+        fprintf(stderr, "uv_tcp_connect: failed with %s(%i)\n", uv_strerror(connectError), connectError);
+        free_connect_request(ptrConnectRequest);
+        return connectError;
+    }
     return 0;
 }
 

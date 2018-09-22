@@ -24,6 +24,8 @@ struct ConnectContext {
     struct Peer *peer;
 };
 
+typedef struct ConnectContext ConnectContext;
+
 struct WriteContext {
     struct Peer *peer;
     uv_buf_t buf;
