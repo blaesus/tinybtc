@@ -7,7 +7,6 @@
 
 #include "communication.h"
 #include "globalstate.h"
-#include "networking.h"
 #include "units.h"
 #include "blockchain.h"
 #include "config.h"
@@ -28,6 +27,7 @@
 #include "messages/headers.h"
 #include "messages/print.h"
 
+#include "utils/networking.h"
 #include "utils/datetime.h"
 #include "utils/random.h"
 #include "utils/memory.h"

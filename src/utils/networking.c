@@ -12,10 +12,10 @@
 #include <pthread.h>
 
 #include "globalstate.h"
-#include "networking.h"
 #include "config.h"
 
-#include <utils/strings.h>
+#include "utils/networking.h"
+#include "utils/strings.h"
 
 uint32_t get_v4_binary_representation(const IP ip) {
     const uint32_t number = (ip[12] << 3 * BITS_IN_BYTE)
@@ -159,3 +159,8 @@ bool is_ipv4(IP ip) {
         ip[11] == (uint8_t)0xFF
     );
 }
+
+bool ips_equal(IP ipA, IP ipB) {
+    return memcmp(ipA, ipB, sizeof(IP)) == 0;
+}
+

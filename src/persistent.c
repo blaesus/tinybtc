@@ -5,11 +5,11 @@
 #include "persistent.h"
 
 #include "globalstate.h"
-#include "networking.h"
 #include "blockchain.h"
 #include "config.h"
 #include "utils/integers.h"
 #include "utils/memory.h"
+#include "utils/networking.h"
 
 #define PEER_LIST_BINARY_FILENAME "peers.dat"
 #define PEER_LIST_CSV_FILENAME "peers.csv"

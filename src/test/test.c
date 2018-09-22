@@ -5,7 +5,6 @@
 #include "openssl/bn.h"
 
 #include "datatypes.h"
-#include "networking.h"
 #include "peer.h"
 #include "globalstate.h"
 #include "messages/shared.h"
@@ -19,6 +18,7 @@
 #include "config.h"
 #include "persistent.h"
 
+#include "utils/networking.h"
 #include "utils/memory.h"
 #include "utils/data.h"
 #include "utils/integers.h"

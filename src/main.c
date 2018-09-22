@@ -1,13 +1,14 @@
 #include <stdlib.h>
 
 #include "communication.h"
-#include "networking.h"
 #include "persistent.h"
 #include "globalstate.h"
 #include "blockchain.h"
 #include "config.h"
+#include "utils/networking.h"
 
 #include "test/test.h"
+
 
 int32_t run_main_loop() {
     return uv_run(uv_default_loop(), UV_RUN_DEFAULT);

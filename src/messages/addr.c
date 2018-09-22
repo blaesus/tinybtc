@@ -3,7 +3,7 @@
 
 #include "messages/shared.h"
 #include "messages/addr.h"
-#include "networking.h"
+#include "utils/networking.h"
 #include "utils/memory.h"
 
 void parse_addr_payload(
