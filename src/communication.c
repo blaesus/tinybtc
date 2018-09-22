@@ -761,7 +761,6 @@ void release_peer(Peer *ptrPeer) {
     if (!ptrPeer) {
         return;
     }
-    global.peers[ptrPeer->slot] = NULL;
     uv_handle_t *socket = (uv_handle_t *) &ptrPeer->socket;
     if (uv_is_closing(socket)) {
         fprintf(stderr, "release_peer: Socket is already closing...\n");
@@ -793,15 +792,20 @@ Peer *create_peer(PeerCandidate* ptrCandidate) {
     return ptrPeer;
 }
 
+Peer *swap_slot_with_candidate(uint32_t slot, PeerCandidate *ptrCandidate) {
+    Peer *ptrOldPeer = global.peers[slot];
+    Peer *ptrNewPeer = create_peer(ptrCandidate);
+    ptrNewPeer->slot = slot;
+    global.peers[ptrNewPeer->slot] = ptrNewPeer;
+    release_peer(ptrOldPeer);
+    return ptrNewPeer;
+}
+
 int32_t connect_peer_candidate(PeerCandidate *ptrCandidate, uint32_t peerSlot)  {
     NetworkAddress *netAddr = &ptrCandidate->addr.net_addr;
     printf("Initializing peer %u with IP %s \n", peerSlot, convert_ipv4_readable(netAddr->ip));
 
-    release_peer(global.peers[peerSlot]);
-
-    Peer *ptrPeer = create_peer(ptrCandidate);
-    ptrPeer->slot = peerSlot;
-    global.peers[ptrPeer->slot] = ptrPeer;
+    Peer *ptrPeer = swap_slot_with_candidate(peerSlot, ptrCandidate);
 
     uv_connect_t *ptrConnectRequest = create_connect_request(ptrPeer);
 
