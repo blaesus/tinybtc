@@ -716,6 +716,9 @@ uv_connect_t *create_connect_request(Peer *ptrPeer) {
 }
 
 void free_connect_request(uv_connect_t *connectRequest) {
+    if (!connectRequest) {
+        return;
+    }
     FREE(connectRequest, "create_connect_request:ConnectRequest");
     FREE(connectRequest->data, "create_connect_request:ConnectContext");
 }
