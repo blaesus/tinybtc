@@ -95,17 +95,10 @@ uint64_t serialize_network_address(
     struct NetworkAddress *ptrAddress,
     uint8_t *ptrBuffer
 ) {
-    //TODO: Check buffer overflow
     uint8_t *p = ptrBuffer;
-    memcpy(p, &ptrAddress->services, sizeof(ptrAddress->services));
-    p += sizeof(ptrAddress->services);
-
-    memcpy(p, &ptrAddress->ip, sizeof(ptrAddress->ip));
-    p += sizeof(ptrAddress->ip);
-
-    memcpy(p, &ptrAddress->port, sizeof(ptrAddress->port));
-    p += sizeof(ptrAddress->port);
-
+    p += SERIALIZE_TO(ptrAddress->services, p);
+    p += SERIALIZE_TO(ptrAddress->ip, p);
+    p += SERIALIZE_TO(ptrAddress->port, p);
     return p - ptrBuffer;
 }
 
@@ -114,15 +107,9 @@ uint64_t parse_network_address(
     struct NetworkAddress *ptrAddress
 ) {
     uint8_t *p = ptrBuffer;
-    memcpy(&ptrAddress->services, p, sizeof(ptrAddress->services));
-    p += sizeof(ptrAddress->services);
-
-    memcpy(&ptrAddress->ip, p, sizeof(ptrAddress->ip));
-    p += sizeof(ptrAddress->ip);
-
-    memcpy(&ptrAddress->port, p, sizeof(ptrAddress->port));
-    p += sizeof(ptrAddress->port);
-
+    p += PARSE_INTO(p, &ptrAddress->services);
+    p += PARSE_INTO(p, &ptrAddress->ip);
+    p += PARSE_INTO(p, &ptrAddress->port);
     return p - ptrBuffer;
 }
 
