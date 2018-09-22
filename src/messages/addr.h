@@ -4,11 +4,11 @@
 #include "datatypes.h"
 #include "messages/shared.h"
 
-#define MAX_ADDR_LIST 1024
+#define MAX_RECORDS_IN_ADDR 4096
 
 struct AddrPayload {
     uint64_t count;
-    struct AddrRecord addr_list[MAX_ADDR_LIST];
+    struct AddrRecord addr_list[MAX_RECORDS_IN_ADDR];
 };
 
 typedef struct AddrPayload AddrPayload;
