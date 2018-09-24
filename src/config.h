@@ -50,7 +50,7 @@ struct Config {
     uint8_t backlog;
     uint16_t getaddrThreshold;
     char *dbName;
-    double ibdModeAvailabilityThreshold;
+    uint16_t ibdModeAvailabilityThreshold;
     uint16_t ibdPeerMaxBlockDifference;
     uint16_t apiPort;
     char *silentIncomingMessageCommands;

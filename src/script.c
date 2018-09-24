@@ -328,7 +328,6 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
     return txCopy;
 }
 
-
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -377,9 +376,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_CHECKSIG: {
-                    // Decude public key
+                    // Deduce public key
                     if (runtimeStack.height < 2) {
-                        fprintf(stderr, "OP_CHECKSIG: insufficient frame[tx]version=1; 1 TxIns; 2 TxOutss\n");
+                        fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
                         goto immediate_fail;
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
@@ -419,6 +418,25 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     release_items_in_tx(txCopy);
                     FREE(txCopy, "make_tx_copy:txCopy");
                     EC_KEY_free(ptrPubKey);
+                    break;
+                }
+                case OP_0: {
+                    StackFrame newFrame = {
+                        .type = FRAME_TYPE_DATA,
+                        .dataWidth = MAX_STACK_FRAME_WIDTH,
+                        .data = {0},
+                    };
+                    push(&runtimeStack, newFrame);
+                    break;
+                }
+                case OP_EQUAL: {
+                    if (runtimeStack.height < 2) {
+                        fprintf(stderr, "OP_EQUAL: insufficient frames\n");
+                        goto immediate_fail;
+                    }
+                    StackFrame frameA = pop(&runtimeStack);
+                    StackFrame frameB = pop(&runtimeStack);
+                    push(&runtimeStack, get_boolean_frame(are_frames_equal(&frameA, &frameB)));
                     break;
                 }
                 default: {

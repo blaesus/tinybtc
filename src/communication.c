@@ -205,15 +205,17 @@ void print_node_status() {
     printf("=====================\n");
 }
 
-void resetIBDMode() {
+void reset_ibd_mode() {
     uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
-    if (maxFullBlockHeight * 1.0 / global.mainHeaderTip.context.height > config.ibdModeAvailabilityThreshold) {
-        printf("\nSwitching off IBD mode\n");
-        global.ibdMode = false;
-    }
-    else {
+    uint32_t missingBlocks = global.mainHeaderTip.context.height - maxFullBlockHeight;
+    bool shouldIBD = missingBlocks > config.ibdModeAvailabilityThreshold;
+    if (shouldIBD && !global.ibdMode) {
         printf("\nSwitching on IBD mode\n");
         global.ibdMode = true;
+    }
+    if (!shouldIBD && global.ibdMode) {
+        printf("\nSwitching off IBD mode\n");
+        global.ibdMode = false;
     }
 }
 
@@ -245,7 +247,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.resetIBDMode,
-            .callback = &resetIBDMode,
+            .callback = &reset_ibd_mode,
         },
         {
             .interval = config.periods.timeoutPeers,
