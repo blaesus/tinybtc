@@ -468,7 +468,6 @@ void validate_new_blocks() {
             continueScanning = true;
         }
         release_block(child);
-        FREE(child, "validate_new_blocks:block");
         if (!continueScanning) {
             return;
         }
