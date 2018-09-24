@@ -19,7 +19,7 @@
 #define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
 
 struct GlobalState {
-    bool ibdMode;
+    bool catchupMode;
     void *timerTable;
 
     uv_tcp_t apiSocket;

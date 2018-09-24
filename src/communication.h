@@ -44,3 +44,4 @@ void send_message(
     void *data
 );
 void terminate_execution();
+bool should_catchup(void);

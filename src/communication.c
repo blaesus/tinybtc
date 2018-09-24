@@ -205,17 +205,21 @@ void print_node_status() {
     printf("=====================\n");
 }
 
-void reset_ibd_mode() {
+bool should_catchup() {
     uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
     uint32_t missingBlocks = global.mainHeaderTip.context.height - maxFullBlockHeight;
-    bool shouldIBD = missingBlocks > config.ibdModeAvailabilityThreshold;
-    if (shouldIBD && !global.ibdMode) {
-        printf("\nSwitching on IBD mode\n");
-        global.ibdMode = true;
+    return missingBlocks > config.catchupThreshold;
+}
+
+void reset_ibd_mode() {
+    bool shouldIBD = should_catchup();
+    if (shouldIBD && !global.catchupMode) {
+        printf("\nSwitching on catchup mode\n");
+        global.catchupMode = true;
     }
-    if (!shouldIBD && global.ibdMode) {
-        printf("\nSwitching off IBD mode\n");
-        global.ibdMode = false;
+    if (!shouldIBD && global.catchupMode) {
+        printf("\nSwitching off catchup mode\n");
+        global.catchupMode = false;
     }
 }
 
@@ -512,7 +516,7 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 }
 
 void on_handshake_success(Peer *ptrPeer) {
-    if (global.ibdMode) {
+    if (global.catchupMode) {
         uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
         if (ptrPeer->chain_height < maxFullBlockHeight) {
             printf("Switching peer for lack of blocks\n");
@@ -962,7 +966,7 @@ void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoingConfig = global.ibdMode ? config.maxOutgoingIBD : config.maxOutgoing;
+    uint32_t outgoingConfig = global.catchupMode ? config.maxOutgoingIBD : config.maxOutgoing;
     uint32_t outgoing = min(outgoingConfig, global.peerCandidateCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_best_candidate_as_peer(i);

@@ -378,7 +378,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (!global.ibdMode) {
+    if (!global.catchupMode) {
         if (is_block_valid(ptrBlock, index)) {
             index->meta.fullBlockValidated = true;
             bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
