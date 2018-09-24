@@ -436,9 +436,6 @@ double verify_block_indices(bool checkDB) {
 }
 
 void validate_new_blocks() {
-    if (!global.ibdMode) {
-        return;
-    }
     printf("Validating new blocks...\n");
     SHA256_HASH blockHash = {0};
     memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
@@ -457,20 +454,18 @@ void validate_new_blocks() {
         BlockPayload *child = CALLOC(1, sizeof(*child), "validate_new_blocks:block");
         int8_t status = load_block(childIndex->meta.hash, child);
         bool continueScanning = false;
-        if (!status) {
-            if (is_block_valid(child, childIndex)) {
-                print_hash_with_description("Move validated tip to ", childIndex->meta.hash);
-                childIndex->meta.fullBlockValidated = true;
-                global.mainValidatedTip = *childIndex;
-                memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
-                continueScanning = true;
-            }
-            else {
-                printf("Block invalid\n");
-            }
+        if (status) {
+            fprintf(stderr, "validate_new_blocks: Cannot load block\n");
+        }
+        else if (!is_block_valid(child, childIndex)) {
+            fprintf(stderr, "validate_new_blocks: Block invalid\n");
         }
         else {
-            printf("Cannot load block\n");
+            print_hash_with_description("Block validated: ", childIndex->meta.hash);
+            childIndex->meta.fullBlockValidated = true;
+            global.mainValidatedTip = *childIndex;
+            memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
+            continueScanning = true;
         }
         release_block(child);
         FREE(child, "validate_new_blocks:block");
