@@ -10,6 +10,7 @@
 #include "script.h"
 #include "utils/memory.h"
 #include "utils/datetime.h"
+#include "utils/data.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
@@ -127,8 +128,30 @@ bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {
     }
 }
 
+static bool is_block_checkpoint_compatible(BlockIndex *ptrIndex) {
+    for (uint32_t i = 0; i < MAX_CHECKPOINTS; i++) {
+        struct ChainCheckPoint checkpoint = mainnet.checkpoints[i];
+        if (!checkpoint.height) {
+            continue;
+        }
+        if (checkpoint.height == ptrIndex->context.height) {
+            SHA256_HASH expectedHash = {0};
+            sha256_hex_to_binary(checkpoint.hashBEHex, expectedHash);
+            reverse_endian(expectedHash, SHA256_LENGTH);
+            if (memcmp(expectedHash, ptrIndex->meta.hash, SHA256_LENGTH) != 0) {
+                return false;
+            };
+        }
+    }
+    return true;
+}
+
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
+
     bool isBlockLegal = is_block_legal(ptrCandidate);
+
+    bool satisfyCheckpoint = is_block_checkpoint_compatible(ptrIndex);
+
     bool allTxValid = true;
     for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
         if (!is_tx_valid(&ptrCandidate->txs[i], ptrIndex)) {
@@ -136,7 +159,9 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
             break;
         }
     }
-    bool isBlockValid = isBlockLegal && allTxValid;
+
+    bool isBlockValid = isBlockLegal && satisfyCheckpoint && allTxValid;
+
     return isBlockValid;
 }
 
