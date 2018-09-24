@@ -19,6 +19,11 @@
 
 #define MAX_STACK_HEIGHT 100
 
+struct ChainCheckPoint {
+    uint32_t height;
+    char *hashHex;
+};
+
 struct ChainParameters {
     uint32_t magic;
     int32_t minimalPeerVersion;
@@ -32,6 +37,7 @@ struct ChainParameters {
     uint16_t scriptSigSizeUpper;
     uint64_t scriptSigSizeLower;
     uint16_t retargetBound;
+    struct ChainCheckPoint checkpoints[];
 };
 
 extern const struct ChainParameters mainnet;
