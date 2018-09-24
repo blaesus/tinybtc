@@ -384,7 +384,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
                     if (pubkeyFrame.dataWidth < 65) {
-                        fprintf(stderr, "Unimplemented: compressed public key");
+                        fprintf(stderr, "Unimplemented: compressed public key\n");
                         goto immediate_fail;
                     }
                     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
@@ -422,7 +422,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 default: {
-                    fprintf(stderr, "\nUnimplemented op %#02x [%s]", op, get_op_name(op));
+                    fprintf(stderr, "\nUnimplemented op %#02x [%s]\n", op, get_op_name(op));
                     goto immediate_fail;
                 }
             }
