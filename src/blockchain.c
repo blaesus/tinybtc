@@ -128,6 +128,7 @@ bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {
 }
 
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
+    bool isBlockLegal = is_block_legal(ptrCandidate);
     bool allTxValid = true;
     for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
         if (!is_tx_valid(&ptrCandidate->txs[i], ptrIndex)) {
@@ -135,7 +136,8 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
             break;
         }
     }
-    return allTxValid;
+    bool isBlockValid = isBlockLegal && allTxValid;
+    return isBlockValid;
 }
 
 
