@@ -229,7 +229,6 @@ void reset_ibd_mode() {
 typedef void TimerCallback(uv_timer_t *);
 
 struct TimerTableRow {
-    uv_timer_t timer;
     uint64_t interval;
     TimerCallback *callback;
     bool onlyOnce;
@@ -279,17 +278,32 @@ void setup_timers() {
     memcpy(timerTable, timerTableAutomatic, sizeof(timerTableAutomatic));
     for (uint32_t i = 0; i < rowCount; i++) {
         TimerTableRow *row = &timerTable[i];
-        if (row->interval > 0) {
-            uv_timer_init(uv_default_loop(), &row->timer);
+        if (row->interval > 0 && row->callback) {
+            uv_timer_t *timer = CALLOC(1, sizeof(*timer), "setup_timers:timer");
+            global.timers[global.timerCount++] = timer;
+            uv_timer_init(uv_default_loop(), timer);
             if (row->onlyOnce) {
-                uv_timer_start(&row->timer, row->callback, row->interval, 0);
+                uv_timer_start(timer, row->callback, row->interval, 0);
             }
             else {
-                uv_timer_start(&row->timer, row->callback, 0, row->interval);
+                uv_timer_start(timer, row->callback, 0, row->interval);
             }
         }
     }
     global.timerTable = timerTable;
+}
+
+void stop_timers() {
+    printf("Stopping timers...\n");
+    for (uint32_t i = 0; i < global.timerCount; i++) {
+        uv_timer_t *timer = global.timers[i];
+        if (!timer) {
+            continue;
+        }
+        uv_timer_stop(global.timers[i]);
+        FREE(timer, "setup_timers:timer");
+    }
+    FREE(global.timerTable, "setup_timers:timerTable");
 }
 
 uint32_t setup_main_event_loop() {
@@ -1016,6 +1030,7 @@ void check_to_cleanup() {
 
 void terminate_execution() {
     save_chain_data();
+    stop_timers();
     terminate_sockets();
     uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
     uv_timer_init(uv_default_loop(), timer);

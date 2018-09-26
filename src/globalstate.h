@@ -18,6 +18,8 @@
 #define GET_BLOCK_INDEX(hash) (hashmap_get(&global.blockIndices, hash, NULL))
 #define SET_BLOCK_INDEX(hash, index) (hashmap_set(&global.blockIndices, hash, &index, sizeof(index)))
 
+#define MAX_TIMERS 32
+
 struct GlobalState {
     bool catchupMode;
     void *timerTable;
@@ -46,6 +48,9 @@ struct GlobalState {
 
     BlockIndex mainHeaderTip;
     BlockIndex mainValidatedTip;
+
+    uv_timer_t *timers[MAX_TIMERS];
+    uint32_t timerCount;
 };
 
 typedef struct GlobalState GlobalState;
