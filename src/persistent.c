@@ -18,10 +18,10 @@
 #define ARCHIVE_ROOT "archive"
 #define BLOCK_ROOT "blocks"
 
-#define PEER_LIST_BINARY_FILENAME "peers.dat"
-#define PEER_LIST_CSV_FILENAME "peers.csv"
+#define PEER_LIST_BINARY_FILENAME (ARCHIVE_ROOT"/peers.dat")
+#define PEER_LIST_CSV_FILENAME (ARCHIVE_ROOT"/peers.csv")
 
-#define BLOCK_INDICES_FILENAME "block_indices.dat"
+#define BLOCK_INDEX_PATH (ARCHIVE_ROOT"/block_indices.dat")
 
 #define PREFIXED_HASH_KEY_LENGTH (SHA256_HEXSTR_LENGTH + 1)
 
@@ -32,11 +32,6 @@ enum Prefix {
 };
 
 typedef enum Prefix Prefix;
-
-static bool file_exist(char *filename) {
-    struct stat buffer;
-    return stat(filename, &buffer) == 0;
-}
 
 int32_t save_peers_for_human() {
     FILE *file = fopen(PEER_LIST_CSV_FILENAME, "wb");
@@ -128,13 +123,13 @@ void cleanup_db() {
 }
 
 int32_t save_block_indices(void) {
-    FILE *file = fopen(BLOCK_INDICES_FILENAME, "wb");
+    FILE *file = fopen(BLOCK_INDEX_PATH, "wb");
     fwrite(&global.mainHeaderTip, sizeof(global.mainHeaderTip), 1, file);
     fwrite(&global.mainValidatedTip, sizeof(global.mainValidatedTip), 1, file);
 
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
     uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDICES_FILENAME);
+    printf("Saving %u block indices to %s...\n", keyCount, BLOCK_INDEX_PATH);
     fwrite(&keyCount, sizeof(keyCount), 1, file);
     uint32_t actualCount = 0;
     for (uint32_t i = 0; i < keyCount; i++) {
@@ -156,11 +151,11 @@ int32_t save_block_indices(void) {
 }
 
 int32_t load_block_indices(void) {
-    if (!file_exist(BLOCK_INDICES_FILENAME)) {
+    if (!file_exist(BLOCK_INDEX_PATH)) {
         fprintf(stderr, "block index file does not exist; skipping import\n");
         return -1;
     }
-    FILE *file = fopen(BLOCK_INDICES_FILENAME, "rb");
+    FILE *file = fopen(BLOCK_INDEX_PATH, "rb");
     fread(&global.mainHeaderTip, sizeof(global.mainHeaderTip), 1, file);
     fread(&global.mainValidatedTip, sizeof(global.mainValidatedTip), 1, file);
     uint32_t headersCount = 0;
