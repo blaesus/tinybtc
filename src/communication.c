@@ -152,7 +152,10 @@ void exchange_data_with_peers() {
     uint32_t blockIndex = 0;
     for (uint32_t i = 0; i < global.peerCount; i++) {
         Peer *ptrPeer = global.peers[i];
-        if (!peer_hand_shaken(ptrPeer)) {
+        if (!ptrPeer) {
+            continue;
+        }
+        else if (!peer_hand_shaken(ptrPeer)) {
             continue;
         }
         if (ptrPeer->chain_height > global.mainHeaderTip.context.height) {
@@ -1003,7 +1006,6 @@ void check_to_cleanup() {
         printf("\nCleaning up\n");
         uv_stop(uv_default_loop());
         uv_loop_close(uv_default_loop());
-        save_chain_data();
         cleanup_db();
         printf("\nGood byte!\n");
     }
@@ -1013,6 +1015,7 @@ void check_to_cleanup() {
 }
 
 void terminate_execution() {
+    save_chain_data();
     terminate_sockets();
     uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
     uv_timer_init(uv_default_loop(), timer);
