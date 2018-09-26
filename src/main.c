@@ -39,6 +39,7 @@ int8_t init() {
     if (dbError) {
         return -1;
     }
+    init_archive_dir();
     load_genesis();
     load_block_indices();
     verify_block_indices(config.verifyBlocks);

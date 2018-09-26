@@ -430,6 +430,21 @@ void test_hash() {
     printf("s=%s", s);
 }
 
+void test_file() {
+    init_archive_dir();
+    printf("Loading genesis block...\n");
+    Message genesis = get_empty_message();
+    load_block_message("genesis.dat", &genesis);
+    BlockPayload *ptrBlock = (BlockPayload*) genesis.ptrPayload;
+    memcpy(&global.genesisBlock, ptrBlock, sizeof(BlockPayload));
+    hash_block_header(&ptrBlock->header, global.genesisHash);
+    save_block(ptrBlock);
+
+    BlockPayload *ptrBlockReloaded = calloc(1, sizeof(BlockPayload));
+    load_block(global.genesisHash, ptrBlockReloaded);
+    print_block_payload(ptrBlockReloaded);
+}
+
 void test() {
     // test_version_messages();
     // test_genesis();
@@ -446,6 +461,7 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    test_script();
+    // test_script();
     // test_hash();
+    test_file();
 }

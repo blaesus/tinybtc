@@ -10,6 +10,13 @@
 #include "utils/integers.h"
 #include "utils/memory.h"
 #include "utils/networking.h"
+#include "utils/data.h"
+#include "utils/file.h"
+
+#define MAX_PATH_LENGTH 256
+
+#define ARCHIVE_ROOT "archive"
+#define BLOCK_ROOT "blocks"
 
 #define PEER_LIST_BINARY_FILENAME "peers.dat"
 #define PEER_LIST_CSV_FILENAME "peers.csv"
@@ -246,12 +253,29 @@ int8_t remove_data_by_hash(Byte *hash, Prefix prefix) {
     return 0;
 }
 
+char *make_entity_path(char *collectionRoot, Byte *hash) {
+    char hashHex[SHA256_HEXSTR_LENGTH+1] = {0};
+    hash_binary_to_hex(hash, hashHex);
+    static char path[MAX_PATH_LENGTH];
+    memset(path, 0, sizeof(path));
+    char x[3] = {0};
+    memcpy(x, hashHex, 2);
+    sprintf(path, "%s/%s/%s/%s.dat", ARCHIVE_ROOT, collectionRoot, x, hashHex);
+    return path;
+}
+
 int8_t save_block(BlockPayload *ptrBlock) {
     SHA256_HASH hash = {0};
     hash_block_header(&ptrBlock->header, hash);
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_block:buffer");
-    uint64_t width = serialize_block_payload(ptrBlock, buffer);
-    save_data_by_hash(hash, BLOCK_PREFIX, buffer, width);
+    uint64_t serializedWidth = serialize_block_payload(ptrBlock, buffer);
+    FILE *file = fopen(make_entity_path(BLOCK_ROOT, hash), "wb");
+    if (!file) {
+        fprintf(stderr, "save_block: cannot open file: %s\n", strerror(errno));
+        return -1;
+    }
+    fwrite(buffer, serializedWidth, 1, file);
+    fclose(file);
     FREE(buffer, "save_block:buffer");
     return 0;
 }
@@ -261,25 +285,28 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     memcpy(key, hash, SHA256_LENGTH);
 
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
-    size_t outputLength = 0;
-    int8_t status = load_data_by_hash(key, BLOCK_PREFIX, buffer, &outputLength);
+    int8_t status = 0;
+    printf("path = %s\n", make_entity_path(BLOCK_ROOT, hash));
+    FILE *file = fopen(make_entity_path(BLOCK_ROOT, hash), "rb");
+    int64_t fileSize = get_file_size(file);
+    fread(buffer, (size_t)fileSize, 1, file);
+    fclose(file);
+
     parse_into_block_payload(buffer, ptrBlock);
     SHA256_HASH actualHash = {0};
     Byte hashBuffer[1000] = {0};
     uint64_t width = serialize_block_payload_header(&ptrBlock->header, hashBuffer);
     dsha256(hashBuffer, (uint32_t)width, actualHash);
     if (memcmp(actualHash, hash, SHA256_LENGTH) != 0) {
-        fprintf(stderr, "load_block: hashes mismatch for %li bytes\n", outputLength);
+        fprintf(stderr, "load_block: hashes mismatch for %lli bytes\n", fileSize);
         print_hash_with_description("requested: ", hash);
         print_hash_with_description("actual: ", actualHash);
         mark_block_as_unavailable(hash);
-        remove_data_by_hash(hash, BLOCK_PREFIX);
         status = ERROR_BAD_DATA;
     }
     else if (!is_block_legal(ptrBlock)) {
-        fprintf(stderr, "load_block: fetched illegal block, probably DB corruption...\n");
+        fprintf(stderr, "load_block: fetched illegal block, probably file corruption...\n");
         mark_block_as_unavailable(hash);
-        remove_data_by_hash(hash, BLOCK_PREFIX);
         status = ERROR_BAD_DATA;
     }
     else {
@@ -303,19 +330,19 @@ int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
     int8_t status = 0;
     SHA256_HASH blockHash = {0};
     size_t hashWidth = 0;
+    BlockPayload *block = CALLOC(1, sizeof(*block), "load_tx:block");
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_tx:buffer");
     status = load_data_by_hash(targetHash, TX_LOCATION_PREFIX, blockHash, &hashWidth);
     if (status) {
         fprintf(stderr, "Cannot load block reference\n");
+        goto release;
     }
 
-    size_t blockLength = 0;
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_tx:buffer");
-    status = load_data_by_hash(blockHash, BLOCK_PREFIX, buffer, &blockLength);
+    status = load_block(blockHash, block);
     if (status) {
         fprintf(stderr, "Cannot load block itself\n");
+        goto release;
     }
-    BlockPayload *block = CALLOC(1, sizeof(*block), "load_tx:block");
-    parse_into_block_payload(buffer, block);
 
     SHA256_HASH txHash = {0};
     for (uint64_t i = 0; i < block->txCount; i++) {
@@ -325,8 +352,13 @@ int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
             parse_into_tx_payload(buffer, ptrPayload);
             status = 0;
         }
+        else {
+            status = -10;
+            goto release;
+        }
     }
 
+    release:
     release_block(block);
     FREE(buffer, "load_tx:buffer");
     return status;
@@ -377,6 +409,27 @@ void load_genesis() {
     hash_block_header(&ptrBlock->header, global.genesisHash);
     process_incoming_block(ptrBlock);
     printf("Done.\n");
+}
+
+void checked_mkdir(char *path) {
+    struct stat st;
+    memset(&st, 0, sizeof(st));
+    if (stat(path, &st) == -1) {
+        mkdir(path, 0744);
+    }
+}
+
+void init_archive_dir() {
+    checked_mkdir(ARCHIVE_ROOT);
+    char blockRoot[MAX_PATH_LENGTH] = {0};
+    sprintf(blockRoot, "%s/%s", ARCHIVE_ROOT, BLOCK_ROOT);
+    checked_mkdir(blockRoot);
+
+    for (uint16_t i = 0; i <= 0x100; i++) {
+        char path[MAX_PATH_LENGTH] = {0};
+        sprintf(path, "%s/%s/%02x", ARCHIVE_ROOT, BLOCK_ROOT, i);
+        checked_mkdir(path);
+    }
 }
 
 void migrate() {
