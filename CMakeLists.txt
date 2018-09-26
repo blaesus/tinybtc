@@ -35,11 +35,6 @@ add_custom_command(
 
 add_custom_command(
         TARGET tinybtc PRE_BUILD
-        COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/peers.dat
-)
-
-add_custom_command(
-        TARGET tinybtc PRE_BUILD
         COMMAND cp -R
         ${CMAKE_CURRENT_SOURCE_DIR}/src/test/fixtures/*.dat
         ${CMAKE_CURRENT_BINARY_DIR}/fixtures/
