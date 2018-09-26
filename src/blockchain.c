@@ -379,7 +379,8 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     }
 
     if (!global.catchupMode) {
-        if (is_block_valid(ptrBlock, index)) {
+        bool valid = is_block_valid(ptrBlock, index);
+        if (valid) {
             index->meta.fullBlockValidated = true;
             bool onMainchain = index->context.chainStatus == CHAIN_STATUS_MAINCHAIN;
             bool morePOW = index->context.chainPOW > global.mainValidatedTip.context.chainPOW;
@@ -462,8 +463,8 @@ double verify_block_indices(bool checkDB) {
     return fullBlockAvailable * 1.0 / indexCount;
 }
 
-void validate_new_blocks() {
-    printf("Validating new blocks...\n");
+void validate_blocks() {
+    printf("Validating blocks...\n");
     SHA256_HASH blockHash = {0};
     memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
     while (true) {

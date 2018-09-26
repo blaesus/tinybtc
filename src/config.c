@@ -11,7 +11,7 @@ const struct Config config = {
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
         .ping = SECOND_TO_MILLISECOND(59),
-        .validateNewBlocks = 0,
+        .validateNewBlocks = MINUTE_TO_MILLISECOND(2),
     },
     .tolerances = {
         .handshake = SECOND_TO_MILLISECOND(10),

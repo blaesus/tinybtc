@@ -270,7 +270,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.validateNewBlocks,
-            .callback = &validate_new_blocks
+            .callback = &validate_blocks
         }
     };
     uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);
