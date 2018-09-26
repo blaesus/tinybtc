@@ -286,6 +286,10 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
     int8_t status = 0;
     FILE *file = fopen(make_entity_path(BLOCK_ROOT, hash), "rb");
+    if (!file) {
+        fprintf(stderr, "load_block: Cannot open file\n");
+        return -99;
+    }
     int64_t fileSize = get_file_size(file);
     fread(buffer, (size_t)fileSize, 1, file);
     fclose(file);
