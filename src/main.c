@@ -30,7 +30,7 @@ int8_t init() {
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();
-    hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+    init_block_index_map();
     load_peer_candidates();
     if (global.peerCandidateCount == 0) {
         dns_bootstrap();
@@ -60,7 +60,7 @@ int32_t connect_to_peers() {
 
 int32_t main(/* int32_t argc, char **argv */) {
     // test(); return 0;
-    // migrate(); return 0;
+    migrate(); return 0;
     int8_t initError = init();
     if (initError) {
         fprintf(stderr, "init error %i\n", initError);

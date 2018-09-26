@@ -420,7 +420,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-double verify_block_indices(bool checkDB) {
+double verify_block_indices(bool loadBlock) {
     printf("Verifying block indices...\n");
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
@@ -438,16 +438,15 @@ double verify_block_indices(bool checkDB) {
             continue;
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
-        if (checkDB) {
+        if (loadBlock) {
             if (ptrIndex->meta.fullBlockAvailable) {
                 ptrIndex->meta.fullBlockAvailable = false;
-                BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "verify_block_indices:block");
+                BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "block_payload");
                 int8_t status = load_block(ptrIndex->meta.hash, ptrBlock);
                 if (!status) {
                     ptrIndex->meta.fullBlockAvailable = true;
                 }
                 release_block(ptrBlock);
-                FREE(ptrBlock, "verify_block_indices:block");
             }
         }
         if (ptrIndex->meta.fullBlockAvailable) {
@@ -469,6 +468,7 @@ void validate_blocks() {
     memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
+        print_hash_with_description("Validating ", blockHash);
         if (!index) {
             return;
         }
@@ -479,14 +479,14 @@ void validate_blocks() {
         if (!childIndex) {
             return;
         }
-        BlockPayload *child = CALLOC(1, sizeof(*child), "validate_new_blocks:block");
+        BlockPayload *child = CALLOC(1, sizeof(*child), "validate_blocks:block");
         int8_t status = load_block(childIndex->meta.hash, child);
         bool continueScanning = false;
         if (status) {
-            fprintf(stderr, "validate_new_blocks: Cannot load block\n");
+            fprintf(stderr, "validate_blocks: Cannot load block\n");
         }
         else if (!is_block_valid(child, childIndex)) {
-            fprintf(stderr, "validate_new_blocks: Block invalid\n");
+            fprintf(stderr, "validate_blocks: Block invalid\n");
         }
         else {
             print_hash_with_description("Block validated: ", childIndex->meta.hash);

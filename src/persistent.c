@@ -281,7 +281,6 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
 
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_block:buffer");
     int8_t status = 0;
-    printf("path = %s\n", make_entity_path(BLOCK_ROOT, hash));
     FILE *file = fopen(make_entity_path(BLOCK_ROOT, hash), "rb");
     int64_t fileSize = get_file_size(file);
     fread(buffer, (size_t)fileSize, 1, file);
@@ -293,19 +292,25 @@ int8_t load_block(Byte *hash, BlockPayload *ptrBlock) {
     uint64_t width = serialize_block_payload_header(&ptrBlock->header, hashBuffer);
     dsha256(hashBuffer, (uint32_t)width, actualHash);
     if (memcmp(actualHash, hash, SHA256_LENGTH) != 0) {
+        #if LOG_BLOCK_LOAD
         fprintf(stderr, "load_block: hashes mismatch for %lli bytes\n", fileSize);
+        #endif
         print_hash_with_description("requested: ", hash);
         print_hash_with_description("actual: ", actualHash);
         mark_block_as_unavailable(hash);
         status = ERROR_BAD_DATA;
     }
     else if (!is_block_legal(ptrBlock)) {
+        #if LOG_BLOCK_LOAD
         fprintf(stderr, "load_block: fetched illegal block, probably file corruption...\n");
+        #endif
         mark_block_as_unavailable(hash);
         status = ERROR_BAD_DATA;
     }
     else {
+        #if LOG_BLOCK_LOAD
         print_hash_with_description("load_block: OK ", hash);
+        #endif
     }
     FREE(buffer, "load_block:buffer");
     return status;
@@ -343,13 +348,10 @@ int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
     for (uint64_t i = 0; i < block->txCount; i++) {
         uint64_t width = serialize_tx_payload(&block->txs[i], buffer);
         dsha256(buffer, (uint32_t)width, txHash);
-        if (memcmp(txHash, targetHash, SHA256_LENGTH) == 0) {
+        bool hashesMatch = memcmp(txHash, targetHash, SHA256_LENGTH) == 0;
+        if (hashesMatch) {
             parse_into_tx_payload(buffer, ptrPayload);
             status = 0;
-        }
-        else {
-            status = -10;
-            goto release;
         }
     }
 
@@ -427,22 +429,16 @@ void init_archive_dir() {
     }
 }
 
-void migrate() {
+void init_block_index_map() {
     hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
+}
+
+void migrate() {
+    init_db();
+    init_block_index_map();
     load_genesis();
     load_block_indices();
-    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
-    uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    for (uint32_t i = 0; i < indexCount; i++) {
-        Byte key[SHA256_LENGTH] = {0};
-        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
-        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
-        ptrIndex->meta.fullBlockAvailable = false;
-        ptrIndex->meta.fullBlockValidated = false;
-    }
-    BlockIndex *genesisIndex = GET_BLOCK_INDEX(global.genesisHash);
-    global.mainValidatedTip = *genesisIndex;
-    global.mainHeaderTip = *genesisIndex;
-    save_block_indices();
+    // verify_block_indices(true);
+    validate_blocks();
 }
 

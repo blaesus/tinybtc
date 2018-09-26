@@ -47,7 +47,7 @@ void release_block(BlockPayload *ptrBlock) {
         release_items_in_tx(&ptrBlock->txs[i]);
     }
     FREE(ptrBlock->txs, "parse_block:txs");
-    FREE(ptrBlock, "load_block_message:payload");
+    FREE(ptrBlock, "block_payload");
 }
 
 uint64_t serialize_block_payload(BlockPayload *ptrPayload, Byte *ptrBuffer) {
