@@ -461,7 +461,7 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    // test_script();
+    test_script();
     // test_hash();
-    test_file();
+    // test_file();
 }

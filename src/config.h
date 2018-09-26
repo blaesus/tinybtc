@@ -50,7 +50,8 @@ struct Config {
     uint32_t peerCandidateLife;
     uint8_t backlog;
     uint16_t getaddrThreshold;
-    char *dbName;
+    char *txLocationDBName;
+    char *txoDBName;
     uint16_t catchupThreshold;
     uint16_t apiPort;
     char *silentIncomingMessageCommands;

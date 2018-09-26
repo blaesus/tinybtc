@@ -23,15 +23,7 @@
 
 #define BLOCK_INDEX_PATH (ARCHIVE_ROOT"/block_indices.dat")
 
-#define PREFIXED_HASH_KEY_LENGTH (SHA256_HEXSTR_LENGTH + 1)
-
-enum Prefix {
-    BLOCK_PREFIX = 'L',
-    TX_PREFIX = 'T',
-    TX_LOCATION_PREFIX = 'R',
-};
-
-typedef enum Prefix Prefix;
+#define HASH_KEY_STRING_LENGTH (SHA256_HEXSTR_LENGTH + 1)
 
 int32_t save_peers_for_human() {
     FILE *file = fopen(PEER_LIST_CSV_FILENAME, "wb");
@@ -102,24 +94,29 @@ int32_t load_peer_candidates() {
 
 int8_t init_db() {
     printf("Connecting to LevelDB...");
-    leveldb_t *db;
     leveldb_options_t *options = leveldb_options_create();
     leveldb_options_set_create_if_missing(options, 1);
     char *error = NULL;
-    db = leveldb_open(options, config.dbName, &error);
+    global.txLocationDB = leveldb_open(options, config.txLocationDBName, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         leveldb_free(error);
         return -1;
     }
+    global.txoDB = leveldb_open(options, config.txoDBName, &error);
+    if (error != NULL) {
+        fprintf(stderr, "Open LevelDB fail: %s\n", error);
+        leveldb_free(error);
+        return -2;
+    }
     leveldb_free(options);
-    global.db = db;
     printf("Done.\n");
     return 0;
 }
 
 void cleanup_db() {
-    leveldb_close(global.db);
+    leveldb_close(global.txLocationDB);
+    leveldb_close(global.txoDB);
 }
 
 int32_t save_block_indices(void) {
@@ -170,16 +167,12 @@ int32_t load_block_indices(void) {
     return 0;
 }
 
-int8_t save_data_by_hash(Byte *hash, Prefix prefix, Byte *value, uint64_t valueLength) {
-    uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
-    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
-    key[0] = prefix;
-    hash_binary_to_hex(hash, key+1);
+int8_t save_data_by_key(leveldb_t *db, char *key, Byte *value, uint64_t valueLength) {
     char *error = NULL;
     leveldb_writeoptions_t *writeOptions = leveldb_writeoptions_create();
     leveldb_put(
-        global.db, writeOptions,
-        key, keyLength,
+        db, writeOptions,
+        key, strlen(key),
         (char*)value, valueLength,
         &error
     );
@@ -191,20 +184,23 @@ int8_t save_data_by_hash(Byte *hash, Prefix prefix, Byte *value, uint64_t valueL
     }
     leveldb_free(writeOptions);
     return 0;
+
 }
 
-int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output, size_t *outputLength) {
-    const uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
-    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
-    key[0] = prefix;
-    hash_binary_to_hex(hash, key+1);
+int8_t save_data_by_hash(leveldb_t *db, Byte *hash, Byte *value, uint64_t valueLength) {
+    char key[HASH_KEY_STRING_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+    save_data_by_key(db, key, value, valueLength);
+    return save_data_by_key(db, key, value, valueLength);
+}
 
+int8_t load_data_by_key(leveldb_t *db, char *key, Byte *output, size_t *outputLength) {
     size_t readLength = 0;
     char *error = NULL;
     leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
     char *read = leveldb_get(
-        global.db, readOptions,
-        key, keyLength,
+        db, readOptions,
+        key, strlen(key),
         &readLength,
         &error
     );
@@ -226,16 +222,18 @@ int8_t load_data_by_hash(Byte *hash, Prefix prefix, Byte *output, size_t *output
     return 0;
 }
 
-int8_t remove_data_by_hash(Byte *hash, Prefix prefix) {
-    uint32_t keyLength = PREFIXED_HASH_KEY_LENGTH;
-    char key[PREFIXED_HASH_KEY_LENGTH] = {0};
-    key[0] = prefix;
-    hash_binary_to_hex(hash, key+1);
+int8_t load_data_by_hash(leveldb_t *db, Byte *hash, Byte *output, size_t *outputLength) {
+    char key[HASH_KEY_STRING_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+    return load_data_by_key(db, key, output, outputLength);
+}
+
+int8_t remove_data_by_key(leveldb_t *db, char *key) {
     char *error = NULL;
     leveldb_writeoptions_t *writeOptions = leveldb_writeoptions_create();
     leveldb_delete(
-        global.db, writeOptions,
-        key, keyLength,
+        db, writeOptions,
+        key, strlen(key),
         &error
     );
 
@@ -248,8 +246,14 @@ int8_t remove_data_by_hash(Byte *hash, Prefix prefix) {
     return 0;
 }
 
+int8_t remove_data_by_hash(leveldb_t *db, Byte *hash) {
+    char key[HASH_KEY_STRING_LENGTH] = {0};
+    hash_binary_to_hex(hash, key);
+    return remove_data_by_key(db, key);
+}
+
 char *make_entity_path(char *collectionRoot, Byte *hash) {
-    char hashHex[SHA256_HEXSTR_LENGTH+1] = {0};
+    char hashHex[HASH_KEY_STRING_LENGTH] = {0};
     hash_binary_to_hex(hash, hashHex);
     static char path[MAX_PATH_LENGTH];
     memset(path, 0, sizeof(path));
@@ -321,8 +325,8 @@ int8_t save_tx_location(TxPayload *ptrTx, Byte *blockHash) {
     uint64_t width = serialize_tx_payload(ptrTx, buffer);
     SHA256_HASH txHash = {0};
     dsha256(buffer, (uint32_t)width, txHash);
-    save_data_by_hash(txHash, TX_LOCATION_PREFIX, blockHash, SHA256_LENGTH);
     FREE(buffer, "save_tx:buffer");
+    save_data_by_hash(global.txLocationDB, txHash, blockHash, SHA256_LENGTH);
     return 0;
 }
 
@@ -332,7 +336,7 @@ int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
     size_t hashWidth = 0;
     BlockPayload *block = CALLOC(1, sizeof(*block), "load_tx:block");
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_tx:buffer");
-    status = load_data_by_hash(targetHash, TX_LOCATION_PREFIX, blockHash, &hashWidth);
+    status = load_data_by_hash(global.txLocationDB, targetHash, blockHash, &hashWidth);
     if (status) {
         fprintf(stderr, "Cannot load block reference\n");
         goto release;
@@ -359,35 +363,6 @@ int8_t load_tx(Byte *targetHash, TxPayload *ptrPayload) {
     release_block(block);
     FREE(buffer, "load_tx:buffer");
     return status;
-}
-
-uint64_t get_binary_keys_by_prefix(SHA256_HASH hashes[], Prefix desiredPrefix) {
-    uint64_t count = 0;
-    leveldb_readoptions_t *readOptions = leveldb_readoptions_create();
-    leveldb_iterator_t *iter = leveldb_create_iterator(global.db, readOptions);
-    for (leveldb_iter_seek_to_first(iter); leveldb_iter_valid(iter); leveldb_iter_next(iter)) {
-        size_t keyLength;
-        const char *ptrKey = leveldb_iter_key(iter, &keyLength);
-        if (keyLength != PREFIXED_HASH_KEY_LENGTH) {
-            fprintf(stderr, "Unexpected key length %lu\n", keyLength);
-            continue;
-        }
-        Prefix prefix = ptrKey[0];
-        if (prefix != desiredPrefix) {
-            continue;
-        }
-        SHA256_HASH hash = {0};
-        sha256_hex_to_binary(ptrKey+1, hash);
-        memcpy(hashes[count], hash, sizeof(hash));
-        count++;
-    }
-    leveldb_free(readOptions);
-    leveldb_free(iter);
-    return count;
-}
-
-uint64_t get_hash_keys_of_blocks(SHA256_HASH *hashes) {
-    return get_binary_keys_by_prefix(hashes, BLOCK_PREFIX);
 }
 
 void save_chain_data() {
@@ -433,12 +408,60 @@ void init_block_index_map() {
     hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
 }
 
+#define UINT32_DECIMAL_MAX_WIDTH 10
+
+#define UTXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
+
+void make_utxo_key(struct Outpoint outpoint, char* key) {
+    hash_binary_to_hex(outpoint.hash, key);
+    sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint.index);
+}
+
+void set_utxo(struct Outpoint outpoint, bool spent) {
+    char key[UTXO_KEY_LENGTH] = {0};
+    make_utxo_key(outpoint, key);
+    save_data_by_key(global.txoDB, key, (Byte *) &spent, 1);
+}
+
+bool is_txo_spent(struct Outpoint outpoint) {
+    char key[UTXO_KEY_LENGTH] = {0};
+    make_utxo_key(outpoint, key);
+    Byte result = false;
+    size_t resultWidth = 0;
+    int8_t status = load_data_by_key(global.txoDB, key, &result, &resultWidth);
+    if (status) {
+        fprintf(stderr, "is_txo_spent: Cannot load data\n");
+        return false;
+    }
+    return result != false;
+}
+
+void reset_validation() {
+    BlockIndex *index = GET_BLOCK_INDEX(global.genesisHash);
+    global.mainValidatedTip = *index;
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    for (uint32_t i = 0; i < keyCount; i++) {
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
+        ptrIndex->meta.fullBlockValidated = false;
+    }
+}
+
 void migrate() {
     init_db();
     init_block_index_map();
     load_genesis();
-    load_block_indices();
-    // verify_block_indices(true);
-    validate_blocks();
+    // load_block_indices();
+    // reset_validation();
+    // validate_blocks();
+    // save_block_indices();
+    struct Outpoint outpoint = {
+        .index = 12345,
+    };
+    memcpy(outpoint.hash, global.genesisHash, SHA256_LENGTH);
+    set_utxo(outpoint, true);
+    printf("spent = %u\n", is_txo_spent(outpoint));
 }
 
