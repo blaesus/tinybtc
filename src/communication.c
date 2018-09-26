@@ -301,9 +301,9 @@ void stop_timers() {
             continue;
         }
         uv_timer_stop(global.timers[i]);
-        FREE(timer, "setup_timers:timer");
+        // FREE(timer, "setup_timers:timer"); // TODO: release safely
     }
-    FREE(global.timerTable, "setup_timers:timerTable");
+    // FREE(global.timerTable, "setup_timers:timerTable"); // TODO: release safely
 }
 
 uint32_t setup_main_event_loop() {
@@ -778,6 +778,7 @@ void release_socket_context(uv_handle_t *socket) {
     if (data) {
         if (data->peer) {
             FREE(data->peer, "Peer");
+            data->peer = NULL;
         }
         FREE(data, "SocketContext");
     }
@@ -798,7 +799,7 @@ void release_peer(Peer *ptrPeer) {
         memcpy(backupSocket, socket, sizeof(*socket));
         global.zombieSockets[global.zombineSocketCount] = backupSocket;
         global.zombineSocketCount = (global.zombineSocketCount + 1) % MAX_ZOMBIE_SOCKETS;
-        release_socket_context(socket);
+        // release_socket_context(socket); // TODO: Release safely
     }
     else {
         uv_close(socket, on_socket_closed);
@@ -996,16 +997,17 @@ int32_t connect_to_initial_peers() {
     return 0;
 }
 
-void terminate_sockets() {
-    printf("Closing sockets...");
-    for (uint32_t peerIndex = 0; peerIndex < global.peerCount; peerIndex++) {
-        struct Peer *peer = global.peers[peerIndex];
+void terminate_peers() {
+    printf("Terminating peers...\n");
+    for (uint32_t slot = 0; slot < global.peerCount; slot++) {
+        struct Peer *peer = global.peers[slot];
+        global.peers[slot] = NULL;
         release_peer(peer);
     }
     printf("Done.\n");
 }
 
-bool ready_to_end() {
+bool are_all_peers_terminated() {
     bool result = true;
     for (uint64_t i = 0; i < global.peerCount; i++) {
         if (global.peers[i]) {
@@ -1016,22 +1018,23 @@ bool ready_to_end() {
 }
 
 void check_to_cleanup() {
-    if (ready_to_end()) {
+    if (are_all_peers_terminated()) {
         printf("\nCleaning up\n");
         uv_stop(uv_default_loop());
         uv_loop_close(uv_default_loop());
-        cleanup_db();
         printf("\nGood byte!\n");
     }
     else {
-        printf("\nNot ready yet...\n");
+        printf("\nStill terminating peers...\n");
+        terminate_peers();
     }
 }
 
 void terminate_execution() {
     save_chain_data();
     stop_timers();
-    terminate_sockets();
+    terminate_peers();
+    cleanup_db();
     uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
     uv_timer_init(uv_default_loop(), timer);
     uv_timer_start(timer, check_to_cleanup, 0, 500);
