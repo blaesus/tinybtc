@@ -3,11 +3,15 @@ project(tinybtc)
 
 set(CMAKE_C_STANDARD 11)
 
-list(APPEND cflags -O3 -march=native)
+if (CMAKE_BUILD_TYPE MATCHES Release)
+    list(APPEND cflags -Ofast -flto)
+else()
+    list(APPEND cflags -O1 -march=native -flto)
+    list(APPEND cflags -Wall -Wextra -Wpedantic -Werror)
+    list(APPEND cflags -Wno-unused-function -Wno-unused-parameter)
+endif(CMAKE_BUILD_TYPE MATCHES Release)
 
-list(APPEND cflags -Wall -Wextra)
-list(APPEND cflags -Wno-unused-function -Wno-unused-parameter)
-
+message("C flags: ${cflags}")
 
 add_subdirectory(deps/libuv)
 add_subdirectory(deps/leveldb)
