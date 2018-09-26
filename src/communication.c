@@ -50,7 +50,7 @@ void replace_peer(Peer *ptrPeer) {
     #if LOG_PEER_REPLACE
     double now = get_now();
     double life = (now - ptrPeer->connectionStart) / SECOND_TO_MILLISECOND(1);
-    printf("Replacing peer %u (life %.1fs)\n", ptrPeer->index, life);
+    printf("Replacing peer %u (life %.1fs)\n", ptrPeer->slot, life);
     #endif
     connect_to_best_candidate_as_peer(ptrPeer->slot);
 }
@@ -758,8 +758,12 @@ void on_peer_connect(uv_connect_t* connectionRequest, int32_t error) {
 
 void release_socket_context(uv_handle_t *socket) {
     SocketContext *data = (SocketContext *)socket->data;
-    FREE(data->peer, "Peer");
-    FREE(data, "SocketContext");
+    if (data) {
+        if (data->peer) {
+            FREE(data->peer, "Peer");
+        }
+        FREE(data, "SocketContext");
+    }
 }
 
 void on_socket_closed(uv_handle_t *socket) {
