@@ -215,9 +215,9 @@ void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash) {
 
 void print_block_payload(BlockPayload *ptrBlock) {
     printf("----- block -----\n");
-    printf("version: %u\n", ptrBlock->header.version);
-    printf("merkle root:");
-    print_object(ptrBlock->header.merkle_root, SHA256_LENGTH);
+    SHA256_HASH blockHash = {0};
+    hash_block_header(&ptrBlock->header, blockHash);
+    print_hash_with_description("", blockHash);
     for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
         printf("\n## TX %u\n", i);
         print_tx_payload(&ptrBlock->txs[i]);

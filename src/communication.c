@@ -226,7 +226,7 @@ void reset_ibd_mode() {
     }
 }
 
-void validate_blocks_callbck() {
+void validate_blocks_timer_callback() {
     validate_blocks(false);
 }
 
@@ -273,7 +273,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.validateNewBlocks,
-            .callback = &validate_blocks_callbck,
+            .callback = &validate_blocks_timer_callback,
         }
     };
     uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);

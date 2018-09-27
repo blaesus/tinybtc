@@ -211,13 +211,13 @@ int8_t load_data_by_key(leveldb_t *db, char *key, Byte *output, size_t *outputLe
     leveldb_free(readOptions);
 
     if (read == NULL) {
-        printf("leveldb: key not found %s\n", key);
+        fprintf(stderr, "leveldb: key not found %s\n", key);
         return -1;
     }
     else if (error != NULL) {
         leveldb_free(error);
         fprintf(stderr, "leveldb: Read fail on key %s\n", key);
-        return -1;
+        return -2;
     }
     memcpy(output, read, readLength);
     if (outputLength) {
@@ -435,7 +435,7 @@ void init_block_index_map() {
 #define TXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
 
 void make_txo_key(Outpoint *outpoint, char *key) {
-    hash_binary_to_hex(outpoint->hash, key);
+    hash_binary_to_hex(outpoint->txHash, key);
     sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint->index);
 }
 
@@ -461,7 +461,7 @@ int8_t load_utxo(Outpoint *outpoint, TxOut *output) {
 }
 
 
-int8_t spend_utxo(Outpoint *outpoint) {
+int8_t spend_output(Outpoint *outpoint) {
     char key[TXO_KEY_LENGTH] = {0};
     make_txo_key(outpoint, key);
     return remove_data_by_key(global.utxoDB, key);
@@ -505,6 +505,7 @@ void migrate() {
     destory_db(config.utxoDBName);
     validate_blocks(true);
     // save_block_indices();
+    destory_db(config.utxoDBName);
     cleanup_db();
 }
 

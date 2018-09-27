@@ -100,3 +100,6 @@ void hash_binary_to_hex(Byte *hash, char *hex) {
     }
 }
 
+bool sha256_match(Byte *hashA, Byte *hashB) {
+    return memcmp(hashA, hashB, SHA256_LENGTH) == 0;
+}

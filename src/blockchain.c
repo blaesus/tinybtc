@@ -71,17 +71,33 @@ bool is_coinbase_tx_valid(TxPayload *tx) {
     return tx != NULL;
 }
 
-bool is_normal_tx_valid(TxPayload *tx) {
+bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
+    TxPayload *tx = &txs[txIndex];
     TxOut *output = CALLOC(1, sizeof(TxOut), "is_tx_valid:txSource");
     bool result = true;
-    for (uint32_t i = 0; i < tx->txInputCount; i++) {
-        TxIn *input = &tx->txInputs[i];
+    for (uint32_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
+        TxIn *input = &tx->txInputs[inputIndex];
         memset(output, 0, sizeof(*output));
-        int8_t error = load_utxo(&input->previous_output, output);
+        Outpoint *outpoint = &input->previous_output;
+        int8_t error = load_utxo(outpoint, output);
         if (error) {
-            fprintf(stderr, "Cannot load source tx\n");
-            result = false;
-            goto release;
+            // Output not in previous blocks; but it may be in the same block;
+            bool outputInSameBlock = false;
+            for (uint64_t i = 0; i < txIndex; i++) {
+                TxPayload *candidateSource = &txs[i];
+                SHA256_HASH txHash;
+                hash_tx(candidateSource, txHash);
+                if (sha256_match(txHash, outpoint->txHash) && candidateSource->txOutputCount > outpoint->index) {
+                    memcpy(output, &candidateSource->txOutputs[outpoint->index], sizeof(*output));
+                    outputInSameBlock = true;
+                    break;
+                }
+            }
+            if (!outputInSameBlock) {
+                fprintf(stderr, "Cannot load source tx output (%i)...\n", error);
+                result = false;
+                goto release;
+            }
         }
         uint64_t programLength = input->signature_script_length + output->public_key_script_length;
 
@@ -90,7 +106,7 @@ bool is_normal_tx_valid(TxPayload *tx) {
         memcpy(program+input->signature_script_length, output->public_key_script, output->public_key_script_length);
         CheckSigMeta meta = {
             .sourceOutput = output,
-            .txInputIndex = i,
+            .txInputIndex = inputIndex,
             .currentTx = tx,
         };
         result = run_program(program, programLength, meta);
@@ -105,17 +121,16 @@ bool is_normal_tx_valid(TxPayload *tx) {
     return result;
 }
 
-bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {
-    if (blockIndex == NULL) {
-        fprintf(stderr, "No block index\n");
+bool is_tx_valid(uint64_t txIndex, TxPayload *txs) {
+    TxPayload *tx = &txs[txIndex];
+    if (!is_tx_legal(tx)) {
         return false;
     }
-
     if (is_coinbase(tx)) {
         return is_coinbase_tx_valid(tx);
     }
     else {
-        return is_normal_tx_valid(tx);
+        return is_normal_tx_valid(txIndex, txs);
     }
 }
 
@@ -145,7 +160,7 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
 
     bool allTxValid = true;
     for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
-        if (!is_tx_valid(&ptrCandidate->txs[i], ptrIndex)) {
+        if (!is_tx_valid(i, ptrCandidate->txs)) {
             allTxValid = false;
             break;
         }
@@ -347,23 +362,27 @@ double calc_block_pow(TargetCompact targetBytes) {
     return pow(2, 256) / (targetFloat + 1);
 }
 
-void register_block_outputs_as_available(BlockPayload *ptrBlock) {
+void register_validated_block(BlockPayload *ptrBlock) {
     SHA256_HASH blockHash = {0};
     hash_block_header(&ptrBlock->header, blockHash);
-    print_hash_with_description("Registering outputs of ", blockHash);
+    print_hash_with_description("Registering block ", blockHash);
     SHA256_HASH txHash = {0};
-    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
-        TxPayload *tx = &ptrBlock->txs[i];
+    for (uint64_t txIndex = 0; txIndex < ptrBlock->txCount; txIndex++) {
+        TxPayload *tx = &ptrBlock->txs[txIndex];
         hash_tx(tx, txHash);
         for (uint64_t outIndex = 0; outIndex < tx->txOutputCount; outIndex++) {
-            TxOut *out = &tx->txOutputs[i];
+            TxOut *out = &tx->txOutputs[outIndex];
             Outpoint outpoint;
             outpoint.index = (uint32_t)outIndex;
-            memcpy(outpoint.hash, txHash, 0);
+            memcpy(outpoint.txHash, txHash, SHA256_LENGTH);
             int8_t status = save_utxo(&outpoint, out);
             if (status) {
                 fprintf(stderr, "register utxo: %i\n", status);
             }
+        }
+        for (uint64_t inIndex = 0; inIndex < tx->txInputCount; inIndex++) {
+            TxIn *input = &tx->txInputs[inIndex];
+            spend_output(&input->previous_output);
         }
     }
 }
@@ -407,7 +426,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
                 printf("Valid incoming block: not moving tip\n");
             }
             if (!index->meta.outputsRegistered) {
-                register_block_outputs_as_available(ptrBlock);
+                register_validated_block(ptrBlock);
                 index->meta.outputsRegistered = true;
             }
         }
@@ -485,7 +504,6 @@ void validate_blocks(bool fromGenesis) {
     memcpy(blockHash, startingHash, SHA256_LENGTH);
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
-        print_hash_with_description("Validating ", blockHash);
         if (!index) {
             return;
         }
@@ -496,13 +514,15 @@ void validate_blocks(bool fromGenesis) {
         if (!childIndex) {
             return;
         }
-        BlockPayload *child = CALLOC(1, sizeof(*child), "validate_blocks:block");
-        int8_t status = load_block(childIndex->meta.hash, child);
+        print_hash_with_description("\nValidating block ", childIndex->meta.hash);
+        BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
+        int8_t status = load_block(childIndex->meta.hash, childBlock);
         bool continueScanning = false;
+        // print_block_payload(childBlock);
         if (status) {
             fprintf(stderr, "validate_blocks: Cannot load block\n");
         }
-        else if (!is_block_valid(child, childIndex)) {
+        else if (!is_block_valid(childBlock, childIndex)) {
             fprintf(stderr, "validate_blocks: Block invalid\n");
         }
         else {
@@ -512,11 +532,11 @@ void validate_blocks(bool fromGenesis) {
             memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
             continueScanning = true;
             if (!childIndex->meta.outputsRegistered) {
-                register_block_outputs_as_available(child);
+                register_validated_block(childBlock);
                 childIndex->meta.outputsRegistered = true;
             }
         }
-        release_block(child);
+        release_block(childBlock);
         if (!continueScanning) {
             return;
         }

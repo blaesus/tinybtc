@@ -16,7 +16,7 @@
 #define MAX_WITNESS_DATA_LENGTH 10000
 
 struct Outpoint {
-    SHA256_HASH hash;
+    SHA256_HASH txHash;
     uint32_t index;
 };
 

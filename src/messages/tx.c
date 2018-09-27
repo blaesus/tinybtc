@@ -3,10 +3,11 @@
 #include <limits.h>
 #include "tx.h"
 #include "utils/memory.h"
+#include "utils/data.h"
 
 static uint64_t parse_outpoint(Byte *ptrBuffer, Outpoint *ptrOutpoint) {
     Byte *p = ptrBuffer;
-    p += PARSE_INTO(p, &ptrOutpoint->hash);
+    p += PARSE_INTO(p, &ptrOutpoint->txHash);
     p += PARSE_INTO(p, &ptrOutpoint->index);
     return p - ptrBuffer;
 }
@@ -16,7 +17,7 @@ static uint64_t serialize_outpoint(
     Byte *ptrBuffer
 ) {
     Byte *p = ptrBuffer;
-    p += SERIALIZE_TO(ptrOutpoint->hash, p);
+    p += SERIALIZE_TO(ptrOutpoint->txHash, p);
     p += SERIALIZE_TO(ptrOutpoint->index, p);
     return p - ptrBuffer;
 }
@@ -253,21 +254,24 @@ int32_t compute_merkle_root(TxPayload txs[], uint64_t txCount, SHA256_HASH resul
 
 void print_tx_payload(TxPayload *ptrTx) {
     printf(
-        "[tx]version=%u; %llu TxIns; %llu TxOuts.\n",
+        "[tx] version=%u; %llu TxIns; %llu TxOuts. ",
         ptrTx->version,
         ptrTx->txInputCount,
         ptrTx->txOutputCount
     );
+    SHA256_HASH hash = {0};
+    hash_tx(ptrTx, hash);
+    print_hash_with_description("", hash);
     TxIn *in = NULL;
     for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
         in = &ptrTx->txInputs[i];
         printf("  input %llu: SigScript %llu bytes, ", i, in->signature_script_length);
-        print_hash_with_description("previous output=", in->previous_output.hash);
+        print_hash_with_description("previous output ", in->previous_output.txHash);
     }
 }
 
 bool is_outpoint_empty(Outpoint *ptrOutpoint) {
-    return (ptrOutpoint->index == UINT32_MAX) && is_hash_empty(ptrOutpoint->hash);
+    return (ptrOutpoint->index == UINT32_MAX) && is_hash_empty(ptrOutpoint->txHash);
 }
 
 bool is_coinbase(TxPayload *ptrTx) {
