@@ -395,6 +395,20 @@ void checked_mkdir(char *path) {
     }
 }
 
+int8_t destory_db(char *dbname) {
+    printf("Destorying database %s\n", dbname);
+    leveldb_options_t *options = leveldb_options_create();
+    char *error = NULL;
+    leveldb_destroy_db(options, dbname, &error);
+    if (error != NULL) {
+        fprintf(stderr, "Database destruction: fail: %s\n", error);
+        leveldb_free(error);
+        return -1;
+    }
+    printf("Done destructing.\n");
+    return 0;
+}
+
 void init_archive_dir() {
     checked_mkdir(ARCHIVE_ROOT);
     char blockRoot[MAX_PATH_LENGTH] = {0};
