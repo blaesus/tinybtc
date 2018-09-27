@@ -72,24 +72,17 @@ bool is_coinbase_tx_valid(TxPayload *tx) {
 }
 
 bool is_normal_tx_valid(TxPayload *tx) {
-    TxPayload *txSource = CALLOC(1, sizeof(TxPayload), "is_tx_valid:txSource");
+    TxOut *output = CALLOC(1, sizeof(TxOut), "is_tx_valid:txSource");
+    bool result = true;
     for (uint32_t i = 0; i < tx->txInputCount; i++) {
         TxIn *input = &tx->txInputs[i];
-        int8_t error = load_tx(input->previous_output.hash, txSource);
+        memset(output, 0, sizeof(*output));
+        int8_t error = load_utxo(&input->previous_output, output);
         if (error) {
             fprintf(stderr, "Cannot load source tx\n");
-            return false;
+            result = false;
+            goto release;
         }
-        if (txSource->txOutputCount < input->previous_output.index + 1) {
-            fprintf(
-                stderr,
-                "Source transaction only has %llu output, but index %u is requested\n",
-                txSource->txOutputCount,
-                input->previous_output.index
-            );
-            return false;
-        }
-        TxOut *output = &txSource->txOutputs[input->previous_output.index];
         uint64_t programLength = input->signature_script_length + output->public_key_script_length;
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
@@ -100,18 +93,16 @@ bool is_normal_tx_valid(TxPayload *tx) {
             .txInputIndex = i,
             .currentTx = tx,
         };
-        bool result = run_program(program, programLength, meta);
+        result = run_program(program, programLength, meta);
+        FREE(program, "is_tx_valid:program");
         if (!result) {
             printf("verification script failed\n");
-            FREE(program, "is_tx_valid:program");
-            return false;
-        }
-        else {
-            FREE(program, "is_tx_valid:program");
+            goto release;
         }
     }
-    FREE(txSource, "is_tx_valid:txSource");
-    return true;
+    release:
+    FREE(output, "is_tx_valid:txSource");
+    return result;
 }
 
 bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {

@@ -439,15 +439,27 @@ void make_txo_key(Outpoint *outpoint, char *key) {
     sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint->index);
 }
 
-int8_t save_utxo(Outpoint *outpoint, TxOut *out) {
+int8_t save_utxo(Outpoint *outpoint, TxOut *output) {
     char key[TXO_KEY_LENGTH] = {0};
     make_txo_key(outpoint, key);
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_utxo:buffer");
-    uint64_t width = serialize_tx_out(out, buffer);
+    uint64_t width = serialize_tx_out(output, buffer);
     int8_t status = save_data_by_key(global.utxoDB, key, buffer, width);
     FREE(buffer, "save_utxo:buffer");
     return status;
 }
+
+int8_t load_utxo(Outpoint *outpoint, TxOut *output) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_utxo:buffer");
+    size_t width = 0;
+    int8_t status = load_data_by_key(global.utxoDB, key, buffer, &width);
+    parse_tx_out(buffer, output);
+    FREE(buffer, "load_utxo:buffer");
+    return status;
+}
+
 
 int8_t spend_utxo(Outpoint *outpoint) {
     char key[TXO_KEY_LENGTH] = {0};
