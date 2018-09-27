@@ -33,10 +33,7 @@ static uint64_t serialize_tx_in(
     return p - ptrBuffer;
 }
 
-static uint64_t serialize_tx_out(
-    TxOut *ptrTxOut,
-    Byte *ptrBuffer
-) {
+uint64_t serialize_tx_out(TxOut *ptrTxOut, Byte *ptrBuffer) {
     Byte *p = ptrBuffer;
     p += SERIALIZE_TO(ptrTxOut->value, p);
     p += serialize_to_varint(ptrTxOut->public_key_script_length, p);
@@ -98,10 +95,7 @@ static uint64_t parse_tx_in(
     return p - ptrBuffer;
 }
 
-static uint64_t parse_tx_out(
-    Byte *ptrBuffer,
-    TxOut *ptrTxOut
-) {
+uint64_t parse_tx_out(Byte *ptrBuffer, TxOut *ptrTxOut) {
     Byte *p = ptrBuffer;
     p += PARSE_INTO(p, &ptrTxOut->value);
     p += parse_varint(p, &ptrTxOut->public_key_script_length);

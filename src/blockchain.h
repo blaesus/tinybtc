@@ -24,6 +24,7 @@ struct BlockMeta {
     SHA256_HASH hash;
     bool fullBlockAvailable;
     bool fullBlockValidated;
+    bool outputsRegistered;
 };
 
 struct BlockContext {

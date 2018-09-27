@@ -432,30 +432,41 @@ void init_block_index_map() {
 
 #define UINT32_DECIMAL_MAX_WIDTH 10
 
-#define UTXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
+#define TXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
 
-void make_utxo_key(struct Outpoint outpoint, char* key) {
-    hash_binary_to_hex(outpoint.hash, key);
-    sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint.index);
+void make_txo_key(Outpoint *outpoint, char *key) {
+    hash_binary_to_hex(outpoint->hash, key);
+    sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint->index);
 }
 
-void set_utxo(struct Outpoint outpoint, bool spent) {
-    char key[UTXO_KEY_LENGTH] = {0};
-    make_utxo_key(outpoint, key);
-    save_data_by_key(global.utxoDB, key, (Byte *) &spent, 1);
+int8_t save_utxo(Outpoint *outpoint, TxOut *out) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_utxo:buffer");
+    uint64_t width = serialize_tx_out(out, buffer);
+    int8_t status = save_data_by_key(global.utxoDB, key, buffer, width);
+    FREE(buffer, "save_utxo:buffer");
+    return status;
 }
 
-bool is_txo_spent(struct Outpoint outpoint) {
-    char key[UTXO_KEY_LENGTH] = {0};
-    make_utxo_key(outpoint, key);
-    Byte result = false;
+int8_t spend_utxo(Outpoint *outpoint) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    return remove_data_by_key(global.utxoDB, key);
+}
+
+bool is_outpoint_available(Outpoint *outpoint) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "is_outpoint_spent:buffer");
     size_t resultWidth = 0;
-    int8_t status = load_data_by_key(global.utxoDB, key, &result, &resultWidth);
-    if (status) {
+    int8_t loadError = load_data_by_key(global.utxoDB, key, buffer, &resultWidth);
+    FREE(buffer, "is_outpoint_spent:buffer");
+    if (loadError) {
         fprintf(stderr, "is_txo_spent: Cannot load data\n");
         return false;
     }
-    return result != false;
+    return true;
 }
 
 void reset_validation() {

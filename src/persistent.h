@@ -20,3 +20,6 @@ void migrate();
 void cleanup_db();
 void init_archive_dir(void);
 void init_block_index_map(void);
+int8_t save_utxo(Outpoint *outpoint, TxOut *out);
+int8_t spend_utxo(Outpoint *outpoint);
+bool is_outpoint_available(Outpoint *outpoint);
