@@ -26,7 +26,7 @@ struct GlobalState {
 
     uv_tcp_t apiSocket;
     void *txLocationDB;
-    void *txoDB;
+    void *utxoDB;
 
     PeerCandidate peerCandidates[MAX_PEER_CANDIDATES];
     uint32_t peerCandidateCount;

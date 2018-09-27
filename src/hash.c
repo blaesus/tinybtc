@@ -26,14 +26,23 @@ static void print_hex_of_width(Byte *data, uint64_t length) {
     }
 }
 
-static void print_hex_reverse_of_width(Byte *data, uint64_t length) {
+static void fprint_hex_reverse_of_width(FILE *stream, Byte *data, uint64_t length) {
     for (uint64_t i = length; i > 0; i--) {
-        printf("%02x", data[i-1]);
+        fprintf(stream, "%02x", data[i-1]);
     }
+}
+
+static void print_hex_reverse_of_width(Byte *data, uint64_t length) {
+    fprint_hex_reverse_of_width(stdout, data, length);
 }
 
 void print_sha256(Byte *hash) {
     print_hex_of_width(hash, SHA256_LENGTH);
+}
+
+void fprint_sha256_reverse(FILE *stream, Byte *hash)  {
+    fprintf(stream, "(BE)");
+    fprint_hex_reverse_of_width(stream, hash, SHA256_LENGTH);
 }
 
 void print_sha256_reverse(Byte *hash) {
@@ -41,10 +50,20 @@ void print_sha256_reverse(Byte *hash) {
     print_hex_reverse_of_width(hash, SHA256_LENGTH);
 }
 
+void fprint_hash_with_description(FILE *stream, char *description, Byte *hash) {
+    fprintf(stream, "%s", description);
+    fprint_sha256_reverse(stream, hash);
+    fprintf(stream, "\n");
+}
+
 void print_hash_with_description(char *description, Byte *hash) {
-    printf("%s", description);
+    fprint_hash_with_description(stdout, description, hash);
+}
+
+void print_hash_with_error(char *description, Byte *hash) {
+    fprintf(stderr, "%s", description);
     print_sha256_reverse(hash);
-    printf("\n");
+    fprintf(stderr, "\n");
 }
 
 void print_sha256_short(Byte *hash) {

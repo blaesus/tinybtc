@@ -93,17 +93,21 @@ int32_t load_peer_candidates() {
 
 
 int8_t init_db() {
-    printf("Connecting to LevelDB...");
+    printf("Connecting to databases...");
     leveldb_options_t *options = leveldb_options_create();
     leveldb_options_set_create_if_missing(options, 1);
     char *error = NULL;
-    global.txLocationDB = leveldb_open(options, config.txLocationDBName, &error);
+    char txLocationPath[MAX_PATH_LENGTH] = {0};
+    sprintf(txLocationPath, "%s/%s", ARCHIVE_ROOT, config.txLocationDBName);
+    global.txLocationDB = leveldb_open(options, txLocationPath, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         leveldb_free(error);
         return -1;
     }
-    global.txoDB = leveldb_open(options, config.txoDBName, &error);
+    char utxoDBPath[MAX_PATH_LENGTH] = {0};
+    sprintf(utxoDBPath, "%s/%s", ARCHIVE_ROOT, config.utxoDBName);
+    global.utxoDB = leveldb_open(options, utxoDBPath, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         leveldb_free(error);
@@ -116,7 +120,7 @@ int8_t init_db() {
 
 void cleanup_db() {
     leveldb_close(global.txLocationDB);
-    leveldb_close(global.txoDB);
+    leveldb_close(global.utxoDB);
 }
 
 int32_t save_block_indices(void) {
@@ -438,7 +442,7 @@ void make_utxo_key(struct Outpoint outpoint, char* key) {
 void set_utxo(struct Outpoint outpoint, bool spent) {
     char key[UTXO_KEY_LENGTH] = {0};
     make_utxo_key(outpoint, key);
-    save_data_by_key(global.txoDB, key, (Byte *) &spent, 1);
+    save_data_by_key(global.utxoDB, key, (Byte *) &spent, 1);
 }
 
 bool is_txo_spent(struct Outpoint outpoint) {
@@ -446,7 +450,7 @@ bool is_txo_spent(struct Outpoint outpoint) {
     make_utxo_key(outpoint, key);
     Byte result = false;
     size_t resultWidth = 0;
-    int8_t status = load_data_by_key(global.txoDB, key, &result, &resultWidth);
+    int8_t status = load_data_by_key(global.utxoDB, key, &result, &resultWidth);
     if (status) {
         fprintf(stderr, "is_txo_spent: Cannot load data\n");
         return false;
@@ -468,6 +472,7 @@ void reset_validation() {
 }
 
 void migrate() {
+    init_archive_dir();
     init_db();
     init_block_index_map();
     load_genesis();
@@ -475,5 +480,6 @@ void migrate() {
     // reset_validation();
     validate_blocks(true);
     // save_block_indices();
+    cleanup_db();
 }
 

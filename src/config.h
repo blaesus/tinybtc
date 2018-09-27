@@ -51,7 +51,7 @@ struct Config {
     uint8_t backlog;
     uint16_t getaddrThreshold;
     char *txLocationDBName;
-    char *txoDBName;
+    char *utxoDBName;
     uint16_t catchupThreshold;
     uint16_t apiPort;
     char *silentIncomingMessageCommands;
