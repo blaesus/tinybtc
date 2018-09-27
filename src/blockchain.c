@@ -462,10 +462,11 @@ double verify_block_indices(bool loadBlock) {
     return fullBlockAvailable * 1.0 / indexCount;
 }
 
-void validate_blocks() {
+void validate_blocks(bool fromGenesis) {
     printf("Validating blocks...\n");
     SHA256_HASH blockHash = {0};
-    memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
+    Byte *startingHash = fromGenesis ? global.genesisHash : global.mainValidatedTip.meta.hash;
+    memcpy(blockHash, startingHash, SHA256_LENGTH);
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
         print_hash_with_description("Validating ", blockHash);

@@ -226,6 +226,10 @@ void reset_ibd_mode() {
     }
 }
 
+void validate_blocks_callbck() {
+    validate_blocks(false);
+}
+
 typedef void TimerCallback(uv_timer_t *);
 
 struct TimerTableRow {
@@ -269,7 +273,7 @@ void setup_timers() {
         },
         {
             .interval = config.periods.validateNewBlocks,
-            .callback = &validate_blocks
+            .callback = &validate_blocks_callbck,
         }
     };
     uint32_t rowCount = sizeof(timerTableAutomatic) / sizeof(timerTableAutomatic[0]);

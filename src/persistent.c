@@ -401,7 +401,7 @@ void init_archive_dir() {
     sprintf(blockRoot, "%s/%s", ARCHIVE_ROOT, BLOCK_ROOT);
     checked_mkdir(blockRoot);
 
-    for (uint16_t i = 0; i <= 0x100; i++) {
+    for (uint16_t i = 0; i < 0x100; i++) {
         char path[MAX_PATH_LENGTH] = {0};
         sprintf(path, "%s/%s/%02x", ARCHIVE_ROOT, BLOCK_ROOT, i);
         checked_mkdir(path);
@@ -457,15 +457,9 @@ void migrate() {
     init_db();
     init_block_index_map();
     load_genesis();
-    // load_block_indices();
+    load_block_indices();
     // reset_validation();
-    // validate_blocks();
+    validate_blocks(true);
     // save_block_indices();
-    struct Outpoint outpoint = {
-        .index = 12345,
-    };
-    memcpy(outpoint.hash, global.genesisHash, SHA256_LENGTH);
-    set_utxo(outpoint, true);
-    printf("spent = %u\n", is_txo_spent(outpoint));
 }
 
