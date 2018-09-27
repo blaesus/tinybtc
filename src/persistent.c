@@ -479,6 +479,7 @@ void reset_validation() {
         memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
         BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
         ptrIndex->meta.fullBlockValidated = false;
+        ptrIndex->meta.outputsRegistered = false;
     }
 }
 
@@ -488,7 +489,8 @@ void migrate() {
     init_block_index_map();
     load_genesis();
     load_block_indices();
-    // reset_validation();
+    reset_validation();
+    destory_db(config.utxoDBName);
     validate_blocks(true);
     // save_block_indices();
     cleanup_db();

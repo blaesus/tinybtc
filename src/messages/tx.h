@@ -74,3 +74,4 @@ void release_items_in_tx(TxPayload *tx);
 void clone_tx(TxPayload *txFrom, TxPayload *txTo);
 uint64_t parse_tx_out(Byte *ptrBuffer, TxOut *ptrTxOut);
 uint64_t serialize_tx_out(TxOut *ptrTxOut, Byte *ptrBuffer);
+void hash_tx(TxPayload *ptrTx, SHA256_HASH result);

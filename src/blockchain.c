@@ -356,6 +356,27 @@ double calc_block_pow(TargetCompact targetBytes) {
     return pow(2, 256) / (targetFloat + 1);
 }
 
+void register_block_outputs_as_available(BlockPayload *ptrBlock) {
+    SHA256_HASH blockHash = {0};
+    hash_block_header(&ptrBlock->header, blockHash);
+    print_hash_with_description("Registering outputs of ", blockHash);
+    SHA256_HASH txHash = {0};
+    for (uint64_t i = 0; i < ptrBlock->txCount; i++) {
+        TxPayload *tx = &ptrBlock->txs[i];
+        hash_tx(tx, txHash);
+        for (uint64_t outIndex = 0; outIndex < tx->txOutputCount; outIndex++) {
+            TxOut *out = &tx->txOutputs[i];
+            Outpoint outpoint;
+            outpoint.index = (uint32_t)outIndex;
+            memcpy(outpoint.hash, txHash, 0);
+            int8_t status = save_utxo(&outpoint, out);
+            if (status) {
+                fprintf(stderr, "register utxo: %i\n", status);
+            }
+        }
+    }
+}
+
 int8_t process_incoming_block(BlockPayload *ptrBlock) {
     double start = get_now();
     if (!is_block_legal(ptrBlock)) {
@@ -393,6 +414,10 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
             }
             else {
                 printf("Valid incoming block: not moving tip\n");
+            }
+            if (!index->meta.outputsRegistered) {
+                register_block_outputs_as_available(ptrBlock);
+                index->meta.outputsRegistered = true;
             }
         }
         else {
@@ -495,6 +520,10 @@ void validate_blocks(bool fromGenesis) {
             global.mainValidatedTip = *childIndex;
             memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
             continueScanning = true;
+            if (!childIndex->meta.outputsRegistered) {
+                register_block_outputs_as_available(child);
+                childIndex->meta.outputsRegistered = true;
+            }
         }
         release_block(child);
         if (!continueScanning) {
