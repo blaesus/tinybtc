@@ -24,3 +24,4 @@ int8_t save_utxo(Outpoint *outpoint, TxOut *output);
 int8_t spend_output(Outpoint *outpoint);
 bool is_outpoint_available(Outpoint *outpoint);
 int8_t load_utxo(Outpoint *outpoint, TxOut *output);
+int8_t destory_db(char *dbname);

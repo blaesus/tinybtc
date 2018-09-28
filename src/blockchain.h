@@ -53,3 +53,4 @@ double verify_block_indices(bool loadBlock);
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex);
 uint32_t max_full_block_height_from_genesis(void);
 uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck);
+void revalidate(uint32_t totalBlocksToCheck);

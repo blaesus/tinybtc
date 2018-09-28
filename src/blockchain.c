@@ -623,3 +623,39 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
         }
     }
 }
+
+void reset_validation() {
+    BlockIndex *index = GET_BLOCK_INDEX(global.genesisHash);
+    global.mainValidatedTip = *index;
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    for (uint32_t i = 0; i < keyCount; i++) {
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
+        ptrIndex->meta.fullBlockValidated = false;
+        ptrIndex->meta.outputsRegistered = false;
+    }
+}
+
+void revalidate(uint32_t totalBlocksToCheck) {
+    init_archive_dir();
+    init_db();
+    init_block_index_map();
+    load_genesis();
+    load_block_indices();
+    // reset_validation();
+    // destory_db(config.utxoDBName);
+    int64_t remainingBlocks = totalBlocksToCheck;
+    while (remainingBlocks > 0) {
+        uint32_t checkedBlocks = validate_blocks(false, 5000);
+        printf("Checked %u blocks\n", checkedBlocks);
+        save_block_indices();
+        remainingBlocks -= checkedBlocks;
+        if (checkedBlocks < 10) {
+            break;
+        }
+    }
+    // destory_db(config.utxoDBName);
+    cleanup_db();
+}
