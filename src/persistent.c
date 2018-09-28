@@ -467,20 +467,6 @@ int8_t spend_output(Outpoint *outpoint) {
     return remove_data_by_key(global.utxoDB, key);
 }
 
-bool is_outpoint_available(Outpoint *outpoint) {
-    char key[TXO_KEY_LENGTH] = {0};
-    make_txo_key(outpoint, key);
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "is_outpoint_spent:buffer");
-    size_t resultWidth = 0;
-    int8_t loadError = load_data_by_key(global.utxoDB, key, buffer, &resultWidth);
-    FREE(buffer, "is_outpoint_spent:buffer");
-    if (loadError) {
-        fprintf(stderr, "is_txo_spent: Cannot load data\n");
-        return false;
-    }
-    return true;
-}
-
 void migrate() {
 }
 
