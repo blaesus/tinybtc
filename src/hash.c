@@ -72,7 +72,7 @@ void print_sha256_short(Byte *hash) {
 
 bool is_hash_empty(Byte *hash) {
     SHA256_HASH empty = {0};
-    return memcmp(hash, empty, SHA256_LENGTH) == 0;
+    return sha256_match(hash, empty);
 }
 
 void sharipe(void *data, uint32_t length, SHA256_HASH result) {

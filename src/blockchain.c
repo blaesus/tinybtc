@@ -65,69 +65,145 @@ bool is_block_header_valid(BlockIndex *index) {
     return headerValid;
 }
 
-bool is_coinbase_tx_valid(TxPayload *tx) {
-    // int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
-    // TODO: Police on max subsidy
-    return tx != NULL;
+int8_t search_utxo(Outpoint *outpoint, TxPayload *txs, uint64_t txLimit, TxOut *sourceOutput) {
+    // Coinbase
+    if (is_outpoint_empty(outpoint)) {
+        return -30;
+    }
+    // Search in the same block
+    for (uint64_t txIndex = 0; txIndex < txLimit; txIndex++) {
+        TxPayload *candidateSource = &txs[txIndex];
+        SHA256_HASH txHash;
+        hash_tx(candidateSource, txHash);
+        if (sha256_match(txHash, outpoint->txHash) && candidateSource->txOutputCount > outpoint->index) {
+            memcpy(sourceOutput, &candidateSource->txOutputs[outpoint->index], sizeof(*sourceOutput));
+            return 0;
+        }
+    }
+    return load_utxo(outpoint, sourceOutput);
+}
+
+uint64_t sum_outputs_from_tx(TxPayload *tx) {
+    uint64_t sum = 0;
+    for (uint64_t outputIndex = 0; outputIndex < tx->txOutputCount; outputIndex++) {
+        TxOut *output = &tx->txOutputs[outputIndex];
+        sum += output->value;
+    }
+    return sum;
+}
+
+uint64_t sum_inputs_from_tx(TxPayload *tx, TxPayload *txs, uint64_t txLimit) {
+    uint64_t sum = 0;
+    TxOut *sourceOutput = CALLOC(1, sizeof(*sourceOutput), "sum_inputs_from_tx:sourceOutput");
+    for (uint64_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
+        TxIn *input = &tx->txInputs[inputIndex];
+        if (is_coinbase(input)) {
+            continue;
+        }
+        memset(sourceOutput, 0, sizeof(*sourceOutput));
+        int8_t error = search_utxo(&input->previous_output, txs, txLimit, sourceOutput);
+        if (error) {
+            fprintf(stderr, "sum_inputs_from_tx: search_utxo error %i\n", error);
+        }
+        else {
+            sum += sourceOutput->value;
+        }
+    }
+    FREE(sourceOutput, "sum_inputs_from_tx:sourceOutput");
+    return sum;
+}
+uint64_t compute_tx_residue(TxPayload *tx, TxPayload *txs, uint64_t txLimit) {
+    uint64_t input = sum_inputs_from_tx(tx, txs, txLimit);
+    uint64_t output = sum_outputs_from_tx(tx);
+    return input - output;
+}
+
+uint64_t agregate_residues(TxPayload *txs, uint64_t count, uint64_t initialOffset) {
+    uint64_t sum = 0;
+    for (uint64_t txIndex = initialOffset; txIndex < count; txIndex++) {
+        TxPayload *tx = &txs[txIndex];
+        sum += compute_tx_residue(tx, txs, txIndex);
+    }
+    return sum;
 }
 
 bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
     TxPayload *tx = &txs[txIndex];
-    TxOut *output = CALLOC(1, sizeof(TxOut), "is_tx_valid:txSource");
-    bool result = true;
+
+    bool amountValid = false;
+    if (txIndex == 0) {
+        amountValid = true; // Handled at is_initial_tx_valid()
+    }
+    else {
+        uint64_t totalInputAmount = sum_inputs_from_tx(tx, txs, txIndex);
+        uint64_t totalOutputAmount = sum_outputs_from_tx(tx);
+        amountValid = totalInputAmount >= totalOutputAmount;
+    }
+
+    bool signaturesValid = true;
+    TxOut *sourceOutput = CALLOC(1, sizeof(TxOut), "is_tx_valid:txSource");
     for (uint32_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
         TxIn *input = &tx->txInputs[inputIndex];
-        memset(output, 0, sizeof(*output));
-        Outpoint *outpoint = &input->previous_output;
-        int8_t error = load_utxo(outpoint, output);
-        if (error) {
-            // Output not in previous blocks; but it may be in the same block;
-            bool outputInSameBlock = false;
-            for (uint64_t i = 0; i < txIndex; i++) {
-                TxPayload *candidateSource = &txs[i];
-                SHA256_HASH txHash;
-                hash_tx(candidateSource, txHash);
-                if (sha256_match(txHash, outpoint->txHash) && candidateSource->txOutputCount > outpoint->index) {
-                    memcpy(output, &candidateSource->txOutputs[outpoint->index], sizeof(*output));
-                    outputInSameBlock = true;
-                    break;
-                }
-            }
-            if (!outputInSameBlock) {
-                fprintf(stderr, "Cannot load source tx output (%i)...\n", error);
-                result = false;
-                goto release;
-            }
+        if (is_coinbase(input)) {
+            continue;
         }
-        uint64_t programLength = input->signature_script_length + output->public_key_script_length;
+
+        memset(sourceOutput, 0, sizeof(*sourceOutput));
+        Outpoint *outpoint = &input->previous_output;
+        int8_t error = search_utxo(outpoint, txs, txIndex, sourceOutput);
+        if (error) {
+            fprintf(stderr, "Cannot load source tx output (%i)...\n", error);
+            signaturesValid = false;
+            break;
+        }
+
+        uint64_t programLength = input->signature_script_length + sourceOutput->public_key_script_length;
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
         memcpy(program, input->signature_script, input->signature_script_length);
-        memcpy(program+input->signature_script_length, output->public_key_script, output->public_key_script_length);
+        memcpy(program+input->signature_script_length, sourceOutput->public_key_script, sourceOutput->public_key_script_length);
         CheckSigMeta meta = {
-            .sourceOutput = output,
+            .sourceOutput = sourceOutput,
             .txInputIndex = inputIndex,
             .currentTx = tx,
         };
-        result = run_program(program, programLength, meta);
+        bool scriptWorks = run_program(program, programLength, meta);
         FREE(program, "is_tx_valid:program");
-        if (!result) {
+        if (!scriptWorks) {
             printf("verification script failed\n");
-            goto release;
+            signaturesValid = false;
+            break;
         }
     }
-    release:
-    FREE(output, "is_tx_valid:txSource");
+    FREE(sourceOutput, "is_tx_valid:txSource");
+
+    bool result = amountValid && signaturesValid;
+
     return result;
 }
 
-bool is_tx_valid(uint64_t txIndex, TxPayload *txs) {
+bool is_initial_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, BlockIndex *blockIndex) {
+    bool validAsNormalTx = is_normal_tx_valid(txIndex, txs);
+
+    bool amountValid;
+    uint64_t totalInputAmount = sum_inputs_from_tx(&txs[txIndex], txs, 0);
+    uint64_t totalOutputAmount = sum_outputs_from_tx(&txs[txIndex]);
+    uint64_t transactionFees = agregate_residues(block->txs, block->txCount, 1);
+    int64_t coinbaseSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+    amountValid = totalInputAmount + coinbaseSubsidy + transactionFees >= totalOutputAmount;
+
+    return validAsNormalTx && amountValid;
+}
+
+
+bool is_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, BlockIndex *blockIndex) {
     TxPayload *tx = &txs[txIndex];
     if (!is_tx_legal(tx)) {
         return false;
     }
-    if (is_coinbase(tx)) {
-        return is_coinbase_tx_valid(tx);
+    bool firstTxInBlock = txIndex == 0;
+    if (firstTxInBlock) {
+        return is_initial_tx_valid(txIndex, txs, block, blockIndex);
     }
     else {
         return is_normal_tx_valid(txIndex, txs);
@@ -160,7 +236,7 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
 
     bool allTxValid = true;
     for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
-        if (!is_tx_valid(i, ptrCandidate->txs)) {
+        if (!is_tx_valid(i, ptrCandidate->txs, ptrCandidate, ptrIndex)) {
             allTxValid = false;
             break;
         }

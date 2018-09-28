@@ -141,13 +141,19 @@ bool is_block_legal(BlockPayload *ptrBlock) {
 
     bool timestampLegal = ptrBlock->header.timestamp - time(NULL) < mainnet.blockMaxForwardTimestamp;
 
-    bool firstTxIsCoinbase = is_coinbase(&ptrBlock->txs[0]);
+    bool initialInputIsCoinbase = is_coinbase(&ptrBlock->txs[0].txInputs[0]);
 
     bool onlyOneCoinbase = true;
-    for (uint64_t i = 1; i < ptrBlock->txCount; i++) {
-        if (is_coinbase(&ptrBlock->txs[i])) {
-            onlyOneCoinbase = false;
-            break;
+    for (uint64_t txIndex = 0; txIndex < ptrBlock->txCount; txIndex++) {
+        TxPayload *tx = &ptrBlock->txs[txIndex];
+        for (uint64_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
+            if (txIndex == 0 && inputIndex == 0) {
+                continue;
+            }
+            if (is_coinbase(&ptrBlock->txs[txIndex].txInputs[inputIndex])) {
+                onlyOneCoinbase = false;
+                break;
+            }
         }
     }
 
@@ -183,7 +189,7 @@ bool is_block_legal(BlockPayload *ptrBlock) {
 
     return nonEmptyTxList
            && timestampLegal
-           && firstTxIsCoinbase
+           && initialInputIsCoinbase
            && onlyOneCoinbase
            && allTxLegal
            && hashSatisfiesTarget

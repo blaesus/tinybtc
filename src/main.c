@@ -60,7 +60,7 @@ int32_t connect_to_peers() {
 
 int32_t main(/* int32_t argc, char **argv */) {
     // test(); return 0;
-    // migrate(); return 0;
+    migrate(); return 0;
     int8_t initError = init();
     if (initError) {
         fprintf(stderr, "init error %i\n", initError);

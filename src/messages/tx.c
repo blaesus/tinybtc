@@ -274,8 +274,8 @@ bool is_outpoint_empty(Outpoint *ptrOutpoint) {
     return (ptrOutpoint->index == UINT32_MAX) && is_hash_empty(ptrOutpoint->txHash);
 }
 
-bool is_coinbase(TxPayload *ptrTx) {
-    return ptrTx->txInputCount == 1 && is_outpoint_empty(&ptrTx->txInputs->previous_output);
+bool is_coinbase(TxIn *input) {
+    return is_outpoint_empty(&input->previous_output);
 }
 
 bool is_tx_legal(TxPayload *ptrTx) {
@@ -292,18 +292,19 @@ bool is_tx_legal(TxPayload *ptrTx) {
     }
 
     bool inputsLegal = true;
-    if (is_coinbase(ptrTx)) {
-        TxIn *firstIn = ptrTx->txInputs;
-        inputsLegal = firstIn->signature_script_length <= mainnet.scriptSigSizeUpper
-                      && firstIn->signature_script_length >= mainnet.scriptSigSizeLower;
-    }
-    else {
-        for (uint64_t i = 0; i < ptrTx->txInputCount; i++) {
-            TxIn *in = &ptrTx->txInputs[i];
-            if (is_outpoint_empty(&in->previous_output)) {
+    for (uint64_t inputIndex = 0; inputIndex < ptrTx->txInputCount; inputIndex++) {
+        TxIn *input = &ptrTx->txInputs[inputIndex];
+        if (is_coinbase(input)) {
+            bool coinbaseLegal = input->signature_script_length <= mainnet.scriptSigSizeUpper
+                                 && input->signature_script_length >= mainnet.scriptSigSizeLower;
+            if (!coinbaseLegal) {
                 inputsLegal = false;
                 break;
             }
+        }
+        else if (is_outpoint_empty(&input->previous_output)) {
+            inputsLegal = false;
+            break;
         }
     }
 
