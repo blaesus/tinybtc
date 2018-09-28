@@ -227,7 +227,7 @@ void reset_ibd_mode() {
 }
 
 void validate_blocks_timer_callback() {
-    validate_blocks(false);
+    validate_blocks(false, 0);
 }
 
 typedef void TimerCallback(uv_timer_t *);

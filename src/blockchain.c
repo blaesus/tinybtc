@@ -573,22 +573,23 @@ double verify_block_indices(bool loadBlock) {
     return fullBlockAvailable * 1.0 / indexCount;
 }
 
-void validate_blocks(bool fromGenesis) {
+uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     printf("Validating blocks...\n");
     SHA256_HASH blockHash = {0};
     Byte *startingHash = fromGenesis ? global.genesisHash : global.mainValidatedTip.meta.hash;
     memcpy(blockHash, startingHash, SHA256_LENGTH);
+    uint32_t checkedBlocks = 0;
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
         if (!index) {
-            return;
+            return checkedBlocks;
         }
         if (index->context.children.length == 0) {
-            return;
+            return checkedBlocks;
         }
         BlockIndex *childIndex = GET_BLOCK_INDEX(index->context.children.hashes[0]); // TODO: Handle side-chain
         if (!childIndex) {
-            return;
+            return checkedBlocks;
         }
         print_hash_with_description("\nValidating block ", childIndex->meta.hash);
         BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
@@ -613,8 +614,12 @@ void validate_blocks(bool fromGenesis) {
             }
         }
         release_block(childBlock);
+        checkedBlocks++;
+        if (maxBlocksToCheck > 0 && checkedBlocks >= maxBlocksToCheck) {
+            continueScanning = false;
+        }
         if (!continueScanning) {
-            return;
+            return checkedBlocks;
         }
     }
 }

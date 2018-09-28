@@ -501,11 +501,17 @@ void migrate() {
     init_block_index_map();
     load_genesis();
     load_block_indices();
-    reset_validation();
-    destory_db(config.utxoDBName);
-    validate_blocks(true);
-    // save_block_indices();
-    destory_db(config.utxoDBName);
+    // reset_validation();
+    // destory_db(config.utxoDBName);
+    while (true) {
+        uint32_t checkedBlocks = validate_blocks(false, 5000);
+        printf("Checked %u blocks\n", checkedBlocks);
+        save_block_indices();
+        if (checkedBlocks < 10) {
+            break;
+        }
+    }
+    // destory_db(config.utxoDBName);
     cleanup_db();
 }
 
