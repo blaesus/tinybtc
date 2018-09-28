@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <openssl/ec.h>
+#include <openssl/err.h>
 #include <openssl/obj_mac.h>
 #include "script.h"
 #include "datatypes.h"
@@ -407,12 +408,25 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
 
                     int32_t verification = ECDSA_verify(
                         0,
-                        (Byte *)&hashTx,
+                        hashTx,
                         sizeof(hashTx),
                         sigFrame.data,
                         sigFrame.dataWidth - 1,
                         ptrPubKey
                     );
+
+                    if (verification == -1) {
+                        uint64_t error = ERR_get_error();
+                        fprintf(stderr, "ECDSA_verify error %llu: %s\n", error, ERR_reason_error_string(error));
+                    }
+                    else if (verification == 0) {
+                        fprintf(stderr, "ECDSA_verify: invalid signature\n");
+                    }
+                    else {
+                        #if LOG_VALIDATION_PROCEDURES
+                        printf("ECDSA_verify: OK\n");
+                        #endif
+                    }
 
                     push(&runtimeStack, get_boolean_frame(verification == 1));
                     release_items_in_tx(txCopy);

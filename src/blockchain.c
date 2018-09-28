@@ -170,7 +170,6 @@ bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
         bool scriptWorks = run_program(program, programLength, meta);
         FREE(program, "is_tx_valid:program");
         if (!scriptWorks) {
-            printf("verification script failed\n");
             signaturesValid = false;
             break;
         }
@@ -198,6 +197,9 @@ bool is_initial_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, 
 
 bool is_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, BlockIndex *blockIndex) {
     TxPayload *tx = &txs[txIndex];
+    #if LOG_VALIDATION_PROCEDURES
+    printf("\nValidating TX #%llu\n", txIndex);
+    #endif
     if (!is_tx_legal(tx)) {
         return false;
     }
@@ -595,7 +597,9 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
         BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
         int8_t status = load_block(childIndex->meta.hash, childBlock);
         bool continueScanning = false;
-        // print_block_payload(childBlock);
+        #if LOG_VALIDATION_PROCEDURES
+        print_block_payload(childBlock);
+        #endif
         if (status) {
             fprintf(stderr, "validate_blocks: Cannot load block\n");
         }
