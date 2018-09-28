@@ -18,6 +18,7 @@
 #define LOG_PEER_REPLACE false
 #define LOG_SCRIPT_STACKS false
 #define LOG_BLOCK_LOAD false
+#define LOG_VALIDATION_PROCEDURES false
 
 #define TRACE_MEMORY_USE false
 
