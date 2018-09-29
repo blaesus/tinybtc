@@ -11,6 +11,7 @@
 #include "utils/memory.h"
 #include "utils/datetime.h"
 #include "utils/data.h"
+#include "utils/integers.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
@@ -652,7 +653,7 @@ void revalidate(uint32_t totalBlocksToCheck) {
     // destory_db(config.utxoDBName);
     int64_t remainingBlocks = totalBlocksToCheck;
     while (remainingBlocks > 0) {
-        uint32_t checkedBlocks = validate_blocks(false, 5000);
+        uint32_t checkedBlocks = validate_blocks(false, min(5000, totalBlocksToCheck));
         printf("Checked %u blocks\n", checkedBlocks);
         save_block_indices();
         remainingBlocks -= checkedBlocks;

@@ -329,6 +329,95 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
     return txCopy;
 }
 
+#define MAX_SIGNATURE_DATA 128
+
+struct EllipticPoint {
+    int8_t pointType;
+    int8_t length;
+    Byte data[MAX_SIGNATURE_DATA];
+};
+
+typedef struct EllipticPoint EllipticPoint;
+
+struct DerSignature {
+    int8_t sequence;
+    int8_t length;
+    EllipticPoint r;
+    EllipticPoint s;
+};
+
+typedef struct DerSignature DerSignature;
+
+uint64_t parse_elliptic_point(Byte *ptrBuffer, EllipticPoint *point) {
+    Byte *p = ptrBuffer;
+    p += PARSE_INTO(p, &point->pointType);
+    p += PARSE_INTO(p, &point->length);
+    p += PARSE_INTO_OF_LENGTH(p, &point->data, point->length);
+    return p - ptrBuffer;
+}
+
+uint64_t serialize_elliptic_point(EllipticPoint *point, Byte *ptrBuffer) {
+    Byte *p = ptrBuffer;
+    p += SERIALIZE_TO(point->pointType, p);
+    p += SERIALIZE_TO(point->length, p);
+    p += SERIALIZE_TO_OF_LENGTH(point->data, p, point->length);
+    return p - ptrBuffer;
+}
+
+uint64_t parse_der(Byte *ptrBuffer, DerSignature *signature) {
+    Byte *p = ptrBuffer;
+    p += PARSE_INTO(p, &signature->sequence);
+    p += PARSE_INTO(p, &signature->length);
+    p += parse_elliptic_point(p, &signature->r);
+    p += parse_elliptic_point(p, &signature->s);
+    return p - ptrBuffer;
+}
+
+uint64_t serialize_der(DerSignature *signature, Byte *ptrBuffer) {
+    Byte *p = ptrBuffer;
+    p += SERIALIZE_TO(signature->sequence, p);
+    p += SERIALIZE_TO(signature->length, p);
+    p += serialize_elliptic_point(&signature->r, p);
+    p += serialize_elliptic_point(&signature->s, p);
+    return p - ptrBuffer;
+}
+
+int8_t fix_point(EllipticPoint *point) {
+    // The initial zeros may kill internal OpenSSL checks
+    if (point->data[0] == 0 && point->data[1] == 0) {
+        memcpy(point->data, point->data+2, point->length-2);
+        point->length -= 2;
+        return -2;
+    }
+    return 0;
+}
+
+void fix_signature(DerSignature *signature) {
+    signature->length += fix_point(&signature->r);
+    signature->length += fix_point(&signature->s);
+}
+
+void print_elliptic_point(EllipticPoint *point) {
+    printf("point type %i, length %i, data:", point->pointType, point->length);
+    print_object(point->data, (uint64_t)point->length);
+}
+
+void print_der(DerSignature *signature) {
+    printf("---------- signature ----------\n");
+    printf("sequence %#02x, length %i\n", signature->sequence, signature->length);
+    print_elliptic_point(&signature->r);
+    print_elliptic_point(&signature->s);
+    printf("-------------------------------\n");
+}
+
+void fix_signature_frame(StackFrame *sigFrame) {
+    DerSignature *signature = CALLOC(1, sizeof(*signature), "fix_signature_frame:signature");
+    parse_der(sigFrame->data, signature);
+    fix_signature(signature);
+    sigFrame->dataWidth = (uint16_t)(serialize_der(signature, sigFrame->data) + 1);
+    FREE(signature, "fix_signature_frame:signature");
+}
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -401,6 +490,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
 
                     StackFrame sigFrame = pop(&runtimeStack);
                     uint32_t sigType = sigFrame.data[sigFrame.dataWidth-1];
+                    fix_signature_frame(&sigFrame);
 
                     TxPayload *txCopy = make_tx_copy(meta);
                     SHA256_HASH hashTx = {0};
