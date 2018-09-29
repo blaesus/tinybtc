@@ -32,6 +32,10 @@ struct Stack {
     uint64_t height;
 };
 
+bool is_anonymous_push_data_op(Byte op) {
+    return (op > OP_0) && (op < OP_PUSHDATA1);
+}
+
 void hash_tx_with_sigtype(TxPayload *tx, int32_t sigType, Byte *hash) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_sigtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
@@ -243,9 +247,8 @@ void print_stack_with_label(struct Stack *stack, char *label) {
 void load_program(Stack *stack, Byte *program, uint64_t programLength) {
     for (uint64_t i = 0; i < programLength; i++) {
         Byte datum = program[i];
-        const char *name = get_op_name(datum);
         StackFrame newFrame = get_empty_frame();
-        if (strcmp(name, UNKNOWN_OPCODE) == 0) {
+        if (is_anonymous_push_data_op(datum)) {
             newFrame.dataWidth = datum;
             newFrame.type = FRAME_TYPE_DATA;
             memcpy(newFrame.data, program + (i+1), datum);
