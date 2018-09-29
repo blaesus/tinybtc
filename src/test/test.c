@@ -383,6 +383,9 @@ void test_script() {
         "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", // genesis
         "00000000d1145790a8694403d4063f323d499e655c83426834d4ce2f8dd4a2ee", // 170, first block with real tx
         "00000000b0c5a240b2a61d2e75692224efd4cbecdf6eaf4cc2cf477ca7c270e7", // 496, multiple inputs
+        "000000005a4ded781e667e06ceefafb71410b511fe0d5adc3e5a27ecbec34ae6", // 546, using transaction of the same block
+        "00000000d50a3cd05e451166e5f618c76cc3273104608fe424835ae5c0d47db9", // 2817, coinbase taking fees
+        "0000000000004939267ff84df0de0b88a7104b0b206e29a4318b3ea5ba6030d6", // 124,276, Tx #4 DER with preceding zeros
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

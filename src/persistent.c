@@ -93,17 +93,21 @@ int32_t load_peer_candidates() {
 
 
 int8_t init_db() {
-    printf("Connecting to LevelDB...");
+    printf("Connecting to databases...");
     leveldb_options_t *options = leveldb_options_create();
     leveldb_options_set_create_if_missing(options, 1);
     char *error = NULL;
-    global.txLocationDB = leveldb_open(options, config.txLocationDBName, &error);
+    char txLocationPath[MAX_PATH_LENGTH] = {0};
+    sprintf(txLocationPath, "%s/%s", ARCHIVE_ROOT, config.txLocationDBName);
+    global.txLocationDB = leveldb_open(options, txLocationPath, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         leveldb_free(error);
         return -1;
     }
-    global.txoDB = leveldb_open(options, config.txoDBName, &error);
+    char utxoDBPath[MAX_PATH_LENGTH] = {0};
+    sprintf(utxoDBPath, "%s/%s", ARCHIVE_ROOT, config.utxoDBName);
+    global.utxoDB = leveldb_open(options, utxoDBPath, &error);
     if (error != NULL) {
         fprintf(stderr, "Open LevelDB fail: %s\n", error);
         leveldb_free(error);
@@ -116,7 +120,7 @@ int8_t init_db() {
 
 void cleanup_db() {
     leveldb_close(global.txLocationDB);
-    leveldb_close(global.txoDB);
+    leveldb_close(global.utxoDB);
 }
 
 int32_t save_block_indices(void) {
@@ -207,13 +211,13 @@ int8_t load_data_by_key(leveldb_t *db, char *key, Byte *output, size_t *outputLe
     leveldb_free(readOptions);
 
     if (read == NULL) {
-        printf("leveldb: key not found %s\n", key);
+        fprintf(stderr, "leveldb: key not found %s\n", key);
         return -1;
     }
     else if (error != NULL) {
         leveldb_free(error);
         fprintf(stderr, "leveldb: Read fail on key %s\n", key);
-        return -1;
+        return -2;
     }
     memcpy(output, read, readLength);
     if (outputLength) {
@@ -395,13 +399,27 @@ void checked_mkdir(char *path) {
     }
 }
 
+int8_t destory_db(char *dbname) {
+    printf("Destorying database %s\n", dbname);
+    leveldb_options_t *options = leveldb_options_create();
+    char *error = NULL;
+    leveldb_destroy_db(options, dbname, &error);
+    if (error != NULL) {
+        fprintf(stderr, "Database destruction: fail: %s\n", error);
+        leveldb_free(error);
+        return -1;
+    }
+    printf("Done destructing.\n");
+    return 0;
+}
+
 void init_archive_dir() {
     checked_mkdir(ARCHIVE_ROOT);
     char blockRoot[MAX_PATH_LENGTH] = {0};
     sprintf(blockRoot, "%s/%s", ARCHIVE_ROOT, BLOCK_ROOT);
     checked_mkdir(blockRoot);
 
-    for (uint16_t i = 0; i <= 0x100; i++) {
+    for (uint16_t i = 0; i < 0x100; i++) {
         char path[MAX_PATH_LENGTH] = {0};
         sprintf(path, "%s/%s/%02x", ARCHIVE_ROOT, BLOCK_ROOT, i);
         checked_mkdir(path);
@@ -414,58 +432,41 @@ void init_block_index_map() {
 
 #define UINT32_DECIMAL_MAX_WIDTH 10
 
-#define UTXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
+#define TXO_KEY_LENGTH (HASH_KEY_STRING_LENGTH + 1 + UINT32_DECIMAL_MAX_WIDTH)
 
-void make_utxo_key(struct Outpoint outpoint, char* key) {
-    hash_binary_to_hex(outpoint.hash, key);
-    sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint.index);
+void make_txo_key(Outpoint *outpoint, char *key) {
+    hash_binary_to_hex(outpoint->txHash, key);
+    sprintf(key+HASH_KEY_STRING_LENGTH-1, "_%010u", outpoint->index);
 }
 
-void set_utxo(struct Outpoint outpoint, bool spent) {
-    char key[UTXO_KEY_LENGTH] = {0};
-    make_utxo_key(outpoint, key);
-    save_data_by_key(global.txoDB, key, (Byte *) &spent, 1);
+int8_t save_utxo(Outpoint *outpoint, TxOut *output) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_utxo:buffer");
+    uint64_t width = serialize_tx_out(output, buffer);
+    int8_t status = save_data_by_key(global.utxoDB, key, buffer, width);
+    FREE(buffer, "save_utxo:buffer");
+    return status;
 }
 
-bool is_txo_spent(struct Outpoint outpoint) {
-    char key[UTXO_KEY_LENGTH] = {0};
-    make_utxo_key(outpoint, key);
-    Byte result = false;
-    size_t resultWidth = 0;
-    int8_t status = load_data_by_key(global.txoDB, key, &result, &resultWidth);
-    if (status) {
-        fprintf(stderr, "is_txo_spent: Cannot load data\n");
-        return false;
-    }
-    return result != false;
+int8_t load_utxo(Outpoint *outpoint, TxOut *output) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_utxo:buffer");
+    size_t width = 0;
+    int8_t status = load_data_by_key(global.utxoDB, key, buffer, &width);
+    parse_tx_out(buffer, output);
+    FREE(buffer, "load_utxo:buffer");
+    return status;
 }
 
-void reset_validation() {
-    BlockIndex *index = GET_BLOCK_INDEX(global.genesisHash);
-    global.mainValidatedTip = *index;
-    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
-    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
-    for (uint32_t i = 0; i < keyCount; i++) {
-        Byte key[SHA256_LENGTH] = {0};
-        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
-        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
-        ptrIndex->meta.fullBlockValidated = false;
-    }
+
+int8_t spend_output(Outpoint *outpoint) {
+    char key[TXO_KEY_LENGTH] = {0};
+    make_txo_key(outpoint, key);
+    return remove_data_by_key(global.utxoDB, key);
 }
 
 void migrate() {
-    init_db();
-    init_block_index_map();
-    load_genesis();
-    // load_block_indices();
-    // reset_validation();
-    // validate_blocks();
-    // save_block_indices();
-    struct Outpoint outpoint = {
-        .index = 12345,
-    };
-    memcpy(outpoint.hash, global.genesisHash, SHA256_LENGTH);
-    set_utxo(outpoint, true);
-    printf("spent = %u\n", is_txo_spent(outpoint));
 }
 

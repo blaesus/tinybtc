@@ -11,7 +11,7 @@ const struct Config config = {
         .timeoutPeers = SECOND_TO_MILLISECOND(10),
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
         .ping = SECOND_TO_MILLISECOND(59),
-        .validateNewBlocks = MINUTE_TO_MILLISECOND(2),
+        .validateNewBlocks = 0,
     },
     .tolerances = {
         .handshake = SECOND_TO_MILLISECOND(10),
@@ -28,7 +28,7 @@ const struct Config config = {
     .backlog = 32,
     .getaddrThreshold = 1000,
     .txLocationDBName = "tx_locations",
-    .txoDBName = "txo",
+    .utxoDBName = "utxo",
     .catchupThreshold = 144,
     .apiPort = 9494,
     .silentIncomingMessageCommands = "inv,pong,ping,addr",

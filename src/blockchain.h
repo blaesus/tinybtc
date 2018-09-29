@@ -24,6 +24,7 @@ struct BlockMeta {
     SHA256_HASH hash;
     bool fullBlockAvailable;
     bool fullBlockValidated;
+    bool outputsRegistered;
 };
 
 struct BlockContext {
@@ -51,4 +52,5 @@ int8_t process_incoming_block(BlockPayload *ptrBlock);
 double verify_block_indices(bool loadBlock);
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex);
 uint32_t max_full_block_height_from_genesis(void);
-void validate_blocks();
+uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck);
+void revalidate(uint32_t totalBlocksToCheck);

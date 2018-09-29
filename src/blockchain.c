@@ -11,6 +11,7 @@
 #include "utils/memory.h"
 #include "utils/datetime.h"
 #include "utils/data.h"
+#include "utils/integers.h"
 
 
 static int8_t get_maximal_target(BlockIndex *index, TargetCompact *result);
@@ -65,66 +66,150 @@ bool is_block_header_valid(BlockIndex *index) {
     return headerValid;
 }
 
-bool is_coinbase_tx_valid(TxPayload *tx) {
-    // int64_t maxSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
-    // TODO: Police on max subsidy
-    return tx != NULL;
+int8_t search_utxo(Outpoint *outpoint, TxPayload *txs, uint64_t txLimit, TxOut *sourceOutput) {
+    // Coinbase
+    if (is_outpoint_empty(outpoint)) {
+        return -30;
+    }
+    // Search in the same block
+    for (uint64_t txIndex = 0; txIndex < txLimit; txIndex++) {
+        TxPayload *candidateSource = &txs[txIndex];
+        SHA256_HASH txHash;
+        hash_tx(candidateSource, txHash);
+        if (sha256_match(txHash, outpoint->txHash) && candidateSource->txOutputCount > outpoint->index) {
+            memcpy(sourceOutput, &candidateSource->txOutputs[outpoint->index], sizeof(*sourceOutput));
+            return 0;
+        }
+    }
+    return load_utxo(outpoint, sourceOutput);
 }
 
-bool is_normal_tx_valid(TxPayload *tx) {
-    TxPayload *txSource = CALLOC(1, sizeof(TxPayload), "is_tx_valid:txSource");
-    for (uint32_t i = 0; i < tx->txInputCount; i++) {
-        TxIn *input = &tx->txInputs[i];
-        int8_t error = load_tx(input->previous_output.hash, txSource);
+uint64_t sum_outputs_from_tx(TxPayload *tx) {
+    uint64_t sum = 0;
+    for (uint64_t outputIndex = 0; outputIndex < tx->txOutputCount; outputIndex++) {
+        TxOut *output = &tx->txOutputs[outputIndex];
+        sum += output->value;
+    }
+    return sum;
+}
+
+uint64_t sum_inputs_from_tx(TxPayload *tx, TxPayload *txs, uint64_t txLimit) {
+    uint64_t sum = 0;
+    TxOut *sourceOutput = CALLOC(1, sizeof(*sourceOutput), "sum_inputs_from_tx:sourceOutput");
+    for (uint64_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
+        TxIn *input = &tx->txInputs[inputIndex];
+        if (is_coinbase(input)) {
+            continue;
+        }
+        memset(sourceOutput, 0, sizeof(*sourceOutput));
+        int8_t error = search_utxo(&input->previous_output, txs, txLimit, sourceOutput);
         if (error) {
-            fprintf(stderr, "Cannot load source tx\n");
-            return false;
+            fprintf(stderr, "sum_inputs_from_tx: search_utxo error %i\n", error);
         }
-        if (txSource->txOutputCount < input->previous_output.index + 1) {
-            fprintf(
-                stderr,
-                "Source transaction only has %llu output, but index %u is requested\n",
-                txSource->txOutputCount,
-                input->previous_output.index
-            );
-            return false;
+        else {
+            sum += sourceOutput->value;
         }
-        TxOut *output = &txSource->txOutputs[input->previous_output.index];
-        uint64_t programLength = input->signature_script_length + output->public_key_script_length;
+    }
+    FREE(sourceOutput, "sum_inputs_from_tx:sourceOutput");
+    return sum;
+}
+uint64_t compute_tx_residue(TxPayload *tx, TxPayload *txs, uint64_t txLimit) {
+    uint64_t input = sum_inputs_from_tx(tx, txs, txLimit);
+    uint64_t output = sum_outputs_from_tx(tx);
+    return input - output;
+}
+
+uint64_t agregate_residues(TxPayload *txs, uint64_t count, uint64_t initialOffset) {
+    uint64_t sum = 0;
+    for (uint64_t txIndex = initialOffset; txIndex < count; txIndex++) {
+        TxPayload *tx = &txs[txIndex];
+        sum += compute_tx_residue(tx, txs, txIndex);
+    }
+    return sum;
+}
+
+bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
+    TxPayload *tx = &txs[txIndex];
+
+    bool amountValid = false;
+    if (txIndex == 0) {
+        amountValid = true; // Handled at is_initial_tx_valid()
+    }
+    else {
+        uint64_t totalInputAmount = sum_inputs_from_tx(tx, txs, txIndex);
+        uint64_t totalOutputAmount = sum_outputs_from_tx(tx);
+        amountValid = totalInputAmount >= totalOutputAmount;
+    }
+
+    bool signaturesValid = true;
+    TxOut *sourceOutput = CALLOC(1, sizeof(TxOut), "is_tx_valid:txSource");
+    for (uint32_t inputIndex = 0; inputIndex < tx->txInputCount; inputIndex++) {
+        TxIn *input = &tx->txInputs[inputIndex];
+        if (is_coinbase(input)) {
+            continue;
+        }
+
+        memset(sourceOutput, 0, sizeof(*sourceOutput));
+        Outpoint *outpoint = &input->previous_output;
+        int8_t error = search_utxo(outpoint, txs, txIndex, sourceOutput);
+        if (error) {
+            fprintf(stderr, "Cannot load source tx output (%i)...\n", error);
+            signaturesValid = false;
+            break;
+        }
+
+        uint64_t programLength = input->signature_script_length + sourceOutput->public_key_script_length;
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
         memcpy(program, input->signature_script, input->signature_script_length);
-        memcpy(program+input->signature_script_length, output->public_key_script, output->public_key_script_length);
+        memcpy(program+input->signature_script_length, sourceOutput->public_key_script, sourceOutput->public_key_script_length);
         CheckSigMeta meta = {
-            .sourceOutput = output,
-            .txInputIndex = i,
+            .sourceOutput = sourceOutput,
+            .txInputIndex = inputIndex,
             .currentTx = tx,
         };
-        bool result = run_program(program, programLength, meta);
-        if (!result) {
-            printf("verification script failed\n");
-            FREE(program, "is_tx_valid:program");
-            return false;
-        }
-        else {
-            FREE(program, "is_tx_valid:program");
+        bool scriptWorks = run_program(program, programLength, meta);
+        FREE(program, "is_tx_valid:program");
+        if (!scriptWorks) {
+            signaturesValid = false;
+            break;
         }
     }
-    FREE(txSource, "is_tx_valid:txSource");
-    return true;
+    FREE(sourceOutput, "is_tx_valid:txSource");
+
+    bool result = amountValid && signaturesValid;
+
+    return result;
 }
 
-bool is_tx_valid(TxPayload *tx, BlockIndex *blockIndex) {
-    if (blockIndex == NULL) {
-        fprintf(stderr, "No block index\n");
+bool is_initial_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, BlockIndex *blockIndex) {
+    bool validAsNormalTx = is_normal_tx_valid(txIndex, txs);
+
+    bool amountValid;
+    uint64_t totalInputAmount = sum_inputs_from_tx(&txs[txIndex], txs, 0);
+    uint64_t totalOutputAmount = sum_outputs_from_tx(&txs[txIndex]);
+    uint64_t transactionFees = agregate_residues(block->txs, block->txCount, 1);
+    int64_t coinbaseSubsidy = COIN(50) >> (blockIndex->context.height / 210000);
+    amountValid = totalInputAmount + coinbaseSubsidy + transactionFees >= totalOutputAmount;
+
+    return validAsNormalTx && amountValid;
+}
+
+
+bool is_tx_valid(uint64_t txIndex, TxPayload *txs, BlockPayload *block, BlockIndex *blockIndex) {
+    TxPayload *tx = &txs[txIndex];
+    #if LOG_VALIDATION_PROCEDURES
+    printf("\nValidating TX #%llu\n", txIndex);
+    #endif
+    if (!is_tx_legal(tx)) {
         return false;
     }
-
-    if (is_coinbase(tx)) {
-        return is_coinbase_tx_valid(tx);
+    bool firstTxInBlock = txIndex == 0;
+    if (firstTxInBlock) {
+        return is_initial_tx_valid(txIndex, txs, block, blockIndex);
     }
     else {
-        return is_normal_tx_valid(tx);
+        return is_normal_tx_valid(txIndex, txs);
     }
 }
 
@@ -154,7 +239,7 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex) {
 
     bool allTxValid = true;
     for (uint64_t i = 0; i < ptrCandidate->txCount; i++) {
-        if (!is_tx_valid(&ptrCandidate->txs[i], ptrIndex)) {
+        if (!is_tx_valid(i, ptrCandidate->txs, ptrCandidate, ptrIndex)) {
             allTxValid = false;
             break;
         }
@@ -356,6 +441,31 @@ double calc_block_pow(TargetCompact targetBytes) {
     return pow(2, 256) / (targetFloat + 1);
 }
 
+void register_validated_block(BlockPayload *ptrBlock) {
+    SHA256_HASH blockHash = {0};
+    hash_block_header(&ptrBlock->header, blockHash);
+    print_hash_with_description("Registering block ", blockHash);
+    SHA256_HASH txHash = {0};
+    for (uint64_t txIndex = 0; txIndex < ptrBlock->txCount; txIndex++) {
+        TxPayload *tx = &ptrBlock->txs[txIndex];
+        hash_tx(tx, txHash);
+        for (uint64_t outIndex = 0; outIndex < tx->txOutputCount; outIndex++) {
+            TxOut *out = &tx->txOutputs[outIndex];
+            Outpoint outpoint;
+            outpoint.index = (uint32_t)outIndex;
+            memcpy(outpoint.txHash, txHash, SHA256_LENGTH);
+            int8_t status = save_utxo(&outpoint, out);
+            if (status) {
+                fprintf(stderr, "register utxo: %i\n", status);
+            }
+        }
+        for (uint64_t inIndex = 0; inIndex < tx->txInputCount; inIndex++) {
+            TxIn *input = &tx->txInputs[inIndex];
+            spend_output(&input->previous_output);
+        }
+    }
+}
+
 int8_t process_incoming_block(BlockPayload *ptrBlock) {
     double start = get_now();
     if (!is_block_legal(ptrBlock)) {
@@ -393,6 +503,10 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
             }
             else {
                 printf("Valid incoming block: not moving tip\n");
+            }
+            if (!index->meta.outputsRegistered) {
+                register_validated_block(ptrBlock);
+                index->meta.outputsRegistered = true;
             }
         }
         else {
@@ -462,30 +576,35 @@ double verify_block_indices(bool loadBlock) {
     return fullBlockAvailable * 1.0 / indexCount;
 }
 
-void validate_blocks() {
+uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     printf("Validating blocks...\n");
     SHA256_HASH blockHash = {0};
-    memcpy(blockHash, global.mainValidatedTip.meta.hash, SHA256_LENGTH);
+    Byte *startingHash = fromGenesis ? global.genesisHash : global.mainValidatedTip.meta.hash;
+    memcpy(blockHash, startingHash, SHA256_LENGTH);
+    uint32_t checkedBlocks = 0;
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
-        print_hash_with_description("Validating ", blockHash);
         if (!index) {
-            return;
+            return checkedBlocks;
         }
         if (index->context.children.length == 0) {
-            return;
+            return checkedBlocks;
         }
         BlockIndex *childIndex = GET_BLOCK_INDEX(index->context.children.hashes[0]); // TODO: Handle side-chain
         if (!childIndex) {
-            return;
+            return checkedBlocks;
         }
-        BlockPayload *child = CALLOC(1, sizeof(*child), "validate_blocks:block");
-        int8_t status = load_block(childIndex->meta.hash, child);
+        print_hash_with_description("\nValidating block ", childIndex->meta.hash);
+        BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
+        int8_t status = load_block(childIndex->meta.hash, childBlock);
         bool continueScanning = false;
+        #if LOG_VALIDATION_PROCEDURES
+        print_block_payload(childBlock);
+        #endif
         if (status) {
             fprintf(stderr, "validate_blocks: Cannot load block\n");
         }
-        else if (!is_block_valid(child, childIndex)) {
+        else if (!is_block_valid(childBlock, childIndex)) {
             fprintf(stderr, "validate_blocks: Block invalid\n");
         }
         else {
@@ -494,10 +613,54 @@ void validate_blocks() {
             global.mainValidatedTip = *childIndex;
             memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
             continueScanning = true;
+            if (!childIndex->meta.outputsRegistered) {
+                register_validated_block(childBlock);
+                childIndex->meta.outputsRegistered = true;
+            }
         }
-        release_block(child);
+        release_block(childBlock);
+        checkedBlocks++;
+        if (maxBlocksToCheck > 0 && checkedBlocks >= maxBlocksToCheck) {
+            continueScanning = false;
+        }
         if (!continueScanning) {
-            return;
+            return checkedBlocks;
         }
     }
+}
+
+void reset_validation() {
+    BlockIndex *index = GET_BLOCK_INDEX(global.genesisHash);
+    global.mainValidatedTip = *index;
+    Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "save_block_indices:keys");
+    uint32_t keyCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
+    for (uint32_t i = 0; i < keyCount; i++) {
+        Byte key[SHA256_LENGTH] = {0};
+        memcpy(key, keys + i * SHA256_LENGTH, SHA256_LENGTH);
+        BlockIndex *ptrIndex = GET_BLOCK_INDEX(key);
+        ptrIndex->meta.fullBlockValidated = false;
+        ptrIndex->meta.outputsRegistered = false;
+    }
+}
+
+void revalidate(uint32_t totalBlocksToCheck) {
+    init_archive_dir();
+    init_db();
+    init_block_index_map();
+    load_genesis();
+    load_block_indices();
+    // reset_validation();
+    // destory_db(config.utxoDBName);
+    int64_t remainingBlocks = totalBlocksToCheck;
+    while (remainingBlocks > 0) {
+        uint32_t checkedBlocks = validate_blocks(false, min(5000, totalBlocksToCheck));
+        printf("Checked %u blocks\n", checkedBlocks);
+        save_block_indices();
+        remainingBlocks -= checkedBlocks;
+        if (checkedBlocks < 10) {
+            break;
+        }
+    }
+    // destory_db(config.utxoDBName);
+    cleanup_db();
 }
