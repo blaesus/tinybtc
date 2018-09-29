@@ -543,6 +543,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, get_boolean_frame(are_frames_equal(&frameA, &frameB)));
                     break;
                 }
+                case OP_NOP: {
+                    break;
+                }
                 default: {
                     fprintf(stderr, "\nUnimplemented op %#02x [%s]\n", op, get_op_name(op));
                     goto immediate_fail;
