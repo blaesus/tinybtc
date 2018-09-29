@@ -14,6 +14,13 @@
 
 #define MAX_STACK_FRAME_WIDTH 256
 
+enum HashType {
+    SIGHASH_ALL = 1,
+    SIGHASH_NONE = 2,
+    SIGHASH_SINGLE = 3,
+    SIGHASH_ANYONECANPAY = 0x80,
+};
+
 enum FrameType {
     FRAME_TYPE_OP,
     FRAME_TYPE_DATA,
@@ -421,6 +428,18 @@ void fix_signature_frame(StackFrame *sigFrame) {
     FREE(signature, "fix_signature_frame:signature");
 }
 
+int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
+    switch (hashtype) {
+        case SIGHASH_ALL: {
+            return 0;
+        }
+        default: {
+            fprintf(stderr, "Unrecognized hashtype %u\n", hashtype);
+            return -1;
+        }
+    }
+}
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -494,10 +513,14 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     StackFrame sigFrame = pop(&runtimeStack);
                     uint32_t hashtype = sigFrame.data[sigFrame.dataWidth-1];
                     fix_signature_frame(&sigFrame);
-
-                    TxPayload *txCopy = make_tx_copy(meta);
                     SHA256_HASH hashTx = {0};
+                    TxPayload *txCopy = make_tx_copy(meta);
+                    if (polish_tx_copy(txCopy, hashtype)) {
+                        goto immediate_fail;
+                    };
                     hash_tx_with_hashtype(txCopy, hashtype, hashTx);
+                    release_items_in_tx(txCopy);
+                    FREE(txCopy, "make_tx_copy:txCopy");
 
                     int32_t verification = ECDSA_verify(
                         0,
@@ -522,8 +545,6 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
 
                     push(&runtimeStack, get_boolean_frame(verification == 1));
-                    release_items_in_tx(txCopy);
-                    FREE(txCopy, "make_tx_copy:txCopy");
                     EC_KEY_free(ptrPubKey);
                     break;
                 }
