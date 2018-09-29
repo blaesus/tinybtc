@@ -15,6 +15,7 @@
 #define MAX_STACK_FRAME_WIDTH 256
 
 enum HashType {
+    SIGHASH_ALL_ALTERNATIVE = 0,
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
@@ -430,6 +431,7 @@ void fix_signature_frame(StackFrame *sigFrame) {
 
 int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
     switch (hashtype) {
+        case SIGHASH_ALL_ALTERNATIVE:
         case SIGHASH_ALL: {
             return 0;
         }

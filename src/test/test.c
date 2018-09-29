@@ -385,6 +385,7 @@ void test_script() {
         "00000000b0c5a240b2a61d2e75692224efd4cbecdf6eaf4cc2cf477ca7c270e7", // 496, multiple inputs
         "000000005a4ded781e667e06ceefafb71410b511fe0d5adc3e5a27ecbec34ae6", // 546, using transaction of the same block
         "00000000d50a3cd05e451166e5f618c76cc3273104608fe424835ae5c0d47db9", // 2817, coinbase taking fees
+        "000000000000b8c3ad583c44e2655f5384f3e4e6a1f2a932b512ecc69a07cc24", // 110,300, hashtype 0
         "0000000000004939267ff84df0de0b88a7104b0b206e29a4318b3ea5ba6030d6", // 124,276, Tx #4 DER with preceding zeros
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
