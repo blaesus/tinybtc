@@ -36,13 +36,13 @@ bool is_anonymous_push_data_op(Byte op) {
     return (op > OP_0) && (op < OP_PUSHDATA1);
 }
 
-void hash_tx_with_sigtype(TxPayload *tx, int32_t sigType, Byte *hash) {
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_sigtype:buffer");
+void hash_tx_with_hashtype(TxPayload *tx, int32_t hashType, Byte *hash) {
+    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_hashtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
-    memcpy(buffer + width, &sigType, 4);
+    memcpy(buffer + width, &hashType, 4);
     width += 4;
     dsha256(buffer, (uint32_t)width, hash);
-    FREE(buffer, "hash_tx_with_sigtype:buffer");
+    FREE(buffer, "hash_tx_with_hashtype:buffer");
 }
 
 typedef struct Stack Stack;
@@ -492,12 +492,12 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
 
                     StackFrame sigFrame = pop(&runtimeStack);
-                    uint32_t sigType = sigFrame.data[sigFrame.dataWidth-1];
+                    uint32_t hashtype = sigFrame.data[sigFrame.dataWidth-1];
                     fix_signature_frame(&sigFrame);
 
                     TxPayload *txCopy = make_tx_copy(meta);
                     SHA256_HASH hashTx = {0};
-                    hash_tx_with_sigtype(txCopy, sigType, hashTx);
+                    hash_tx_with_hashtype(txCopy, hashtype, hashTx);
 
                     int32_t verification = ECDSA_verify(
                         0,
