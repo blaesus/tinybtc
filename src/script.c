@@ -417,6 +417,13 @@ int8_t fix_point(EllipticPoint *point) {
         point->length -= 2;
         return -2;
     }
+    // Supplement a zero if the initial byte starts with 0b01, which should be prefixed with a zero
+    if (point->data[0] & 0x80) {
+        memcpy(point->data+1, point->data, point->length);
+        point->data[0] = 0;
+        point->length += 1;
+        return 1;
+    }
     return 0;
 }
 
@@ -441,7 +448,13 @@ void print_der(DerSignature *signature) {
 void fix_signature_frame(StackFrame *sigFrame) {
     DerSignature *signature = CALLOC(1, sizeof(*signature), "fix_signature_frame:signature");
     parse_der(sigFrame->data, signature);
+    #if LOG_VALIDATION_PROCEDURES
+    print_der(signature);
+    #endif
     fix_signature(signature);
+    #if LOG_VALIDATION_PROCEDURES
+    print_der(signature);
+    #endif
     sigFrame->dataWidth = (uint16_t)(serialize_der(signature, sigFrame->data) + 1);
     FREE(signature, "fix_signature_frame:signature");
 }
