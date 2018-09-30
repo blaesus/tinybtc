@@ -410,6 +410,10 @@ uint64_t serialize_der(DerSignature *signature, Byte *ptrBuffer) {
     return p - ptrBuffer;
 }
 
+bool byte_has_initial_zero(Byte n) {
+    return (n & 0x80) != 0;
+}
+
 int8_t fix_point(EllipticPoint *point) {
     // The initial zeros may kill internal OpenSSL checks
     if (point->data[0] == 0 && point->data[1] == 0) {
@@ -417,12 +421,17 @@ int8_t fix_point(EllipticPoint *point) {
         point->length -= 2;
         return -2;
     }
-    // Supplement a zero if the initial byte starts with 0b01, which should be prefixed with a zero
-    if (point->data[0] & 0x80) {
+    // Set correct initial zero
+    if (byte_has_initial_zero(point->data[0])) {
         memcpy(point->data+1, point->data, point->length);
         point->data[0] = 0;
         point->length += 1;
         return 1;
+    }
+    if (point->data[0] == 0 && !byte_has_initial_zero(point->data[1])) {
+        memcpy(point->data, point->data+1, point->length-1);
+        point->length -= 1;
+        return -1;
     }
     return 0;
 }
@@ -439,7 +448,7 @@ void print_elliptic_point(EllipticPoint *point) {
 
 void print_der(DerSignature *signature) {
     printf("---------- signature ----------\n");
-    printf("sequence %#02x, length %i\n", signature->sequence, signature->length);
+    printf("sequence %#02x, length %i (%#02x)\n", signature->sequence, signature->length, signature->length);
     print_elliptic_point(&signature->r);
     print_elliptic_point(&signature->s);
     printf("-------------------------------\n");
