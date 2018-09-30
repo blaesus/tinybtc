@@ -44,6 +44,10 @@ bool is_anonymous_push_data_op(Byte op) {
     return (op > OP_0) && (op < OP_PUSHDATA1);
 }
 
+bool is_push_data_op(Byte op) {
+    return is_anonymous_push_data_op(op)|| op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4;
+}
+
 void hash_tx_with_hashtype(TxPayload *tx, int32_t hashType, Byte *hash) {
     Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_hashtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
@@ -256,16 +260,29 @@ void load_program(Stack *stack, Byte *program, uint64_t programLength) {
     for (uint64_t i = 0; i < programLength; i++) {
         Byte datum = program[i];
         StackFrame newFrame = get_empty_frame();
-        if (is_anonymous_push_data_op(datum)) {
-            newFrame.dataWidth = datum;
+        if (is_push_data_op(datum)) {
             newFrame.type = FRAME_TYPE_DATA;
-            memcpy(newFrame.data, program + (i+1), datum);
-            i += datum;
+            uint16_t dataWidth = 0;
+            uint16_t dataStartOffset = 0;
+            if (is_anonymous_push_data_op(datum)) {
+                dataWidth = datum;
+                dataStartOffset = 1;
+            }
+            else if (datum == OP_PUSHDATA1) {
+                dataWidth = program[i+1];
+                dataStartOffset = 2;
+            }
+            else {
+                fprintf(stderr, "Unimplemented push data op %u\n", datum);
+            }
+            newFrame.dataWidth = dataWidth;
+            memcpy(newFrame.data, program + (i+dataStartOffset), dataWidth);
+            i += dataWidth + dataStartOffset - 1;
         }
         else {
+            newFrame.type = FRAME_TYPE_OP;
             newFrame.dataWidth = 1;
             memcpy(newFrame.data, &datum, 1);
-            newFrame.type = FRAME_TYPE_OP;
         }
         push(stack, newFrame);
     }
