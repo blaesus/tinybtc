@@ -211,12 +211,16 @@ int8_t load_data_by_key(leveldb_t *db, char *key, Byte *output, size_t *outputLe
     leveldb_free(readOptions);
 
     if (read == NULL) {
+        #if LOG_DB_ERROR
         fprintf(stderr, "leveldb: key not found %s\n", key);
+        #endif
         return -1;
     }
     else if (error != NULL) {
         leveldb_free(error);
+        #if LOG_DB_ERROR
         fprintf(stderr, "leveldb: Read fail on key %s\n", key);
+        #endif
         return -2;
     }
     memcpy(output, read, readLength);
