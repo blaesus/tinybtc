@@ -20,8 +20,14 @@
 
 #define MAX_TIMERS 32
 
+enum ExecutionMode {
+    MODE_NORMAL,
+    MODE_CATCHUP,
+    MODE_VALIDATE,
+};
+
 struct GlobalState {
-    bool catchupMode;
+    enum ExecutionMode mode;
     void *timerTable;
 
     uv_tcp_t apiSocket;

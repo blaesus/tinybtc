@@ -216,13 +216,13 @@ bool should_catchup() {
 
 void reset_ibd_mode() {
     bool shouldIBD = should_catchup();
-    if (shouldIBD && !global.catchupMode) {
+    if (shouldIBD && global.mode == MODE_NORMAL) {
         printf("\nSwitching on catchup mode\n");
-        global.catchupMode = true;
+        global.mode = MODE_CATCHUP;
     }
-    if (!shouldIBD && global.catchupMode) {
+    if (!shouldIBD && global.mode == MODE_CATCHUP) {
         printf("\nSwitching off catchup mode\n");
-        global.catchupMode = false;
+        global.mode = MODE_NORMAL;
     }
 }
 
@@ -537,7 +537,7 @@ void send_message(uv_tcp_t *socket, char *command, void *ptrData) {
 }
 
 void on_handshake_success(Peer *ptrPeer) {
-    if (global.catchupMode) {
+    if (global.mode == MODE_CATCHUP) {
         uint32_t maxFullBlockHeight = max_full_block_height_from_genesis();
         if (ptrPeer->chain_height < maxFullBlockHeight) {
             printf("Switching peer for lack of blocks\n");
@@ -992,7 +992,7 @@ void connect_to_best_candidate_as_peer(uint32_t peerIndex) {
 }
 
 int32_t connect_to_initial_peers() {
-    uint32_t outgoingConfig = global.catchupMode ? config.maxOutgoingIBD : config.maxOutgoing;
+    uint32_t outgoingConfig = global.mode == MODE_CATCHUP ? config.maxOutgoingIBD : config.maxOutgoing;
     uint32_t outgoing = min(outgoingConfig, global.peerCandidateCount);
     for (uint32_t i = 0; i < outgoing; i++) {
         connect_to_best_candidate_as_peer(i);

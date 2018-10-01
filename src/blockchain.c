@@ -488,7 +488,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (!global.catchupMode) {
+    if (global.mode == MODE_NORMAL) {
         bool valid = is_block_valid(ptrBlock, index);
         if (valid) {
             index->meta.fullBlockValidated = true;

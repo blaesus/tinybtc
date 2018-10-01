@@ -6,6 +6,7 @@
 #include "blockchain.h"
 #include "config.h"
 #include "utils/networking.h"
+#include "utils/opt.h"
 
 #include "test/test.h"
 
@@ -44,7 +45,7 @@ int8_t init() {
     load_block_indices();
     verify_block_indices(config.verifyBlocks);
     if (should_catchup()) {
-        global.catchupMode = true;
+        global.mode = MODE_CATCHUP;
         printf("Activated catchup mode\n");
     }
     setup_main_event_loop();
@@ -58,7 +59,9 @@ int32_t connect_to_peers() {
     return 0;
 }
 
-int32_t main(/* int32_t argc, char **argv */) {
+int32_t main(int32_t argc, char **argv) {
+    handle_options(argc, argv);
+    return 0;
     // test(); return 0;
     revalidate(10); return 0;
     int8_t initError = init();
