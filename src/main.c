@@ -61,16 +61,25 @@ int32_t connect_to_peers() {
 
 int32_t main(int32_t argc, char **argv) {
     handle_options(argc, argv);
-    return 0;
-    // test(); return 0;
-    revalidate(10); return 0;
-    int8_t initError = init();
-    if (initError) {
-        fprintf(stderr, "init error %i\n", initError);
-        return -1;
+    switch (global.mode) {
+        case MODE_VALIDATE: {
+            uint32_t *count = global.modeData;
+            revalidate(*count);
+            return 0;
+        }
+        case MODE_TEST: {
+            test();
+            return 0;
+        }
+        default: {
+            int8_t initError = init();
+            if (initError) {
+                fprintf(stderr, "init error %i\n", initError);
+                return -1;
+            }
+            connect_to_peers();
+            run_main_loop();
+        }
     }
-    connect_to_peers();
-    run_main_loop();
-
     return 0;
 }

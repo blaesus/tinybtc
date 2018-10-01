@@ -21,13 +21,16 @@
 #define MAX_TIMERS 32
 
 enum ExecutionMode {
-    MODE_NORMAL,
+    MODE_NORMAL = 0,
     MODE_CATCHUP,
     MODE_VALIDATE,
+    MODE_TEST,
 };
 
 struct GlobalState {
     enum ExecutionMode mode;
+    void *modeData;
+
     void *timerTable;
 
     uv_tcp_t apiSocket;
