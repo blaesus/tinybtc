@@ -414,31 +414,27 @@ bool byte_has_initial_zero(Byte n) {
     return (n & 0x80) != 0;
 }
 
-int8_t fix_point(EllipticPoint *point) {
-    // The initial zeros may kill internal OpenSSL checks
-    if (point->data[0] == 0 && point->data[1] == 0) {
-        memcpy(point->data, point->data+2, point->length-2);
-        point->length -= 2;
-        return -2;
+int8_t fix_point_preceding_zeros(EllipticPoint *point) {
+    int8_t offset = 0;
+    // Remove current zeros
+    while (point->data[0] == 0 && point->length > 0) {
+        memcpy(point->data, point->data+1, point->length-1);
+        point->length -= 1;
+        offset -= 1;
     }
-    // Set correct initial zero
+    // Put in our own
     if (byte_has_initial_zero(point->data[0])) {
         memcpy(point->data+1, point->data, point->length);
         point->data[0] = 0;
         point->length += 1;
-        return 1;
+        offset += 1;
     }
-    if (point->data[0] == 0 && !byte_has_initial_zero(point->data[1])) {
-        memcpy(point->data, point->data+1, point->length-1);
-        point->length -= 1;
-        return -1;
-    }
-    return 0;
+    return offset;
 }
 
 void fix_signature(DerSignature *signature) {
-    signature->length += fix_point(&signature->r);
-    signature->length += fix_point(&signature->s);
+    signature->length += fix_point_preceding_zeros(&signature->r);
+    signature->length += fix_point_preceding_zeros(&signature->s);
 }
 
 void print_elliptic_point(EllipticPoint *point) {
