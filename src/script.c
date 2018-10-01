@@ -531,10 +531,6 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                         goto immediate_fail;
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
-                    if (pubkeyFrame.dataWidth < 65) {
-                        fprintf(stderr, "Unimplemented: compressed public key\n");
-                        goto immediate_fail;
-                    }
                     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
                     int32_t status = EC_KEY_oct2key(
                         ptrPubKey,
