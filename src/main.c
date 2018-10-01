@@ -25,9 +25,9 @@ void setup_cleanup() {
     sigaction(SIGINT, &sa, NULL);
 }
 
-int8_t init() {
+int8_t init(int32_t argc, char **argv) {
     printf("Initializing...\n");
-    printf("Size of global state: %lu\n", sizeof(global.blockIndices));
+    handle_options(argc, argv);
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();
@@ -44,11 +44,10 @@ int8_t init() {
     load_genesis();
     load_block_indices();
     verify_block_indices(config.verifyBlocks);
-    if (should_catchup()) {
+    if (global.mode == MODE_NORMAL && should_catchup()) {
         global.mode = MODE_CATCHUP;
         printf("Activated catchup mode\n");
     }
-    setup_main_event_loop();
     printf("Done initialization.\n");
     return 0;
 }
@@ -60,7 +59,11 @@ int32_t connect_to_peers() {
 }
 
 int32_t main(int32_t argc, char **argv) {
-    handle_options(argc, argv);
+    int8_t initError = init(argc, argv);
+    if (initError) {
+        fprintf(stderr, "init error %i\n", initError);
+        return -1;
+    }
     switch (global.mode) {
         case MODE_VALIDATE: {
             uint32_t *count = global.modeData;
@@ -72,11 +75,7 @@ int32_t main(int32_t argc, char **argv) {
             return 0;
         }
         default: {
-            int8_t initError = init();
-            if (initError) {
-                fprintf(stderr, "init error %i\n", initError);
-                return -1;
-            }
+            setup_main_event_loop();
             connect_to_peers();
             run_main_loop();
         }

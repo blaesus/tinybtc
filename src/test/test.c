@@ -342,7 +342,6 @@ void test_target_conversions() {
 }
 
 void test_db() {
-    init_db();
     Message genesis = get_empty_message();
     load_block_message("genesis.dat", &genesis);
     print_block_message(&genesis);
@@ -372,13 +371,6 @@ void test_ripe() {
 }
 
 void test_script() {
-    global.start_time = time(NULL);
-    srand((unsigned int)global.start_time);
-    hashmap_init(&global.blockIndices, (1UL << 25) - 1, SHA256_LENGTH);
-    init_db();
-    load_genesis();
-    load_block_indices();
-
     char *targets[] = {
         "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", // genesis
         "00000000d1145790a8694403d4063f323d499e655c83426834d4ce2f8dd4a2ee", // 170, first block with real tx
@@ -424,7 +416,6 @@ void test_script() {
 }
 
 void test_hash() {
-    init_db();
     Message genesis = get_empty_message();
     load_block_message("genesis.dat", &genesis);
     print_block_message(&genesis);

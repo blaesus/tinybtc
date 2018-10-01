@@ -644,11 +644,6 @@ void reset_validation() {
 }
 
 void revalidate(uint32_t totalBlocksToCheck) {
-    init_archive_dir();
-    init_db();
-    init_block_index_map();
-    load_genesis();
-    load_block_indices();
     // reset_validation();
     // destory_db(config.utxoDBName);
     int64_t remainingBlocks = totalBlocksToCheck;

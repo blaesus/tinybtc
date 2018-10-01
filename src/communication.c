@@ -1036,10 +1036,14 @@ void check_to_cleanup() {
 
 void terminate_execution() {
     save_chain_data();
-    stop_timers();
-    terminate_peers();
+    if (global.mode == MODE_NORMAL || global.mode == MODE_CATCHUP) {
+        stop_timers();
+        terminate_peers();
+    }
     cleanup_db();
-    uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
-    uv_timer_init(uv_default_loop(), timer);
-    uv_timer_start(timer, check_to_cleanup, 0, 500);
+    if (global.mode == MODE_NORMAL || global.mode == MODE_CATCHUP) {
+        uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
+        uv_timer_init(uv_default_loop(), timer);
+        uv_timer_start(timer, check_to_cleanup, 0, 500);
+    }
 }
