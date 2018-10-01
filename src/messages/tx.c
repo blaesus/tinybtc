@@ -192,9 +192,10 @@ uint64_t serialize_tx_message(
 // @see https://en.bitcoin.it/wiki/Block_hashing_algorithm
 
 void hash_tx(TxPayload *ptrTx, SHA256_HASH result) {
-    Byte buffer[MESSAGE_BUFFER_LENGTH] = {0};
+    Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "hash_tx:buffer");
     uint64_t txWidth = serialize_tx_payload(ptrTx, buffer);
     dsha256(buffer, (uint32_t) txWidth, result);
+    FREE(buffer, "hash-tx:buffer");
 }
 
 struct HashNode {
