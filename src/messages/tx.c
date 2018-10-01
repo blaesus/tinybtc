@@ -195,7 +195,7 @@ void hash_tx(TxPayload *ptrTx, SHA256_HASH result) {
     Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "hash_tx:buffer");
     uint64_t txWidth = serialize_tx_payload(ptrTx, buffer);
     dsha256(buffer, (uint32_t) txWidth, result);
-    FREE(buffer, "hash-tx:buffer");
+    FREE(buffer, "hash_tx:buffer");
 }
 
 struct HashNode {
