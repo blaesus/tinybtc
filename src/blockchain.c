@@ -71,6 +71,10 @@ int8_t search_utxo(Outpoint *outpoint, TxPayload *txs, uint64_t txLimit, TxOut *
     if (is_outpoint_empty(outpoint)) {
         return -30;
     }
+    int8_t status = load_utxo(outpoint, sourceOutput);
+    if (!status) {
+        return 0;
+    }
     // Search in the same block
     for (uint64_t txIndex = 0; txIndex < txLimit; txIndex++) {
         TxPayload *candidateSource = &txs[txIndex];
@@ -81,7 +85,7 @@ int8_t search_utxo(Outpoint *outpoint, TxPayload *txs, uint64_t txLimit, TxOut *
             return 0;
         }
     }
-    return load_utxo(outpoint, sourceOutput);
+    return -1;
 }
 
 uint64_t sum_outputs_from_tx(TxPayload *tx) {
