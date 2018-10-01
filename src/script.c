@@ -607,6 +607,21 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_NOP: {
                     break;
                 }
+                case OP_DROP: {
+                    pop(&runtimeStack);
+                    break;
+                }
+                case OP_SHA256: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    SHA256_HASH hash = {0};
+                    sha256(topFrame.data, topFrame.dataWidth, hash);
+                    StackFrame newFrame = get_empty_frame();
+                    newFrame.dataWidth = SHA256_LENGTH;
+                    memcpy(newFrame.data, hash, SHA256_LENGTH);
+                    newFrame.type = FRAME_TYPE_DATA;
+                    push(&runtimeStack, newFrame);
+                    break;
+                }
                 default: {
                     fprintf(stderr, "\nUnimplemented op %#02x [%s]\n", op, get_op_name(op));
                     goto immediate_fail;
