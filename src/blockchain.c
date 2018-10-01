@@ -648,7 +648,7 @@ void revalidate(uint32_t totalBlocksToCheck) {
     // destory_db(config.utxoDBName);
     int64_t remainingBlocks = totalBlocksToCheck;
     while (remainingBlocks > 0) {
-        uint32_t checkedBlocks = validate_blocks(false, min(5000, totalBlocksToCheck));
+        uint32_t checkedBlocks = validate_blocks(false, totalBlocksToCheck);
         printf("Checked %u blocks\n", checkedBlocks);
         save_block_indices();
         remainingBlocks -= checkedBlocks;
