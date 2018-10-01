@@ -49,7 +49,7 @@ bool is_push_data_op(Byte op) {
 }
 
 void hash_tx_with_hashtype(TxPayload *tx, int32_t hashType, Byte *hash) {
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "hash_tx_with_hashtype:buffer");
+    Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "hash_tx_with_hashtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
     memcpy(buffer + width, &hashType, 4);
     width += 4;
