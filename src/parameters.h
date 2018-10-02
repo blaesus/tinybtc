@@ -26,6 +26,10 @@ struct ChainCheckPoint {
     char *hashBEHex;
 };
 
+struct BIPHeights {
+    uint32_t bip65;
+};
+
 struct ChainParameters {
     uint32_t magic;
     int32_t minimalPeerVersion;
@@ -40,6 +44,7 @@ struct ChainParameters {
     uint64_t scriptSigSizeLower;
     uint16_t retargetBound;
     struct ChainCheckPoint checkpoints[MAX_CHECKPOINTS];
+    struct BIPHeights bipHeights;
 };
 
 extern const struct ChainParameters mainnet;

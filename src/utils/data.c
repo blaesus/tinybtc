@@ -45,4 +45,3 @@ bool is_byte_array_empty(const Byte *hash, uint64_t length) {
     }
     return true;
 }
-

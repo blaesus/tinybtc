@@ -1,12 +1,13 @@
 #include <stdlib.h>
-#include <openssl/ec.h>
-#include <openssl/err.h>
-#include <openssl/obj_mac.h>
+
+#include "openssl/ec.h"
+#include "openssl/err.h"
+#include "openssl/obj_mac.h"
+
 #include "script.h"
+#include "messages/tx.h"
 #include "datatypes.h"
 #include "parameters.h"
-#include "hash.h"
-#include "config.h"
 #include "utils/memory.h"
 #include "utils/data.h"
 
@@ -221,6 +222,8 @@ const char *get_op_name(enum OpcodeType opcode) {
         case OP_CHECKMULTISIGVERIFY    : return "OP_CHECKMULTISIGVERIFY";
 
         case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
+
+        case OP_NOP2                   : return "OP_NOP2/OP_CHECKLOCKTIMEVERIFY";
         default:
             return UNKNOWN_OPCODE;
     }
@@ -333,13 +336,13 @@ bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
 
 TxPayload *make_tx_copy(CheckSigMeta meta) {
     Byte *subscript = CALLOC(1, 100000, "make_tx_copy:subscript");
-    Byte subscriptIndex = 0;
+    uint16_t subscriptLength = 0;
     memcpy(
         subscript,
         meta.sourceOutput->public_key_script,
         meta.sourceOutput->public_key_script_length
     );
-    subscriptIndex += meta.sourceOutput->public_key_script_length;
+    subscriptLength += meta.sourceOutput->public_key_script_length;
     TxPayload *txCopy = CALLOC(1, sizeof(TxPayload), "make_tx_copy:txCopy");
     clone_tx(meta.currentTx, txCopy);
     for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
@@ -350,9 +353,9 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
     memcpy(
         txCopy->txInputs[meta.txInputIndex].signature_script,
         subscript,
-        subscriptIndex
+        subscriptLength
     );
-    txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptIndex;
+    txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptLength;
     FREE(subscript, "make_tx_copy:subscript");
     return txCopy;
 }
@@ -477,16 +480,77 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
     }
 }
 
+// 1: valid, 0: invalid, <0: error
+int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta) {
+    printf("Check signature\n");
+    print_frame(&pubkeyFrame);
+    print_frame(&sigFrame);
+    EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    int32_t status = EC_KEY_oct2key(
+        ptrPubKey,
+        pubkeyFrame.data,
+        pubkeyFrame.dataWidth,
+        NULL
+    );
+    if (status != 1) {
+        fprintf(stderr, "Failed to decode elliptic public key");
+        return -1;
+    }
+
+    uint32_t hashtype = sigFrame.data[sigFrame.dataWidth-1];
+    fix_signature_frame(&sigFrame);
+    SHA256_HASH hashTx = {0};
+    TxPayload *txCopy = make_tx_copy(meta);
+    if (polish_tx_copy(txCopy, hashtype)) {
+        return -2;
+    };
+    hash_tx_with_hashtype(txCopy, hashtype, hashTx);
+    release_items_in_tx(txCopy);
+    FREE(txCopy, "make_tx_copy:txCopy");
+
+    int32_t verification = ECDSA_verify(
+        0,
+        hashTx,
+        sizeof(hashTx),
+        sigFrame.data,
+        sigFrame.dataWidth - 1,
+        ptrPubKey
+    );
+    EC_KEY_free(ptrPubKey);
+
+    if (verification == -1) {
+        uint64_t error = ERR_get_error();
+        fprintf(stderr, "ECDSA_verify error %llu: %s\n", error, ERR_reason_error_string(error));
+        return -100;
+    }
+    else if (verification == 0) {
+        fprintf(stderr, "ECDSA_verify: invalid signature\n");
+        return 0;
+    }
+    else {
+        #if LOG_VALIDATION_PROCEDURES
+        printf("ECDSA_verify: OK\n");
+        #endif
+        return 1;
+    }
+}
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
     for (uint64_t i = 0; i < inputStack->height; i++) {
         StackFrame *inputFrame = inputStack->frames[i];
         if (inputFrame->type == FRAME_TYPE_DATA) {
+            #if LOG_SCRIPT_STACKS
+            printf("next frame: %u bytes data\n", inputFrame->dataWidth);
+            #endif
             push(&runtimeStack, *inputFrame);
         }
         else if (inputFrame->type == FRAME_TYPE_OP) {
             Byte op = inputFrame->data[0];
+            #if LOG_SCRIPT_STACKS
+            printf("next frame: %s\n", get_op_name(op));
+            #endif
             switch (op) {
                 case OP_DUP: {
                     if (runtimeStack.height == 0) {
@@ -525,66 +589,23 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_CHECKSIG: {
-                    // Deduce public key
                     if (runtimeStack.height < 2) {
                         fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
                         goto immediate_fail;
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
-                    EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
-                    int32_t status = EC_KEY_oct2key(
-                        ptrPubKey,
-                        pubkeyFrame.data,
-                        pubkeyFrame.dataWidth,
-                        NULL
-                    );
-                    if (status != 1) {
-                        fprintf(stderr, "Failed to decode elliptic public key");
-                        goto immediate_fail;
-                    }
-
                     StackFrame sigFrame = pop(&runtimeStack);
-                    uint32_t hashtype = sigFrame.data[sigFrame.dataWidth-1];
-                    fix_signature_frame(&sigFrame);
-                    SHA256_HASH hashTx = {0};
-                    TxPayload *txCopy = make_tx_copy(meta);
-                    if (polish_tx_copy(txCopy, hashtype)) {
+                    int8_t result = check_signature(pubkeyFrame, sigFrame, meta);
+                    if (result < 0) {
                         goto immediate_fail;
-                    };
-                    hash_tx_with_hashtype(txCopy, hashtype, hashTx);
-                    release_items_in_tx(txCopy);
-                    FREE(txCopy, "make_tx_copy:txCopy");
-
-                    int32_t verification = ECDSA_verify(
-                        0,
-                        hashTx,
-                        sizeof(hashTx),
-                        sigFrame.data,
-                        sigFrame.dataWidth - 1,
-                        ptrPubKey
-                    );
-
-                    if (verification == -1) {
-                        uint64_t error = ERR_get_error();
-                        fprintf(stderr, "ECDSA_verify error %llu: %s\n", error, ERR_reason_error_string(error));
                     }
-                    else if (verification == 0) {
-                        fprintf(stderr, "ECDSA_verify: invalid signature\n");
-                    }
-                    else {
-                        #if LOG_VALIDATION_PROCEDURES
-                        printf("ECDSA_verify: OK\n");
-                        #endif
-                    }
-
-                    push(&runtimeStack, get_boolean_frame(verification == 1));
-                    EC_KEY_free(ptrPubKey);
+                    push(&runtimeStack, get_boolean_frame(result));
                     break;
                 }
                 case OP_0: {
                     StackFrame newFrame = {
                         .type = FRAME_TYPE_DATA,
-                        .dataWidth = MAX_STACK_FRAME_WIDTH,
+                        .dataWidth = 1,
                         .data = {0},
                     };
                     push(&runtimeStack, newFrame);
@@ -616,6 +637,71 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     memcpy(newFrame.data, hash, SHA256_LENGTH);
                     newFrame.type = FRAME_TYPE_DATA;
                     push(&runtimeStack, newFrame);
+                    break;
+                }
+                case OP_CODESEPARATOR: {
+                    break;
+                }
+                case OP_1: {
+                    push(&runtimeStack, get_boolean_frame(true));
+                    break;
+                }
+                case OP_CHECKMULTISIG: {
+                    StackFrame publicKeyCountFrame = pop(&runtimeStack);
+
+                    // Load public keys
+                    Byte publicKeyCount = publicKeyCountFrame.data[0];
+                    StackFrame *publicKeys = CALLOC(
+                        (size_t)publicKeyCount, sizeof(StackFrame), "OP_CHECKMULTISIG:publicKeys"
+                    );
+                    for (int8_t pki = 0; pki < publicKeyCount; pki++) {
+                        StackFrame publicKeyFrame = pop(&runtimeStack);
+                        memcpy(&publicKeys[pki], &publicKeyFrame, sizeof(publicKeyFrame));
+                    }
+
+                    // Load signatures
+                    StackFrame signatureCountFrame = pop(&runtimeStack);
+                    Byte signatureCount = signatureCountFrame.data[0];
+                    StackFrame *signatures = CALLOC(
+                        (size_t)signatureCount, sizeof(StackFrame), "OP_CHECKMULTISIG:signatures"
+                    );
+                    for (int8_t si = 0; si < signatureCount; si++) {
+                        StackFrame signatureFrame = pop(&runtimeStack);
+                        memcpy(&signatures[si], &signatureFrame, sizeof(signatureFrame));
+                    }
+
+                    // Simulate Bitcoin bug
+                    pop(&runtimeStack);
+
+                    // Check public keys against signatures
+                    int8_t pki = 0;
+                    int8_t si = 0;
+                    bool result = false;
+                    while (true) {
+                        if (pki >= publicKeyCount || si >= signatureCount) {
+                            result = false;
+                            break;
+                        }
+                        bool signatureValid = check_signature(publicKeys[pki], signatures[si], meta) == 1;
+                        if (signatureValid) {
+                            if (si + 1 == signatureCount) {
+                                result = true;
+                                break;
+                            }
+                            pki++;
+                        }
+                        else {
+                            pki++;
+                            si++;
+                        }
+                    }
+                    FREE(publicKeys, "OP_CHECKMULTISIG:publicKeys");
+                    FREE(signatures, "OP_CHECKMULTISIG:signatures");
+                    push(&runtimeStack, get_boolean_frame(result));
+                    break;
+                }
+                case OP_NOP2: {
+                    // TODO: implement OP_CHECKLOCKTIMEVERIFY
                     break;
                 }
                 default: {

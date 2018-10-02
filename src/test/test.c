@@ -381,7 +381,8 @@ void test_script() {
         "0000000000004939267ff84df0de0b88a7104b0b206e29a4318b3ea5ba6030d6", // 124,276, Tx #4 DER with preceding zeros
         "000000000000018f5ee13ecf9e9595356148c097a2fb5825169fde3f48e8eb8a", // OP_PUSHDATA1
         "0000000000000684e1d3f30ac8cad2c9b5be096bf7c7c77cdd57f8930673cb78", // tx #82 has missing preceding zero
-        "00000000000002fce4abfccc009ddb621b28fad22dad8fc31d8620cd4716ef73"  // compressed key
+        "00000000000002fce4abfccc009ddb621b28fad22dad8fc31d8620cd4716ef73", // compressed key
+        "000000000000074006e067120f51b576e9cfb31f31d8d9212d6416748e650685", // tx #13: OP_CHECKMULTISIG and fancy OPs
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

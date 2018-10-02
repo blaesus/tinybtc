@@ -166,7 +166,9 @@ bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
         memcpy(program, input->signature_script, input->signature_script_length);
-        memcpy(program+input->signature_script_length, sourceOutput->public_key_script, sourceOutput->public_key_script_length);
+        Byte codeSeparator = OP_CODESEPARATOR;
+        memcpy(program+input->signature_script_length, &codeSeparator, 1);
+        memcpy(program+input->signature_script_length+1, sourceOutput->public_key_script, sourceOutput->public_key_script_length);
         CheckSigMeta meta = {
             .sourceOutput = sourceOutput,
             .txInputIndex = inputIndex,
