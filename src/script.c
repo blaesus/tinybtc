@@ -66,13 +66,17 @@ StackFrame get_empty_frame() {
     return frame;
 }
 
-StackFrame get_boolean_frame(bool value) {
+StackFrame get_numerical_frame(Byte value) {
     StackFrame resultFrame = {
         .type = FRAME_TYPE_DATA,
         .dataWidth = 1,
-        .data = { (Byte)value }
+        .data = { value }
     };
     return resultFrame;
+}
+
+StackFrame get_boolean_frame(bool value) {
+    return get_numerical_frame((Byte) value);
 }
 
 StackFrame pop(Stack *stack) {
@@ -602,15 +606,6 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, get_boolean_frame(result));
                     break;
                 }
-                case OP_0: {
-                    StackFrame newFrame = {
-                        .type = FRAME_TYPE_DATA,
-                        .dataWidth = 1,
-                        .data = {0},
-                    };
-                    push(&runtimeStack, newFrame);
-                    break;
-                }
                 case OP_EQUAL: {
                     if (runtimeStack.height < 2) {
                         fprintf(stderr, "OP_EQUAL: insufficient frames\n");
@@ -642,8 +637,27 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_CODESEPARATOR: {
                     break;
                 }
-                case OP_1: {
-                    push(&runtimeStack, get_boolean_frame(true));
+                case OP_0: {
+                    push(&runtimeStack, get_numerical_frame(0));
+                    break;
+                }
+                case OP_1:
+                case OP_2:
+                case OP_3:
+                case OP_4:
+                case OP_5:
+                case OP_6:
+                case OP_7:
+                case OP_8:
+                case OP_9:
+                case OP_10:
+                case OP_11:
+                case OP_12:
+                case OP_13:
+                case OP_14:
+                case OP_15:
+                case OP_16: {
+                    push(&runtimeStack, get_numerical_frame(inputFrame->data[0] - OP_1 + (Byte)1));
                     break;
                 }
                 case OP_CHECKMULTISIG: {
