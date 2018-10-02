@@ -456,12 +456,16 @@ int8_t save_utxo(Outpoint *outpoint, TxOut *output) {
 int8_t load_utxo(Outpoint *outpoint, TxOut *output) {
     char key[TXO_KEY_LENGTH] = {0};
     make_txo_key(outpoint, key);
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "load_utxo:buffer");
+    Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "load_utxo:buffer");
     size_t width = 0;
     int8_t status = load_data_by_key(global.utxoDB, key, buffer, &width);
+    if (status) {
+        FREE(buffer, "load_utxo:buffer");
+        return status;
+    }
     parse_tx_out(buffer, output);
     FREE(buffer, "load_utxo:buffer");
-    return status;
+    return 0;
 }
 
 
