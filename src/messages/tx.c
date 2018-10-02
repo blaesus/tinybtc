@@ -131,6 +131,10 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
         p += PARSE_INTO(p, &ptrTx->marker);
         p += PARSE_INTO(p, &ptrTx->flag);
     }
+    else {
+        ptrTx->marker = 0;
+        ptrTx->flag = 0;
+    }
 
     p += parse_varint(p, &ptrTx->txInputCount);
     ptrTx->txInputs = CALLOC(ptrTx->txInputCount, sizeof(TxIn), "parse_into_tx_payload:txInputs");
@@ -150,7 +154,7 @@ uint64_t parse_into_tx_payload(Byte *ptrBuffer, TxPayload *ptrTx) {
             p += parse_tx_witness(p, &ptrTx->txWitnesses[i]);
         }
     }
-    p += PARSE_INTO(p, &ptrTx->lockTime);
+    p += PARSE_INTO(p, &ptrTx->lockTime); // TODO: Some txs don't have this
     return p - ptrBuffer;
 }
 
@@ -324,8 +328,19 @@ void release_items_in_tx(TxPayload *tx) {
 }
 
 void clone_tx(TxPayload *txFrom, TxPayload *txTo) {
-    Byte *cloneBuffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "clone_tx:buffer");
-    serialize_tx_payload(txFrom, cloneBuffer);
-    parse_into_tx_payload(cloneBuffer, txTo); // Is that you, JSON.parse(JSON.stringify(obj))?
-    FREE(cloneBuffer, "clone_tx:buffer");
+    memcpy(txTo, txFrom, sizeof(*txTo));
+
+    uint64_t inputSize = txTo->txInputCount * sizeof(TxIn);
+    txTo->txInputs = MALLOC(inputSize, "clone_tx:txInputs");
+    memcpy(txTo->txInputs, txFrom->txInputs, inputSize);
+
+    uint64_t outputSize = txTo->txOutputCount * sizeof(TxOut);
+    txTo->txOutputs = MALLOC(outputSize, "clone_tx:txOutputs");
+    memcpy(txTo->txOutputs, txFrom->txOutputs, outputSize);
+
+    if (check_segwit_bits(txTo->marker, txTo->flag)) {
+        uint64_t witnessSize = txTo->txInputCount * sizeof(TxWitness);
+        txTo->txWitnesses = MALLOC(witnessSize, "clone_tx:txWitnesses");
+        memcpy(txTo->txWitnesses, txFrom->txWitnesses, witnessSize);
+    }
 }
