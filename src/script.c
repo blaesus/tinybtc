@@ -486,9 +486,6 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
 
 // 1: valid, 0: invalid, <0: error
 int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta) {
-    printf("Check signature\n");
-    print_frame(&pubkeyFrame);
-    print_frame(&sigFrame);
     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
     int32_t status = EC_KEY_oct2key(
         ptrPubKey,
@@ -716,6 +713,31 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_NOP2: {
                     // TODO: implement OP_CHECKLOCKTIMEVERIFY
+                    break;
+                }
+                case OP_MIN: {
+                    StackFrame frame1 = pop(&runtimeStack);
+                    StackFrame frame2 = pop(&runtimeStack);
+                    StackFrame *minFrame = &frame1;
+                    if (frame1.dataWidth > frame2.dataWidth) {
+                        minFrame = &frame2;
+                    }
+                    else if (frame2.dataWidth > frame1.dataWidth) {
+                        minFrame = &frame1;
+                    }
+                    else {
+                        for (int16_t digit = frame1.dataWidth; digit >= 0; digit--) {
+                            if (frame1.data[digit] > frame2.data[digit]) {
+                                minFrame = &frame2;
+                                break;
+                            }
+                            else if (frame1.data[digit] < frame2.data[digit]) {
+                                minFrame = &frame1;
+                                break;
+                            }
+                        }
+                    }
+                    push(&runtimeStack, *minFrame);
                     break;
                 }
                 default: {
