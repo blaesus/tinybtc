@@ -591,13 +591,16 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     while (true) {
         BlockIndex *index = GET_BLOCK_INDEX(blockHash);
         if (!index) {
+            fprintf(stderr, "validate_blocks: No index for current target\n");
             return checkedBlocks;
         }
         if (index->context.children.length == 0) {
+            printf("validate_blocks: Reached chain end\n");
             return checkedBlocks;
         }
         BlockIndex *childIndex = GET_BLOCK_INDEX(index->context.children.hashes[0]); // TODO: Handle side-chain
         if (!childIndex) {
+            fprintf(stderr, "validate_blocks: Cannot find next child to validate\n");
             return checkedBlocks;
         }
         print_hash_with_description("\nValidating block ", childIndex->meta.hash);
