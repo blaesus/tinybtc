@@ -162,7 +162,7 @@ bool is_normal_tx_valid(uint64_t txIndex, TxPayload *txs) {
             break;
         }
 
-        uint64_t programLength = input->signature_script_length + sourceOutput->public_key_script_length;
+        uint64_t programLength = input->signature_script_length + 1 + sourceOutput->public_key_script_length;
 
         Byte *program = CALLOC(1, programLength, "is_tx_valid:program");
         memcpy(program, input->signature_script, input->signature_script_length);
