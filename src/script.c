@@ -338,15 +338,9 @@ bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
            && (memcmp(frameA->data, frameB->data, frameA->dataWidth) == 0);
 }
 
-TxPayload *make_tx_copy(CheckSigMeta meta) {
-    Byte *subscript = CALLOC(1, 100000, "make_tx_copy:subscript");
-    uint16_t subscriptLength = 0;
-    memcpy(
-        subscript,
-        meta.sourceOutput->public_key_script,
-        meta.sourceOutput->public_key_script_length
-    );
-    subscriptLength += meta.sourceOutput->public_key_script_length;
+TxPayload *make_tx_copy(CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
+    printf("Using subscript");
+    print_object(subscript, subscriptLength);
     TxPayload *txCopy = CALLOC(1, sizeof(TxPayload), "make_tx_copy:txCopy");
     clone_tx(meta.currentTx, txCopy);
     for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
@@ -360,7 +354,6 @@ TxPayload *make_tx_copy(CheckSigMeta meta) {
         subscriptLength
     );
     txCopy->txInputs[meta.txInputIndex].signature_script_length = subscriptLength;
-    FREE(subscript, "make_tx_copy:subscript");
     return txCopy;
 }
 
@@ -485,7 +478,7 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
 }
 
 // 1: valid, 0: invalid, <0: error
-int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta) {
+int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
     int32_t status = EC_KEY_oct2key(
         ptrPubKey,
@@ -501,7 +494,7 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
     uint32_t hashtype = sigFrame.data[sigFrame.dataWidth-1];
     fix_signature_frame(&sigFrame);
     SHA256_HASH hashTx = {0};
-    TxPayload *txCopy = make_tx_copy(meta);
+    TxPayload *txCopy = make_tx_copy(meta, subscript, subscriptLength);
     if (polish_tx_copy(txCopy, hashtype)) {
         return -2;
     };
@@ -534,6 +527,37 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
         #endif
         return 1;
     }
+}
+
+int64_t find_op_frame(Stack *stack, uint64_t end, Byte op) {
+    for (int64_t i = end; i > 0; i--) {
+        StackFrame *frame = stack->frames[i];
+        if (frame->type == FRAME_TYPE_OP && frame->data[0] == op) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+uint64_t form_subscript(Stack *inputStack, uint64_t checksigIndex, Byte *subscript) {
+    int64_t separatorIndex = find_op_frame(inputStack, checksigIndex, OP_CODESEPARATOR);
+    if (separatorIndex < 0) {
+        return 0;
+    }
+    uint64_t subscriptLength = 0;
+    for (uint64_t i = (uint64_t)separatorIndex+1; i < inputStack->height; i++) {
+        StackFrame *frame = inputStack->frames[i];
+        if (frame->type == FRAME_TYPE_OP && frame->data[0] == OP_CODESEPARATOR) {
+            continue;
+        }
+        if (frame->type == FRAME_TYPE_DATA) {
+            memcpy(subscript + subscriptLength, &frame->dataWidth, 1);
+            subscriptLength += 1;
+        }
+        memcpy(subscript + subscriptLength, frame->data, frame->dataWidth);
+        subscriptLength += frame->dataWidth;
+    }
+    return subscriptLength;
 }
 
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
@@ -596,7 +620,10 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
                     StackFrame pubkeyFrame = pop(&runtimeStack);
                     StackFrame sigFrame = pop(&runtimeStack);
-                    int8_t result = check_signature(pubkeyFrame, sigFrame, meta);
+                    Byte *subscript = CALLOC(1, 100000, "subscript");
+                    uint64_t subscriptLength = form_subscript(inputStack, i, subscript);
+                    int8_t result = check_signature(pubkeyFrame, sigFrame, meta, subscript, subscriptLength);
+                    FREE(subscript, "subscript");
                     if (result < 0) {
                         goto immediate_fail;
                     }
@@ -684,6 +711,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     // Simulate Bitcoin bug
                     pop(&runtimeStack);
 
+                    Byte *subscript = CALLOC(1, 100000, "subscript");
+                    uint64_t subscriptLength = form_subscript(inputStack, i, subscript);
+
                     // Check public keys against signatures
                     int8_t pki = 0;
                     int8_t si = 0;
@@ -693,7 +723,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                             result = false;
                             break;
                         }
-                        bool signatureValid = check_signature(publicKeys[pki], signatures[si], meta) == 1;
+                        bool signatureValid = check_signature(publicKeys[pki], signatures[si], meta, subscript, subscriptLength) == 1;
                         if (signatureValid) {
                             if (si + 1 == signatureCount) {
                                 result = true;
@@ -708,6 +738,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
                     FREE(publicKeys, "OP_CHECKMULTISIG:publicKeys");
                     FREE(signatures, "OP_CHECKMULTISIG:signatures");
+                    FREE(subscript, "subscript");
                     push(&runtimeStack, get_boolean_frame(result));
                     break;
                 }
