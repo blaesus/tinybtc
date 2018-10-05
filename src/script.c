@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <utils/integers.h>
 
 #include "openssl/ec.h"
 #include "openssl/err.h"
@@ -30,7 +31,7 @@ enum FrameType {
 
 struct StackFrame {
     Byte data[MAX_STACK_FRAME_WIDTH];
-    uint16_t dataWidth;
+    uint32_t dataWidth;
     enum FrameType type;
 };
 
@@ -269,7 +270,7 @@ void load_program(Stack *stack, Byte *program, uint64_t programLength) {
         StackFrame newFrame = get_empty_frame();
         if (is_push_data_op(datum)) {
             newFrame.type = FRAME_TYPE_DATA;
-            uint16_t dataWidth = 0;
+            uint32_t dataWidth = 0;
             uint16_t dataStartOffset = 0;
             if (is_anonymous_push_data_op(datum)) {
                 dataWidth = datum;
@@ -278,6 +279,10 @@ void load_program(Stack *stack, Byte *program, uint64_t programLength) {
             else if (datum == OP_PUSHDATA1) {
                 dataWidth = program[i+1];
                 dataStartOffset = 2;
+            }
+            else if (datum == OP_PUSHDATA2) {
+                dataWidth = program[i+1] * 256U + program[i+2];
+                dataStartOffset = 3;
             }
             else {
                 fprintf(stderr, "Unimplemented push data op %u\n", datum);
