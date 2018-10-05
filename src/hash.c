@@ -32,6 +32,15 @@ static void fprint_hex_reverse_of_width(FILE *stream, Byte *data, uint64_t lengt
     }
 }
 
+char *get_hexstr_reverse_of_width(Byte *data, uint64_t length) {
+    static char s[1024] = {0};
+    for (uint64_t i = length; i > 0; i--) {
+        sprintf(&s[(length - i) * 2], "%02x", data[i-1]);
+    }
+    s[length * 2] = '\0';
+    return s;
+}
+
 static void print_hex_reverse_of_width(Byte *data, uint64_t length) {
     fprint_hex_reverse_of_width(stdout, data, length);
 }

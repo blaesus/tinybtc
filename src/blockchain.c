@@ -603,7 +603,11 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
             fprintf(stderr, "validate_blocks: Cannot find next child to validate\n");
             return checkedBlocks;
         }
-        print_hash_with_description("\nValidating block ", childIndex->meta.hash);
+        printf(
+            "\nValidating block %u %s",
+            childIndex->context.height,
+            get_hexstr_reverse_of_width(childIndex->meta.hash, SHA256_LENGTH)
+        );
         BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
         int8_t status = load_block(childIndex->meta.hash, childBlock);
         bool continueScanning = false;
@@ -617,7 +621,7 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
             fprintf(stderr, "validate_blocks: Block invalid\n");
         }
         else {
-            print_hash_with_description("Block validated: ", childIndex->meta.hash);
+            printf(" [validated]\n");
             childIndex->meta.fullBlockValidated = true;
             global.mainValidatedTip = *childIndex;
             memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);

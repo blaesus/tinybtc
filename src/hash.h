@@ -21,3 +21,4 @@ bool is_hash_empty(Byte *hash);
 void sha256_hex_to_binary(const char *str, Byte *hash);
 void hash_binary_to_hex(Byte *hash, char *hex);
 bool sha256_match(Byte *hashA, Byte *hashB);
+char *get_hexstr_reverse_of_width(Byte *data, uint64_t length);
