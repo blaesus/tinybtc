@@ -40,4 +40,5 @@ const struct ChainParameters mainnet = {
     .bipHeights = {
         .bip65 = 388381
     },
+    .addressVersion = 0x00,
 };

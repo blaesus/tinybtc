@@ -43,6 +43,7 @@ struct ChainParameters {
     uint16_t retargetBound;
     struct ChainCheckPoint checkpoints[MAX_CHECKPOINTS];
     struct BIPHeights bipHeights;
+    Byte addressVersion;
 };
 
 extern const struct ChainParameters mainnet;
