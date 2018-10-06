@@ -14,7 +14,7 @@
 
 #define UNKNOWN_OPCODE "UNKNOWN_OPCODE"
 
-#define MAX_STACK_FRAME_WIDTH 256
+#define MAX_STACK_FRAME_WIDTH 1024 // TODO: dynamic allocate
 
 enum HashType {
     SIGHASH_ALL_ALTERNATIVE = 0,
