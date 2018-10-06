@@ -281,7 +281,7 @@ void load_program(Stack *stack, Byte *program, uint64_t programLength) {
                 dataStartOffset = 2;
             }
             else if (datum == OP_PUSHDATA2) {
-                dataWidth = program[i+1] * 256U + program[i+2];
+                dataWidth = program[i+1] + program[i+2] * 256U;
                 dataStartOffset = 3;
             }
             else {
