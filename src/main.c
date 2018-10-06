@@ -70,6 +70,13 @@ int32_t main(int32_t argc, char **argv) {
             revalidate(*count);
             return 0;
         }
+        case MODE_VALIDATE_ONE: {
+            Byte *hash = global.modeData;
+            BlockIndex *index = GET_BLOCK_INDEX(hash);
+            validate_block(hash, false, NULL);
+            printf("height=%u\n", index->context.height);
+            return 0;
+        }
         case MODE_TEST: {
             test();
             return 0;

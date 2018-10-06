@@ -6,6 +6,7 @@
 #include "opt.h"
 #include "globalstate.h"
 #include "utils/memory.h"
+#include "utils/data.h"
 
 void handle_options(int32_t argc, char **argv) {
     int32_t optionIndex = 0;
@@ -16,7 +17,7 @@ void handle_options(int32_t argc, char **argv) {
     };
     int32_t optionChar;
     while (true) {
-        optionChar = getopt_long_only(argc, argv, "r:t", options, &optionIndex);
+        optionChar = getopt_long_only(argc, argv, "o:r:t", options, &optionIndex);
         if (optionChar == -1) {
             break;
         }
@@ -26,6 +27,14 @@ void handle_options(int32_t argc, char **argv) {
                 *count = atoi(optarg);
                 global.mode = MODE_VALIDATE;
                 global.modeData = count;
+                break;
+            }
+            case 'o': {
+                Byte *hash = CALLOC(1, SHA256_LENGTH, "handle_options:modeData");
+                sha256_hex_to_binary(optarg, hash);
+                reverse_endian(hash, SHA256_LENGTH);
+                global.mode = MODE_VALIDATE_ONE;
+                global.modeData = hash;
                 break;
             }
             case 't': {

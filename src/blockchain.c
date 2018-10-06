@@ -598,7 +598,7 @@ int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
     BlockPayload *block = CALLOC(1, sizeof(*block), "validate_blocks:block");
     int8_t blockLoadStatus = load_block(index->meta.hash, block);
     #if LOG_VALIDATION_PROCEDURES
-    print_block_payload(childBlock);
+    print_block_payload(block);
     #endif
 
     int8_t blockValidation = 0;
