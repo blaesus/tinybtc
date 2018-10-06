@@ -692,16 +692,6 @@ void reset_validation() {
 void revalidate(uint32_t totalBlocksToCheck) {
     // reset_validation();
     // destory_db(config.utxoDBName);
-    int64_t remainingBlocks = totalBlocksToCheck;
-    while (remainingBlocks > 0) {
-        uint32_t checkedBlocks = validate_blocks(false, totalBlocksToCheck);
-        printf("Checked %u blocks\n", checkedBlocks);
-        save_block_indices();
-        remainingBlocks -= checkedBlocks;
-        if (checkedBlocks < 10) {
-            break;
-        }
-    }
-    // destory_db(config.utxoDBName);
-    cleanup_db();
+    uint32_t checkedBlocks = validate_blocks(false, totalBlocksToCheck);
+    printf("\nChecked %u blocks\n", checkedBlocks);
 }
