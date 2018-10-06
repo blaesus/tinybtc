@@ -582,6 +582,69 @@ double verify_block_indices(bool loadBlock) {
     return fullBlockAvailable * 1.0 / indexCount;
 }
 
+// 2: valid and continue; 1: valid and stop; 0: invalid; <0: error
+
+int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
+    BlockIndex *index = GET_BLOCK_INDEX(hash);
+    if (!index) {
+        fprintf(stderr, "validate_blocks: No index for current target\n");
+        return -1;
+    }
+    printf(
+        "\nValidating block %u %s",
+        index->context.height,
+        get_hexstr_reverse_of_width(index->meta.hash, SHA256_LENGTH)
+    );
+    BlockPayload *block = CALLOC(1, sizeof(*block), "validate_blocks:block");
+    int8_t blockLoadStatus = load_block(index->meta.hash, block);
+    #if LOG_VALIDATION_PROCEDURES
+    print_block_payload(childBlock);
+    #endif
+
+    int8_t blockValidation = 0;
+
+    if (blockLoadStatus) {
+        fprintf(stderr, "validate_blocks: Cannot load block\n");
+        blockValidation = -10;
+        goto release;
+    }
+
+    bool hasChild = index->context.children.length > 0;
+
+    bool blockValid = is_block_valid(block, index);
+    if (!blockValid) {
+        fprintf(stderr, "validate_blocks: Block invalid\n");
+        blockValidation = 0;
+        goto release;
+    }
+    else {
+        if (hasChild) {
+            blockValidation = 2;
+        }
+        else {
+            blockValidation = 1;
+        }
+    }
+
+    printf(" [validated]\n");
+
+    if (saveValidation) {
+        index->meta.fullBlockValidated = true;
+        global.mainValidatedTip = *index;
+        if (nextHash && hasChild) {
+            memcpy(nextHash, index->context.children.hashes[0], SHA256_LENGTH); // TODO: handle side-chain
+        }
+        if (!index->meta.outputsRegistered) {
+            register_validated_block(block);
+            index->meta.outputsRegistered = true;
+        }
+    }
+
+    release:
+    release_block(block);
+    return blockValidation;
+}
+
 uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     printf("Validating blocks...\n");
     SHA256_HASH blockHash = {0};
@@ -589,53 +652,10 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     memcpy(blockHash, startingHash, SHA256_LENGTH);
     uint32_t checkedBlocks = 0;
     while (true) {
-        BlockIndex *index = GET_BLOCK_INDEX(blockHash);
-        if (!index) {
-            fprintf(stderr, "validate_blocks: No index for current target\n");
-            return checkedBlocks;
-        }
-        if (index->context.children.length == 0) {
-            printf("validate_blocks: Reached chain end\n");
-            return checkedBlocks;
-        }
-        BlockIndex *childIndex = GET_BLOCK_INDEX(index->context.children.hashes[0]); // TODO: Handle side-chain
-        if (!childIndex) {
-            fprintf(stderr, "validate_blocks: Cannot find next child to validate\n");
-            return checkedBlocks;
-        }
-        printf(
-            "\nValidating block %u %s",
-            childIndex->context.height,
-            get_hexstr_reverse_of_width(childIndex->meta.hash, SHA256_LENGTH)
-        );
-        BlockPayload *childBlock = CALLOC(1, sizeof(*childBlock), "validate_blocks:block");
-        int8_t status = load_block(childIndex->meta.hash, childBlock);
-        bool continueScanning = false;
-        #if LOG_VALIDATION_PROCEDURES
-        print_block_payload(childBlock);
-        #endif
-        if (status) {
-            fprintf(stderr, "validate_blocks: Cannot load block\n");
-        }
-        else if (!is_block_valid(childBlock, childIndex)) {
-            fprintf(stderr, "validate_blocks: Block invalid\n");
-        }
-        else {
-            printf(" [validated]\n");
-            childIndex->meta.fullBlockValidated = true;
-            global.mainValidatedTip = *childIndex;
-            memcpy(blockHash, childIndex->meta.hash, SHA256_LENGTH);
-            continueScanning = true;
-            if (!childIndex->meta.outputsRegistered) {
-                register_validated_block(childBlock);
-                childIndex->meta.outputsRegistered = true;
-            }
-        }
-        release_block(childBlock);
+        int8_t validation = validate_block(blockHash, true, blockHash);
         checkedBlocks++;
-        if (maxBlocksToCheck > 0 && checkedBlocks >= maxBlocksToCheck) {
-            continueScanning = false;
-        }
+        bool maxBlocksSpecified = maxBlocksToCheck > 0;
+        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks < maxBlocksToCheck);
         if (!continueScanning) {
             return checkedBlocks;
         }
