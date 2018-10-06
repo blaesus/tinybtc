@@ -668,7 +668,7 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
         int8_t validation = validate_block(blockHash, true, blockHash);
         checkedBlocks++;
         bool maxBlocksSpecified = maxBlocksToCheck > 0;
-        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks < maxBlocksToCheck);
+        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks <= maxBlocksToCheck);
         if (!continueScanning) {
             return checkedBlocks;
         }
