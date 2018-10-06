@@ -29,6 +29,8 @@ enum ExecutionMode {
 };
 
 struct GlobalState {
+    bool terminating;
+
     enum ExecutionMode mode;
     void *modeData;
 

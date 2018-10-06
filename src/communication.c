@@ -1035,6 +1035,10 @@ void check_to_cleanup() {
 }
 
 void terminate_execution() {
+    if (global.terminating) {
+        return;
+    }
+    global.terminating = true;
     save_chain_data();
     if (global.mode == MODE_NORMAL || global.mode == MODE_CATCHUP) {
         stop_timers();
