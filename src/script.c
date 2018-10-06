@@ -468,25 +468,23 @@ void fix_signature_frame(StackFrame *sigFrame) {
 }
 
 int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex) {
-    switch (hashtype) {
-        case SIGHASH_ALL_ALTERNATIVE:
-        case SIGHASH_ALL: {
-            return 0;
-        }
-        case SIGHASH_NONE: {
-            memset(txCopy->txOutputs, 0, sizeof(TxOut) * txCopy->txOutputCount);
-            txCopy->txOutputCount = 0;
-            for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
-                if (i != currentInputIndex) {
-                    txCopy->txInputs[i].sequence = 0;
-                }
+    if ((hashtype & 0x1f) == SIGHASH_NONE) {
+        memset(txCopy->txOutputs, 0, sizeof(TxOut) * txCopy->txOutputCount);
+        txCopy->txOutputCount = 0;
+        for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
+            if (i != currentInputIndex) {
+                txCopy->txInputs[i].sequence = 0;
             }
-            return 0;
         }
-        default: {
-            fprintf(stderr, "Unrecognized hashtype %u\n", hashtype);
-            return -1;
-        }
+        return 0;
+    }
+    else if (hashtype == SIGHASH_ALL_ALTERNATIVE || hashtype == SIGHASH_ALL) {
+        // NOP
+        return 0;
+    }
+    else {
+        fprintf(stderr, "Unrecognized hashtype %u\n", hashtype);
+        return -1;
     }
 }
 
