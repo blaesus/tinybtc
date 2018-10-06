@@ -362,34 +362,34 @@ TxPayload *make_tx_copy(CheckSigMeta meta, Byte *subscript, uint64_t subscriptLe
 
 #define MAX_SIGNATURE_DATA 128
 
-struct EllipticPoint {
-    int8_t pointType;
+struct SignatureComponent {
+    int8_t type;
     int8_t length;
     Byte data[MAX_SIGNATURE_DATA];
 };
 
-typedef struct EllipticPoint EllipticPoint;
+typedef struct SignatureComponent SignatureComponent;
 
 struct DerSignature {
     int8_t sequence;
     int8_t length;
-    EllipticPoint r;
-    EllipticPoint s;
+    SignatureComponent r;
+    SignatureComponent s;
 };
 
 typedef struct DerSignature DerSignature;
 
-uint64_t parse_elliptic_point(Byte *ptrBuffer, EllipticPoint *point) {
+uint64_t parse_elliptic_point(Byte *ptrBuffer, SignatureComponent *point) {
     Byte *p = ptrBuffer;
-    p += PARSE_INTO(p, &point->pointType);
+    p += PARSE_INTO(p, &point->type);
     p += PARSE_INTO(p, &point->length);
     p += PARSE_INTO_OF_LENGTH(p, &point->data, point->length);
     return p - ptrBuffer;
 }
 
-uint64_t serialize_elliptic_point(EllipticPoint *point, Byte *ptrBuffer) {
+uint64_t serialize_elliptic_point(SignatureComponent *point, Byte *ptrBuffer) {
     Byte *p = ptrBuffer;
-    p += SERIALIZE_TO(point->pointType, p);
+    p += SERIALIZE_TO(point->type, p);
     p += SERIALIZE_TO(point->length, p);
     p += SERIALIZE_TO_OF_LENGTH(point->data, p, point->length);
     return p - ptrBuffer;
@@ -417,31 +417,31 @@ bool byte_has_initial_zero(Byte n) {
     return (n & 0x80) != 0;
 }
 
-int8_t fix_point_preceding_zeros(EllipticPoint *point) {
+int8_t fix_signature_component_preceding_zeros(SignatureComponent *component) {
     int8_t offset = 0;
     // Remove current zeros
-    while (point->data[0] == 0 && point->length > 0) {
-        memcpy(point->data, point->data+1, point->length-1);
-        point->length -= 1;
+    while (component->data[0] == 0 && component->length > 0) {
+        memcpy(component->data, component->data+1, component->length-1);
+        component->length -= 1;
         offset -= 1;
     }
     // Put in our own
-    if (byte_has_initial_zero(point->data[0])) {
-        memcpy(point->data+1, point->data, point->length);
-        point->data[0] = 0;
-        point->length += 1;
+    if (byte_has_initial_zero(component->data[0])) {
+        memcpy(component->data+1, component->data, component->length);
+        component->data[0] = 0;
+        component->length += 1;
         offset += 1;
     }
     return offset;
 }
 
 void fix_signature(DerSignature *signature) {
-    signature->length += fix_point_preceding_zeros(&signature->r);
-    signature->length += fix_point_preceding_zeros(&signature->s);
+    signature->length += fix_signature_component_preceding_zeros(&signature->r);
+    signature->length += fix_signature_component_preceding_zeros(&signature->s);
 }
 
-void print_elliptic_point(EllipticPoint *point) {
-    printf("point type %i, length %i, data:", point->pointType, point->length);
+void print_elliptic_point(SignatureComponent *point) {
+    printf("point type %i, length %i, data:", point->type, point->length);
     print_object(point->data, (uint64_t)point->length);
 }
 
