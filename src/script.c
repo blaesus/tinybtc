@@ -456,19 +456,21 @@ void print_der(DerSignature *signature) {
 void fix_signature_frame(StackFrame *sigFrame) {
     DerSignature *signature = CALLOC(1, sizeof(*signature), "fix_signature_frame:signature");
     parse_der(sigFrame->data, signature);
-    #if LOG_VALIDATION_PROCEDURES
+    #if LOG_SIGNATURE_FIXING
     print_der(signature);
     #endif
     fix_signature(signature);
-    #if LOG_VALIDATION_PROCEDURES
+    #if LOG_SIGNATURE_FIXING
     print_der(signature);
     #endif
     sigFrame->dataWidth = (uint16_t)(serialize_der(signature, sigFrame->data) + 1);
     FREE(signature, "fix_signature_frame:signature");
 }
 
+#define MASK_HASHTYPE(ht) (ht & 0x1f)
+
 int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex) {
-    if ((hashtype & 0x1f) == SIGHASH_NONE) {
+    if (MASK_HASHTYPE(hashtype) == SIGHASH_NONE) {
         memset(txCopy->txOutputs, 0, sizeof(TxOut) * txCopy->txOutputCount);
         txCopy->txOutputCount = 0;
         for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
@@ -476,16 +478,17 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInpu
                 txCopy->txInputs[i].sequence = 0;
             }
         }
-        return 0;
     }
-    else if (hashtype == SIGHASH_ALL_ALTERNATIVE || hashtype == SIGHASH_ALL) {
-        // NOP
-        return 0;
-    }
-    else {
-        fprintf(stderr, "Unrecognized hashtype %u\n", hashtype);
+    else if (MASK_HASHTYPE(hashtype) == SIGHASH_SINGLE) {
+        fprintf(stderr, "Not implemented: SIGHASH_SINGLE\n");
         return -1;
     }
+
+    if (hashtype & SIGHASH_ANYONECANPAY) {
+        txCopy->txInputs[0] = txCopy->txInputs[currentInputIndex];
+        txCopy->txInputCount = 1;
+    }
+    return 0;
 }
 
 // 1: valid, 0: invalid, <0: error

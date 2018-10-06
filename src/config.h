@@ -19,6 +19,7 @@
 #define LOG_SCRIPT_STACKS false
 #define LOG_BLOCK_LOAD false
 #define LOG_VALIDATION_PROCEDURES false
+#define LOG_SIGNATURE_FIXING false
 #define LOG_DB_ERROR false
 
 #define TRACE_MEMORY_USE false
