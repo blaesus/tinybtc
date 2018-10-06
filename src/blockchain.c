@@ -67,6 +67,19 @@ bool is_block_header_valid(BlockIndex *index) {
 }
 
 int8_t search_utxo(Outpoint *outpoint, TxPayload *txs, uint64_t txLimit, TxOut *sourceOutput) {
+    if (global.mode == MODE_VALIDATE_ONE) {
+        TxPayload *tx = CALLOC(1, sizeof(*tx), "search_utxo:tx");
+        int8_t status = load_tx(outpoint->txHash, tx);
+        if (status == 0 && outpoint->index < tx->txOutputCount) {
+            memcpy(sourceOutput, &tx->txOutputs[outpoint->index], sizeof(TxOut));
+            FREE(tx, "search_utxo:tx");
+            return 0;
+        }
+        else {
+            FREE(tx, "search_utxo:tx");
+            return -1;
+        }
+    }
     // Coinbase
     if (is_outpoint_empty(outpoint)) {
         return -30;
