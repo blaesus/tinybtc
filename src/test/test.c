@@ -383,6 +383,7 @@ void test_script() {
         "0000000000000684e1d3f30ac8cad2c9b5be096bf7c7c77cdd57f8930673cb78", // tx #82 has missing preceding zero
         "00000000000002fce4abfccc009ddb621b28fad22dad8fc31d8620cd4716ef73", // compressed key
         "000000000000074006e067120f51b576e9cfb31f31d8d9212d6416748e650685", // tx #13: OP_CHECKMULTISIG and fancy OPs
+        "00000000000004e6d451786f2ddd89c9432a24badf80f02cb8cbbc94317a765c", // hashtype 2
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

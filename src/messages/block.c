@@ -220,7 +220,7 @@ void hash_block_header(BlockPayloadHeader *ptrHeader, Byte *hash) {
 
 
 void print_block_payload(BlockPayload *ptrBlock) {
-    printf("----- block -----\n");
+    printf("\n----- block -----\n");
     SHA256_HASH blockHash = {0};
     hash_block_header(&ptrBlock->header, blockHash);
     print_hash_with_description("", blockHash);

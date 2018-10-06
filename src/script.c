@@ -467,10 +467,20 @@ void fix_signature_frame(StackFrame *sigFrame) {
     FREE(signature, "fix_signature_frame:signature");
 }
 
-int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype) {
+int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex) {
     switch (hashtype) {
         case SIGHASH_ALL_ALTERNATIVE:
         case SIGHASH_ALL: {
+            return 0;
+        }
+        case SIGHASH_NONE: {
+            memset(txCopy->txOutputs, 0, sizeof(TxOut) * txCopy->txOutputCount);
+            txCopy->txOutputCount = 0;
+            for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
+                if (i != currentInputIndex) {
+                    txCopy->txInputs[i].sequence = 0;
+                }
+            }
             return 0;
         }
         default: {
@@ -498,7 +508,7 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
     fix_signature_frame(&sigFrame);
     SHA256_HASH hashTx = {0};
     TxPayload *txCopy = make_tx_copy(meta, subscript, subscriptLength);
-    if (polish_tx_copy(txCopy, hashtype)) {
+    if (polish_tx_copy(txCopy, hashtype, meta.txInputIndex)) {
         return -2;
     };
     hash_tx_with_hashtype(txCopy, hashtype, hashTx);
