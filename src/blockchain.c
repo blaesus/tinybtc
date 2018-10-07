@@ -663,12 +663,12 @@ uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
     SHA256_HASH blockHash = {0};
     Byte *startingHash = fromGenesis ? global.genesisHash : global.mainValidatedTip.meta.hash;
     memcpy(blockHash, startingHash, SHA256_LENGTH);
+    bool maxBlocksSpecified = maxBlocksToCheck > 0;
     uint32_t checkedBlocks = 0;
     while (true) {
         int8_t validation = validate_block(blockHash, true, blockHash);
         checkedBlocks++;
-        bool maxBlocksSpecified = maxBlocksToCheck > 0;
-        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks <= maxBlocksToCheck);
+        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks < maxBlocksToCheck);
         if (!continueScanning) {
             return checkedBlocks;
         }
