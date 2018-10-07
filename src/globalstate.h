@@ -30,6 +30,7 @@ enum ExecutionMode {
 
 struct GlobalState {
     bool terminating;
+    bool shouldTerminate;
 
     enum ExecutionMode mode;
     void *modeData;
@@ -81,3 +82,4 @@ uint32_t count_hand_shaken_peers();
 bool peer_hand_shaken(Peer *ptrPeer);
 void add_orphan(Byte *hash);
 void mark_block_as_unavailable(Byte *hash);
+void initiate_termination();

@@ -18,7 +18,7 @@ int32_t run_main_loop() {
 void setup_cleanup() {
     atexit(&terminate_execution);
     struct sigaction sa = {
-        .sa_handler = &terminate_execution,
+        .sa_handler = &initiate_termination,
         .sa_flags = 0,
     };
     sigemptyset(&sa.sa_mask);

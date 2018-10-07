@@ -12,6 +12,7 @@ const struct Config config = {
         .printNodeStatus = SECOND_TO_MILLISECOND(5),
         .ping = SECOND_TO_MILLISECOND(59),
         .validateNewBlocks = SECOND_TO_MILLISECOND(1),
+        .terminationCheck = SECOND_TO_MILLISECOND(1),
     },
     .tolerances = {
         .handshake = SECOND_TO_MILLISECOND(10),

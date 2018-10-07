@@ -37,6 +37,7 @@
 void send_getheaders(uv_tcp_t *socket);
 void send_getdata_for_block(uv_tcp_t *socket, Byte *hash);
 int32_t setup_api_socket(void);
+void termination_check();
 
 bool disable_candidate(PeerCandidate *ptrCandidate) {
     if (ptrCandidate) {
@@ -252,8 +253,12 @@ void setup_timers() {
         },
         {
             .interval = config.periods.autoexit,
-            .callback = &terminate_execution,
+            .callback = &initiate_termination,
             .onlyOnce = true,
+        },
+        {
+            .interval = config.periods.terminationCheck,
+            .callback = &termination_check,
         },
         {
             .interval = config.periods.resetIBDMode,
@@ -874,7 +879,7 @@ void on_incoming_segment_to_api(uv_stream_t *socket, ssize_t nread, const uv_buf
     }
     printf("\nIncoming segment to API socket\n");
     if (memcmp(buf->base, INSTRUCTION_KILL, strlen(INSTRUCTION_KILL)) == 0) {
-        terminate_execution();
+        initiate_termination();
     }
     FREE(buf->base, "allocate_read_buffer:bufBase");
 }
@@ -1049,5 +1054,16 @@ void terminate_execution() {
         uv_timer_t *timer = CALLOC(1, sizeof(*timer), "terminate_execution:timer");
         uv_timer_init(uv_default_loop(), timer);
         uv_timer_start(timer, check_to_cleanup, 0, 500);
+    }
+}
+
+void initiate_termination() {
+    printf("Issued termination command\n");
+    global.shouldTerminate = true;
+}
+
+void termination_check() {
+    if (global.shouldTerminate) {
+        terminate_execution();
     }
 }
