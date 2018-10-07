@@ -650,12 +650,11 @@ int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
     if (saveValidation) {
         index->meta.fullBlockValidated = true;
         global.mainValidatedTip = *index;
+        register_validated_block(block);
+        index->meta.outputsRegistered = true;
+
         if (nextHash && hasChild) {
             memcpy(nextHash, index->context.children.hashes[0], SHA256_LENGTH); // TODO: handle side-chain
-        }
-        if (!index->meta.outputsRegistered) {
-            register_validated_block(block);
-            index->meta.outputsRegistered = true;
         }
     }
 
