@@ -32,7 +32,7 @@ static void fprint_hex_reverse_of_width(FILE *stream, Byte *data, uint64_t lengt
     }
 }
 
-char *get_hexstr_reverse_of_width(Byte *data, uint64_t length) {
+char *binary_to_hexstr(Byte *data, uint64_t length) {
     static char s[1024] = {0};
     memset(s, 0, sizeof(s));
     for (uint64_t i = length; i > 0; i--) {

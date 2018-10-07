@@ -121,7 +121,13 @@ uint64_t sum_inputs_from_tx(TxPayload *tx, TxPayload *txs, uint64_t txLimit) {
         memset(sourceOutput, 0, sizeof(*sourceOutput));
         int8_t error = search_utxo(&input->previous_output, txs, txLimit, sourceOutput);
         if (error) {
-            fprintf(stderr, "sum_inputs_from_tx: search_utxo error %i\n", error);
+            fprintf(
+                stderr,
+                "search_utxo error %i: searching %s #%u\n",
+                error,
+                binary_to_hexstr(input->previous_output.txHash, SHA256_LENGTH),
+                input->previous_output.index
+            );
         }
         else {
             sum += sourceOutput->value;
@@ -606,7 +612,7 @@ int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
     printf(
         "\nValidating block %u %s",
         index->context.height,
-        get_hexstr_reverse_of_width(index->meta.hash, SHA256_LENGTH)
+        binary_to_hexstr(index->meta.hash, SHA256_LENGTH)
     );
     BlockPayload *block = CALLOC(1, sizeof(*block), "validate_blocks:block");
     int8_t blockLoadStatus = load_block(index->meta.hash, block);
