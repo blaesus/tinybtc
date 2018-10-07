@@ -49,7 +49,7 @@ uint32_t target_bignum_to_compact(BIGNUM *ptrTarget);
 double calc_block_pow(TargetCompact targetFloat);
 int8_t process_incoming_block_header(BlockPayloadHeader *ptrHeader);
 int8_t process_incoming_block(BlockPayload *ptrBlock);
-double verify_block_indices(bool loadBlock);
+double scan_block_indices(bool loadBlock);
 bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex);
 uint32_t max_full_block_height_from_genesis(void);
 uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck);

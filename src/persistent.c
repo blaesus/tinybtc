@@ -478,3 +478,6 @@ int8_t spend_output(Outpoint *outpoint) {
 void migrate() {
 }
 
+bool is_block_downloaded(Byte *hash) {
+    return file_exist(make_entity_path(BLOCK_ROOT, hash));
+}

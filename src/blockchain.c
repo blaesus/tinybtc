@@ -553,8 +553,8 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-double verify_block_indices(bool loadBlock) {
-    printf("Verifying block indices...\n");
+double scan_block_indices(bool loadBlock) {
+    printf("Scanning block indices...\n");
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
     uint32_t fullBlockAvailable = 0;
@@ -574,12 +574,10 @@ double verify_block_indices(bool loadBlock) {
         if (loadBlock) {
             if (ptrIndex->meta.fullBlockAvailable) {
                 ptrIndex->meta.fullBlockAvailable = false;
-                BlockPayload *ptrBlock = CALLOC(1, sizeof(BlockPayload), "block_payload");
-                int8_t status = load_block(ptrIndex->meta.hash, ptrBlock);
+                int8_t status = is_block_downloaded(ptrIndex->meta.hash);
                 if (!status) {
                     ptrIndex->meta.fullBlockAvailable = true;
                 }
-                release_block(ptrBlock);
             }
         }
         if (ptrIndex->meta.fullBlockAvailable) {
