@@ -481,12 +481,28 @@ void register_validated_block(BlockPayload *ptrBlock) {
             memcpy(outpoint.txHash, txHash, SHA256_LENGTH);
             int8_t status = save_utxo(&outpoint, out);
             if (status) {
+                #if LOG_BLOCK_REGISTRATION_DETAILS
                 fprintf(stderr, "register utxo: %i\n", status);
+                #endif
+            }
+            else  {
+                #if LOG_BLOCK_REGISTRATION_DETAILS
+                printf("registered utxo: %s %llu\n", binary_to_hexstr(txHash, SHA256_LENGTH), outIndex);
+                #endif
             }
         }
         for (uint64_t inIndex = 0; inIndex < tx->txInputCount; inIndex++) {
             TxIn *input = &tx->txInputs[inIndex];
-            spend_output(&input->previous_output);
+            if (!is_coinbase(input)) {
+                spend_output(&input->previous_output);
+                #if LOG_BLOCK_REGISTRATION_DETAILS
+                printf(
+                    "spent utxo: %s %u\n",
+                    binary_to_hexstr(input->previous_output.txHash, SHA256_LENGTH),
+                    input->previous_output.index
+                );
+                #endif
+            }
         }
     }
 }
@@ -603,11 +619,15 @@ double scan_block_indices(bool recheckBlockExistence, bool reloadBlockContent) {
 
 // 2: valid and continue; 1: valid and stop; 0: invalid; <0: error
 
-int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
-    BlockIndex *index = GET_BLOCK_INDEX(hash);
+int8_t validate_block(Byte *target, bool saveValidation, Byte *nextHash) {
+    BlockIndex *index = GET_BLOCK_INDEX(target);
     if (!index) {
         fprintf(stderr, "validate_blocks: No index for current target\n");
         return -1;
+    }
+    else if (!index->meta.fullBlockAvailable) {
+        fprintf(stderr, "validate_blocks: block %s not available\n", binary_to_hexstr(target, SHA256_LENGTH));
+        return -10;
     }
     printf(
         "\nValidating block %u %s",
@@ -668,8 +688,15 @@ uint32_t validate_blocks(double maxTime) {
     double now = start;
     printf("Validating blocks for %.1fms\n", maxTime);
     SHA256_HASH blockHash = {0};
-    Byte *startingHash = global.mainValidatedTip.meta.hash;
-    memcpy(blockHash, startingHash, SHA256_LENGTH);
+    Byte *lastValid = global.mainValidatedTip.meta.hash;
+    BlockIndex *index = GET_BLOCK_INDEX(lastValid);
+    if (!index) {
+        return 0;
+    }
+    else if (index->context.children.length == 0) {
+        return 1;
+    }
+    memcpy(blockHash, index->context.children.hashes[0], SHA256_LENGTH);
     uint32_t checkedBlocks = 0;
     double averageTime = 0.0;
     while ((now - start + averageTime) < maxTime) {
@@ -681,7 +708,7 @@ uint32_t validate_blocks(double maxTime) {
             break;
         }
     }
-    printf("Stopping validation after %.1fms\n", now - start);
+    printf("\nStopping validation after %.1fms\n", now - start);
     return checkedBlocks;
 }
 

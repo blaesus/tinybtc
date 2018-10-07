@@ -54,4 +54,4 @@ bool is_block_valid(BlockPayload *ptrCandidate, BlockIndex *ptrIndex);
 uint32_t max_full_block_height_from_genesis(void);
 uint32_t validate_blocks(double maxTime);
 void revalidate(uint32_t totalBlocksToCheck);
-int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash);
+int8_t validate_block(Byte *target, bool saveValidation, Byte *nextHash);
