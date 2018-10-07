@@ -25,7 +25,7 @@ void handle_options(int32_t argc, char **argv) {
         switch (optionChar) {
             case 'r': {
                 int32_t *timeMs = CALLOC(1, sizeof(*timeMs), "handle_options:modeData");
-                *timeMs = atoi(optarg);
+                *timeMs = atoi(optarg) * 1000;
                 global.mode = MODE_VALIDATE;
                 global.modeData = timeMs;
                 break;
