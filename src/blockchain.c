@@ -652,10 +652,10 @@ int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
         global.mainValidatedTip = *index;
         register_validated_block(block);
         index->meta.outputsRegistered = true;
+    }
 
-        if (nextHash && hasChild) {
-            memcpy(nextHash, index->context.children.hashes[0], SHA256_LENGTH); // TODO: handle side-chain
-        }
+    if (nextHash && hasChild) {
+        memcpy(nextHash, index->context.children.hashes[0], SHA256_LENGTH); // TODO: handle side-chain
     }
 
     release:
