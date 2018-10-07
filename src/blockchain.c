@@ -658,21 +658,26 @@ int8_t validate_block(Byte *hash, bool saveValidation, Byte *nextHash) {
     return blockValidation;
 }
 
-uint32_t validate_blocks(bool fromGenesis, uint32_t maxBlocksToCheck) {
-    printf("Validating blocks...\n");
+uint32_t validate_blocks(double maxTime) {
+    double start = get_now();
+    double now = start;
+    printf("Validating blocks for %.1fms\n", maxTime);
     SHA256_HASH blockHash = {0};
-    Byte *startingHash = fromGenesis ? global.genesisHash : global.mainValidatedTip.meta.hash;
+    Byte *startingHash = global.mainValidatedTip.meta.hash;
     memcpy(blockHash, startingHash, SHA256_LENGTH);
-    bool maxBlocksSpecified = maxBlocksToCheck > 0;
     uint32_t checkedBlocks = 0;
-    while (true) {
+    double averageTime = 0.0;
+    while ((now - start + averageTime) < maxTime) {
         int8_t validation = validate_block(blockHash, true, blockHash);
         checkedBlocks++;
-        bool continueScanning = (validation == 2) && (!maxBlocksSpecified || checkedBlocks < maxBlocksToCheck);
-        if (!continueScanning) {
-            return checkedBlocks;
+        now = get_now();
+        averageTime = (now - start) / maxTime;
+        if (validation != 2) {
+            break;
         }
     }
+    printf("Stopping validation after %.1fms\n", now - start);
+    return checkedBlocks;
 }
 
 void reset_validation() {
@@ -689,9 +694,9 @@ void reset_validation() {
     }
 }
 
-void revalidate(uint32_t totalBlocksToCheck) {
-    // reset_validation();
-    // destory_db(config.utxoDBName);
-    uint32_t checkedBlocks = validate_blocks(false, totalBlocksToCheck);
+void revalidate(uint32_t maxTime) {
+    reset_validation();
+    destory_db(config.utxoDBName);
+    uint32_t checkedBlocks = validate_blocks(maxTime);
     printf("\nChecked %u blocks\n", checkedBlocks);
 }

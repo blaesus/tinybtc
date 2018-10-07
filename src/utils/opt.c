@@ -23,10 +23,10 @@ void handle_options(int32_t argc, char **argv) {
         }
         switch (optionChar) {
             case 'r': {
-                int32_t *count = CALLOC(1, sizeof(*count), "handle_options:modeData");
-                *count = atoi(optarg);
+                int32_t *timeMs = CALLOC(1, sizeof(*timeMs), "handle_options:modeData");
+                *timeMs = atoi(optarg);
                 global.mode = MODE_VALIDATE;
-                global.modeData = count;
+                global.modeData = timeMs;
                 break;
             }
             case 'o': {
