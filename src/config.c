@@ -32,6 +32,6 @@ const struct Config config = {
     .utxoDBName = "utxo",
     .catchupThreshold = 144,
     .apiPort = 9494,
-    .silentIncomingMessageCommands = "inv,pong,ping,addr",
+    .silentIncomingMessageCommands = "inv,pong,ping,addr,version,verack",
     .verifyBlocks = false,
 };
