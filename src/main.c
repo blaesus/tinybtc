@@ -79,6 +79,10 @@ int32_t main(int32_t argc, char **argv) {
             test();
             return 0;
         }
+        case MODE_RESET_UTXO: {
+            reset_utxo();
+            return 0;
+        }
         default: {
             setup_main_event_loop();
             connect_to_peers();

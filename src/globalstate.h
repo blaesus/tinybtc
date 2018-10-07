@@ -24,6 +24,7 @@ enum ExecutionMode {
     MODE_NORMAL = 0,
     MODE_CATCHUP,
     MODE_VALIDATE,
+    MODE_RESET_UTXO,
     MODE_VALIDATE_ONE,
     MODE_TEST,
 };

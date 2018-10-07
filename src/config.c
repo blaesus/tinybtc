@@ -2,7 +2,7 @@
 #include "units.h"
 #include "parameters.h"
 
-const struct Config config = {
+struct Config config = {
     .periods = {
         .autoexit = 0,
         .saveIndices = MINUTE_TO_MILLISECOND(5),

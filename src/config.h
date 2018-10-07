@@ -64,4 +64,4 @@ struct Config {
     bool verifyBlocks;
 };
 
-extern const struct Config config;
+extern struct Config config;

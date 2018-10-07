@@ -12,12 +12,13 @@ void handle_options(int32_t argc, char **argv) {
     int32_t optionIndex = 0;
     struct option options[] = {
         {"revalidate", required_argument, 0, 'r'},
+        {"reset-utxo", no_argument, 0, 'u'},
         {"test", no_argument, 0, 't'},
         {NULL, 0, NULL, 0}
     };
     int32_t optionChar;
     while (true) {
-        optionChar = getopt_long_only(argc, argv, "o:r:t", options, &optionIndex);
+        optionChar = getopt_long_only(argc, argv, "o:r:tu", options, &optionIndex);
         if (optionChar == -1) {
             break;
         }
@@ -27,6 +28,10 @@ void handle_options(int32_t argc, char **argv) {
                 *timeMs = atoi(optarg);
                 global.mode = MODE_VALIDATE;
                 global.modeData = timeMs;
+                break;
+            }
+            case 'u': {
+                global.mode = MODE_RESET_UTXO;
                 break;
             }
             case 'o': {

@@ -726,9 +726,14 @@ void reset_validation() {
     }
 }
 
-void revalidate(uint32_t maxTime) {
+void reset_utxo() {
+    printf("Reseting utxo\n");
     reset_validation();
     destory_db(config.utxoDBName);
+    printf("Done.\n");
+}
+
+void revalidate(uint32_t maxTime) {
     uint32_t checkedBlocks = validate_blocks(maxTime);
     printf("\nChecked %u blocks\n", checkedBlocks);
 }
