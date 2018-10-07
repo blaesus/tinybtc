@@ -633,7 +633,7 @@ void handle_incoming_message(Peer *ptrPeer, Message message) {
     }
     else if (strcmp(command, CMD_BLOCK) == 0) {
         BlockPayload *ptrBlock = message.ptrPayload;
-        process_incoming_block(ptrBlock);
+        process_incoming_block(ptrBlock, global.mode == MODE_NORMAL);
         memset(ptrPeer->networking.requesting, 0, SHA256_LENGTH);
     }
     else if (strcmp(command, CMD_INV) == 0) {

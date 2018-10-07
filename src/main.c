@@ -43,7 +43,7 @@ int8_t init(int32_t argc, char **argv) {
     init_archive_dir();
     load_genesis();
     load_block_indices();
-    scan_block_indices(false);
+    scan_block_indices(false, false);
     if (global.mode == MODE_NORMAL && should_catchup()) {
         global.mode = MODE_CATCHUP;
         printf("Activated catchup mode\n");

@@ -485,7 +485,7 @@ void register_validated_block(BlockPayload *ptrBlock) {
     }
 }
 
-int8_t process_incoming_block(BlockPayload *ptrBlock) {
+int8_t process_incoming_block(BlockPayload *ptrBlock, bool persistent) {
     double start = get_now();
     if (!is_block_legal(ptrBlock)) {
         fprintf(stderr, "Illegal block\n");
@@ -507,7 +507,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
         return -30;
     }
 
-    if (global.mode == MODE_NORMAL) {
+    if (persistent) {
         bool valid = is_block_valid(ptrBlock, index);
         if (valid) {
             index->meta.fullBlockValidated = true;
@@ -553,7 +553,7 @@ int8_t process_incoming_block(BlockPayload *ptrBlock) {
     return 0;
 }
 
-double scan_block_indices(bool loadBlock) {
+double scan_block_indices(bool recheckBlockExistence, bool reloadBlockContent) {
     printf("Scanning block indices...\n");
     Byte *keys = CALLOC(MAX_BLOCK_COUNT, SHA256_LENGTH, "recalculate_block_indices:keys");
     uint32_t indexCount = (uint32_t)hashmap_getkeys(&global.blockIndices, keys);
@@ -571,17 +571,19 @@ double scan_block_indices(bool loadBlock) {
             continue;
         }
         dsha256(&ptrIndex->header, sizeof(BlockPayloadHeader), ptrIndex->meta.hash);
-        if (loadBlock) {
-            if (ptrIndex->meta.fullBlockAvailable) {
-                ptrIndex->meta.fullBlockAvailable = false;
-                int8_t status = is_block_downloaded(ptrIndex->meta.hash);
-                if (!status) {
-                    ptrIndex->meta.fullBlockAvailable = true;
-                }
-            }
+        if (recheckBlockExistence) {
+            ptrIndex->meta.fullBlockAvailable = is_block_downloaded(ptrIndex->meta.hash);
         }
         if (ptrIndex->meta.fullBlockAvailable) {
             fullBlockAvailable++;
+            if (reloadBlockContent) {
+                BlockPayload *block = CALLOC(1, sizeof(*block), "scan_block_indices:block");
+                int8_t error = load_block(ptrIndex->meta.hash, block);
+                if (error == 0) {
+                    process_incoming_block(block, true);
+                }
+                FREE(block, "scan_block_indices:block");
+            }
         }
         if (ptrIndex->context.chainStatus == CHAIN_STATUS_ORPHAN) {
             add_orphan(ptrIndex->meta.hash);
