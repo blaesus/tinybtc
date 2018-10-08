@@ -502,7 +502,7 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
         NULL
     );
     if (status != 1) {
-        fprintf(stderr, "Failed to decode elliptic public key");
+        fprintf(stderr, "Failed to decode elliptic public key\n");
         return -1;
     }
 
