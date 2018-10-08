@@ -16,6 +16,12 @@
 
 #define MAX_STACK_FRAME_WIDTH 1024 // TODO: dynamic allocate
 
+#define SECP256K1_TAG_PUBKEY_EVEN 0x02
+#define SECP256K1_TAG_PUBKEY_ODD 0x03
+#define SECP256K1_TAG_PUBKEY_UNCOMPRESSED 0x04
+#define SECP256K1_TAG_PUBKEY_HYBRID_EVEN 0x06
+#define SECP256K1_TAG_PUBKEY_HYBRID_ODD 0x07
+
 enum HashType {
     SIGHASH_ALL_ALTERNATIVE = 0,
     SIGHASH_ALL = 1,
@@ -505,8 +511,23 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInpu
     return 0;
 }
 
+bool is_pubkey_prefix_valid(Byte prefix) {
+    return prefix == SECP256K1_TAG_PUBKEY_EVEN
+           || prefix == SECP256K1_TAG_PUBKEY_ODD
+           || prefix == SECP256K1_TAG_PUBKEY_UNCOMPRESSED
+           || prefix == SECP256K1_TAG_PUBKEY_HYBRID_EVEN
+           || prefix == SECP256K1_TAG_PUBKEY_HYBRID_ODD;
+}
+
 // 1: valid, 0: invalid, <0: error
 int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
+    if (!is_pubkey_prefix_valid(pubkeyFrame.data[0])) {
+        printf(
+            "\nInvalid pubkey prefix 0x%#02x. Possibly arbitrary data. Skipping...\n",
+            pubkeyFrame.data[0]
+        );
+        return -1;
+    }
     EC_KEY *ptrPubKey = EC_KEY_new_by_curve_name(NID_secp256k1);
     int32_t status = EC_KEY_oct2key(
         ptrPubKey,
