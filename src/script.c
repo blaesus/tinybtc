@@ -575,6 +575,18 @@ uint64_t form_subscript(Stack *inputStack, uint64_t checksigIndex, Byte *subscri
     return subscriptLength;
 }
 
+typedef void Sha256HashFunc(void *data, uint32_t length, SHA256_HASH result);
+
+StackFrame hash_frame(StackFrame topFrame, Sha256HashFunc hashFunc) {
+    SHA256_HASH hash = {0};
+    hashFunc(topFrame.data, topFrame.dataWidth, hash);
+    StackFrame newFrame = get_empty_frame();
+    newFrame.dataWidth = SHA256_LENGTH;
+    memcpy(newFrame.data, hash, SHA256_LENGTH);
+    newFrame.type = FRAME_TYPE_DATA;
+    return newFrame;
+}
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -664,12 +676,13 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_SHA256: {
                     StackFrame topFrame = pop(&runtimeStack);
-                    SHA256_HASH hash = {0};
-                    sha256(topFrame.data, topFrame.dataWidth, hash);
-                    StackFrame newFrame = get_empty_frame();
-                    newFrame.dataWidth = SHA256_LENGTH;
-                    memcpy(newFrame.data, hash, SHA256_LENGTH);
-                    newFrame.type = FRAME_TYPE_DATA;
+                    StackFrame newFrame = hash_frame(topFrame, sha256);
+                    push(&runtimeStack, newFrame);
+                    break;
+                }
+                case OP_HASH256: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    StackFrame newFrame = hash_frame(topFrame, dsha256);
                     push(&runtimeStack, newFrame);
                     break;
                 }
