@@ -585,6 +585,16 @@ StackFrame hash_frame(StackFrame topFrame, HashFunc hashFunc, uint32_t outputWid
     return newFrame;
 }
 
+void hash_top_frame(Stack *stack, HashFunc hashFunc, uint32_t outputWidth) {
+    if (stack->height < 1) {
+        fprintf(stderr, "hash_top_frame: insufficient frames\n");
+        return;
+    }
+    StackFrame topFrame = pop(stack);
+    StackFrame newFrame = hash_frame(topFrame, hashFunc, outputWidth);
+    push(stack, newFrame);
+}
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
@@ -658,21 +668,15 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_HASH160: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    StackFrame newFrame = hash_frame(topFrame, sharipe, RIPEMD_LENGTH);
-                    push(&runtimeStack, newFrame);
+                    hash_top_frame(&runtimeStack, sharipe, RIPEMD_LENGTH);
                     break;
                 }
                 case OP_SHA256: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    StackFrame newFrame = hash_frame(topFrame, sha256, SHA256_LENGTH);
-                    push(&runtimeStack, newFrame);
+                    hash_top_frame(&runtimeStack, sha256, SHA256_LENGTH);
                     break;
                 }
                 case OP_HASH256: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    StackFrame newFrame = hash_frame(topFrame, dsha256, SHA256_LENGTH);
-                    push(&runtimeStack, newFrame);
+                    hash_top_frame(&runtimeStack, dsha256, SHA256_LENGTH);
                     break;
                 }
                 case OP_CODESEPARATOR: {
