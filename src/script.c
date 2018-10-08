@@ -228,6 +228,7 @@ const char *get_op_name(enum OpcodeType opcode) {
 
         case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
 
+        case OP_NOP1                   : return "OP_NOP1";
         case OP_NOP2                   : return "OP_NOP2/OP_CHECKLOCKTIMEVERIFY";
         default:
             return UNKNOWN_OPCODE;
@@ -761,6 +762,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     FREE(signatures, "OP_CHECKMULTISIG:signatures");
                     FREE(subscript, "subscript");
                     push(&runtimeStack, get_boolean_frame(result));
+                    break;
+                }
+                case OP_NOP1: {
                     break;
                 }
                 case OP_NOP2: {
