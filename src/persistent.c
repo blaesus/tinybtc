@@ -446,7 +446,7 @@ void make_txo_key(Outpoint *outpoint, char *key) {
 int8_t save_utxo(Outpoint *outpoint, TxOut *output) {
     char key[TXO_KEY_LENGTH] = {0};
     make_txo_key(outpoint, key);
-    Byte *buffer = CALLOC(1, MESSAGE_BUFFER_LENGTH, "save_utxo:buffer");
+    Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "save_utxo:buffer");
     uint64_t width = serialize_tx_out(output, buffer);
     int8_t status = save_data_by_key(global.utxoDB, key, buffer, width);
     FREE(buffer, "save_utxo:buffer");
