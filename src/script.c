@@ -481,8 +481,21 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInpu
         }
     }
     else if (MASK_HASHTYPE(hashtype) == SIGHASH_SINGLE) {
-        fprintf(stderr, "Not implemented: SIGHASH_SINGLE\n");
-        return -1;
+        txCopy->txOutputCount = currentInputIndex + 1;
+        txCopy->txOutputs = realloc(txCopy->txOutputs, txCopy->txOutputCount * sizeof(TxOut));
+        for (uint64_t i = 0; i < txCopy->txOutputCount; i++) {
+            if (i != currentInputIndex) {
+                TxOut *out = &txCopy->txOutputs[i];
+                out->public_key_script_length = 0;
+                out->value = -1;
+            }
+        }
+        for (uint64_t i = 0; i < txCopy->txInputCount; i++) {
+            if (i != currentInputIndex) {
+                TxIn *input = &txCopy->txInputs[i];
+                input->sequence = 0;
+            }
+        }
     }
 
     if (hashtype & SIGHASH_ANYONECANPAY) {
