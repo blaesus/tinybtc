@@ -575,14 +575,12 @@ uint64_t form_subscript(Stack *inputStack, uint64_t checksigIndex, Byte *subscri
     return subscriptLength;
 }
 
-typedef void Sha256HashFunc(void *data, uint32_t length, SHA256_HASH result);
+typedef void HashFunc(void *data, uint32_t length, Byte *result);
 
-StackFrame hash_frame(StackFrame topFrame, Sha256HashFunc hashFunc) {
-    SHA256_HASH hash = {0};
-    hashFunc(topFrame.data, topFrame.dataWidth, hash);
+StackFrame hash_frame(StackFrame topFrame, HashFunc hashFunc, uint32_t outputWidth) {
     StackFrame newFrame = get_empty_frame();
-    newFrame.dataWidth = SHA256_LENGTH;
-    memcpy(newFrame.data, hash, SHA256_LENGTH);
+    hashFunc(topFrame.data, topFrame.dataWidth, newFrame.data);
+    newFrame.dataWidth = outputWidth;
     newFrame.type = FRAME_TYPE_DATA;
     return newFrame;
 }
@@ -610,21 +608,6 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                         goto immediate_fail;
                     }
                     push(&runtimeStack, top(&runtimeStack));
-                    break;
-                }
-                case OP_HASH160: {
-                    if (runtimeStack.height == 0) {
-                        fprintf(stderr, "OP_HASH160: empty stack\n");
-                        goto immediate_fail;
-                    }
-                    StackFrame currentTop = pop(&runtimeStack);
-                    StackFrame newFrame = {
-                        .type = FRAME_TYPE_DATA,
-                        .dataWidth = RIPEMD_LENGTH,
-                        .data = {0}
-                    };
-                    sharipe(currentTop.data, currentTop.dataWidth, newFrame.data);
-                    push(&runtimeStack, newFrame);
                     break;
                 }
                 case OP_EQUALVERIFY: {
@@ -674,15 +657,21 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     pop(&runtimeStack);
                     break;
                 }
+                case OP_HASH160: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    StackFrame newFrame = hash_frame(topFrame, sharipe, RIPEMD_LENGTH);
+                    push(&runtimeStack, newFrame);
+                    break;
+                }
                 case OP_SHA256: {
                     StackFrame topFrame = pop(&runtimeStack);
-                    StackFrame newFrame = hash_frame(topFrame, sha256);
+                    StackFrame newFrame = hash_frame(topFrame, sha256, SHA256_LENGTH);
                     push(&runtimeStack, newFrame);
                     break;
                 }
                 case OP_HASH256: {
                     StackFrame topFrame = pop(&runtimeStack);
-                    StackFrame newFrame = hash_frame(topFrame, dsha256);
+                    StackFrame newFrame = hash_frame(topFrame, dsha256, SHA256_LENGTH);
                     push(&runtimeStack, newFrame);
                     break;
                 }
