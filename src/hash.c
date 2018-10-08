@@ -84,7 +84,7 @@ bool is_hash_empty(Byte *hash) {
     return sha256_match(hash, empty);
 }
 
-void sharipe(void *data, uint32_t length, SHA256_HASH result) {
+void sharipe(void *data, uint32_t length, RIPEMD_HASH result) {
     SHA256_HASH sha256Hash;
     sha256(data, length, sha256Hash);
     RIPEMD160_CTX context;

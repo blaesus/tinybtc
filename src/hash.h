@@ -12,7 +12,7 @@ typedef Byte RIPEMD_HASH[RIPEMD_LENGTH];
 
 void sha256(void *data, uint32_t length, SHA256_HASH result);
 void dsha256(void *data, uint32_t length, SHA256_HASH result);
-void sharipe(void *data, uint32_t length, SHA256_HASH result);
+void sharipe(void *data, uint32_t length, RIPEMD_HASH result);
 void print_sha256(Byte *hash);
 void print_sha256_reverse(Byte *hash);
 void print_sha256_short(Byte *hash);
