@@ -39,6 +39,9 @@ struct StackFrame {
     Byte data[MAX_STACK_FRAME_WIDTH];
     uint32_t dataWidth;
     enum FrameType type;
+
+    Byte opHeader[8];
+    uint8_t opHeaderWidth;
 };
 
 typedef struct StackFrame StackFrame;
@@ -278,30 +281,35 @@ void load_program(Stack *stack, Byte *program, uint64_t programLength) {
         if (is_push_data_op(datum)) {
             newFrame.type = FRAME_TYPE_DATA;
             uint32_t dataWidth = 0;
-            uint16_t dataStartOffset = 0;
+            uint8_t opHeaderWidth = 0;
             if (is_anonymous_push_data_op(datum)) {
                 dataWidth = datum;
-                dataStartOffset = 1;
+                opHeaderWidth = 1;
             }
             else if (datum == OP_PUSHDATA1) {
                 dataWidth = program[i+1];
-                dataStartOffset = 2;
+                opHeaderWidth = 2;
             }
             else if (datum == OP_PUSHDATA2) {
                 dataWidth = program[i+1] + program[i+2] * 256U;
-                dataStartOffset = 3;
+                opHeaderWidth = 3;
             }
             else {
                 fprintf(stderr, "Unimplemented push data op %u\n", datum);
             }
+            memcpy(newFrame.opHeader, program + i, opHeaderWidth);
+            newFrame.opHeaderWidth = (uint8_t)opHeaderWidth;
+            i += opHeaderWidth;
+
             newFrame.dataWidth = dataWidth;
-            memcpy(newFrame.data, program + (i+dataStartOffset), dataWidth);
-            i += dataWidth + dataStartOffset - 1;
+            memcpy(newFrame.data, program + i, dataWidth);
+            i += dataWidth - 1;
         }
         else {
             newFrame.type = FRAME_TYPE_OP;
             newFrame.dataWidth = 1;
             memcpy(newFrame.data, &datum, 1);
+            newFrame.opHeaderWidth = 0;
         }
         push(stack, newFrame);
     }
@@ -600,10 +608,8 @@ uint64_t form_subscript(Stack *inputStack, uint64_t checksigIndex, Byte *subscri
         if (frame->type == FRAME_TYPE_OP && frame->data[0] == OP_CODESEPARATOR) {
             continue;
         }
-        if (frame->type == FRAME_TYPE_DATA) {
-            memcpy(subscript + subscriptLength, &frame->dataWidth, 1);
-            subscriptLength += 1;
-        }
+        memcpy(subscript + subscriptLength, frame->opHeader, frame->opHeaderWidth);
+        subscriptLength += frame->opHeaderWidth;
         memcpy(subscript + subscriptLength, frame->data, frame->dataWidth);
         subscriptLength += frame->dataWidth;
     }
