@@ -388,6 +388,7 @@ void test_script() {
         "0000000000000449d509274d2749a62d9e003403746417b21c5d0c0df67417f8", // SIGHASH_SINGLE
         "69216b8aaa35b76d6613e5f527f4858640d986e1046238583bdad79b35e938dc", // tx, SIGHASH_SINGLE, input > output
             // see https://bitcointalk.org/index.php?topic=260595.0
+        "0000000000000025d42c1a8e04ece646f7116bb4cac5abfaf16a7264f1a724c3", // OP_IF, OP_SIZE
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

@@ -645,11 +645,57 @@ void hash_top_frame(Stack *stack, HashFunc hashFunc, uint32_t outputWidth) {
     push(stack, newFrame);
 }
 
+bool is_frame_truthy(StackFrame *frame) {
+    if (frame->dataWidth == 0) {
+        return false;
+    }
+    for (uint64_t i = 0; i < frame->dataWidth; i++) {
+        if (frame->data[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+int64_t next_op(Stack *stack, uint64_t start, Byte op) {
+    for (uint64_t i = start+1; i < stack->height; i++) {
+        StackFrame *frame = stack->frames[i];
+        if (frame->type == FRAME_TYPE_OP && frame->data[0] == op) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool is_branch_op_frame(StackFrame *frame) {
+    if (frame->type != FRAME_TYPE_OP) {
+        return false;
+    }
+    Byte op = frame->data[0];
+    return op == OP_IF || op == OP_ELSE || op == OP_NOTIF || op == OP_ENDIF;
+}
+
+enum BranchState {
+    BRANCH_OUTSIDE,
+    BRANCH_EXECUTING,
+    BRANCH_NOT_EXECUTING,
+};
+
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
 
+    enum BranchState branchState = BRANCH_OUTSIDE;
+
     for (uint64_t i = 0; i < inputStack->height; i++) {
         StackFrame *inputFrame = inputStack->frames[i];
+        if (branchState == BRANCH_NOT_EXECUTING && !is_branch_op_frame(inputFrame)) {
+            #if LOG_SCRIPT_STACKS
+            printf("Skipping frame for branching:\n");
+            print_frame(inputFrame);
+            #endif
+            continue;
+        }
         if (inputFrame->type == FRAME_TYPE_DATA) {
             #if LOG_SCRIPT_STACKS
             printf("next frame: %u bytes data\n", inputFrame->dataWidth);
@@ -843,6 +889,70 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                         }
                     }
                     push(&runtimeStack, *minFrame);
+                    break;
+                }
+                case OP_SIZE: {
+                    StackFrame topFrame = top(&runtimeStack);
+                    StackFrame newFrame = get_empty_frame();
+                    newFrame.type = FRAME_TYPE_DATA;
+                    uint32_t width = topFrame.dataWidth;
+                    newFrame.dataWidth = 4;
+                    segment_uint32(width, newFrame.data);
+                    push(&runtimeStack, newFrame);
+                    break;
+                }
+                case OP_IF: {
+                    int64_t endifIndex = next_op(inputStack, i, OP_ENDIF);
+                    if (endifIndex < 0) {
+                        goto immediate_fail;
+                    }
+                    StackFrame topFrame = pop(&runtimeStack);
+                    if (is_frame_truthy(&topFrame)) {
+                        branchState = BRANCH_EXECUTING;
+                    }
+                    else {
+                        branchState = BRANCH_NOT_EXECUTING;
+                    }
+                    break;
+                }
+                case OP_ELSE: {
+                    if (branchState == BRANCH_OUTSIDE) {
+                        fprintf(stderr, "Unexpected OP_ELSE\n");
+                        goto immediate_fail;
+                    }
+                    else if (branchState == BRANCH_EXECUTING) {
+                        branchState = BRANCH_NOT_EXECUTING;
+                    }
+                    else {
+                        branchState = BRANCH_EXECUTING;
+                    }
+                    break;
+                }
+                case OP_ENDIF: {
+                    if (branchState == BRANCH_OUTSIDE) {
+                        fprintf(stderr, "Unexpected OP_ENDIF\n");
+                        goto immediate_fail;
+                    }
+                    branchState = BRANCH_OUTSIDE;
+                    break;
+                }
+                case OP_RETURN: {
+                    fprintf(stderr, "Encountered OP_RETURN\n");
+                    goto immediate_fail;
+                }
+                case OP_SUB: {
+                    StackFrame frame1 = pop(&runtimeStack);
+                    StackFrame frame2 = pop(&runtimeStack);
+                    Byte num1 = frame1.data[0];
+                    Byte num2 = frame2.data[0]; // TODO: Use BIGNUM
+                    Byte result = num2 - num1;
+                    push(&runtimeStack, get_numerical_frame(result));
+                    break;
+                }
+                case OP_1SUB: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    topFrame.data[0]--;
+                    push(&runtimeStack, get_numerical_frame(topFrame.data[0]));
                     break;
                 }
                 default: {
