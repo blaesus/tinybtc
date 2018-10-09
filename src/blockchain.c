@@ -247,7 +247,7 @@ static bool is_block_checkpoint_compatible(BlockIndex *ptrIndex) {
         if (checkpoint.height == ptrIndex->context.height) {
             SHA256_HASH expectedHash = {0};
             sha256_hex_to_binary(checkpoint.hashBEHex, expectedHash);
-            reverse_endian(expectedHash, SHA256_LENGTH);
+            reverse_bytes(expectedHash, SHA256_LENGTH);
             if (memcmp(expectedHash, ptrIndex->meta.hash, SHA256_LENGTH) != 0) {
                 return false;
             };

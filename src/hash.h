@@ -5,14 +5,18 @@
 
 #define SHA256_LENGTH 32
 #define RIPEMD_LENGTH 20
+#define SHA1_LENGTH 20
 #define SHA256_HEXSTR_LENGTH (2 * SHA256_LENGTH)
 
 typedef Byte SHA256_HASH[SHA256_LENGTH];
+typedef Byte SHA1_HASH[SHA1_LENGTH];
 typedef Byte RIPEMD_HASH[RIPEMD_LENGTH];
 
 void sha256(void *data, uint32_t length, SHA256_HASH result);
 void dsha256(void *data, uint32_t length, SHA256_HASH result);
 void sharipe(void *data, uint32_t length, RIPEMD_HASH result);
+void ripemd(void *data, uint32_t length, RIPEMD_HASH result);
+void sha1(void *data, uint32_t length, SHA1_HASH result);
 void print_sha256(Byte *hash);
 void print_sha256_reverse(Byte *hash);
 void print_sha256_short(Byte *hash);

@@ -84,13 +84,17 @@ bool is_hash_empty(Byte *hash) {
     return sha256_match(hash, empty);
 }
 
+void ripemd(void *data, uint32_t length, RIPEMD_HASH result) {
+    RIPEMD160_CTX context;
+    RIPEMD160_Init(&context);
+    RIPEMD160_Update(&context, data, length);
+    RIPEMD160_Final(result, &context);
+}
+
 void sharipe(void *data, uint32_t length, RIPEMD_HASH result) {
     SHA256_HASH sha256Hash;
     sha256(data, length, sha256Hash);
-    RIPEMD160_CTX context;
-    RIPEMD160_Init(&context);
-    RIPEMD160_Update(&context, sha256Hash, SHA256_LENGTH);
-    RIPEMD160_Final(result, &context);
+    ripemd(sha256Hash, SHA256_LENGTH, result);
 }
 
 void sha256_hex_to_binary(const char *str, Byte *hash) {
@@ -111,4 +115,11 @@ void hash_binary_to_hex(Byte *hash, char *hex) {
 
 bool sha256_match(Byte *hashA, Byte *hashB) {
     return memcmp(hashA, hashB, SHA256_LENGTH) == 0;
+}
+
+void sha1(void *data, uint32_t length, SHA1_HASH result) {
+    SHA_CTX context;
+    SHA1_Init(&context);
+    SHA1_Update(&context, data, length);
+    SHA1_Final(result, &context);
 }

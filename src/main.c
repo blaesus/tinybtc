@@ -25,9 +25,8 @@ void setup_cleanup() {
     sigaction(SIGINT, &sa, NULL);
 }
 
-int8_t init(int32_t argc, char **argv) {
+int8_t init() {
     printf("Initializing...\n");
-    handle_options(argc, argv);
     global.start_time = time(NULL);
     srand((unsigned int)global.start_time);
     setup_cleanup();
@@ -59,7 +58,12 @@ int32_t connect_to_peers() {
 }
 
 int32_t main(int32_t argc, char **argv) {
-    int8_t initError = init(argc, argv);
+    handle_options(argc, argv);
+    if (global.mode == MODE_TEST) {
+        test();
+        return 0;
+    }
+    int8_t initError = init();
     if (initError) {
         fprintf(stderr, "init error %i\n", initError);
         return -1;
@@ -73,10 +77,6 @@ int32_t main(int32_t argc, char **argv) {
         case MODE_VALIDATE_ONE: {
             Byte *hash = global.modeData;
             validate_block(hash, false, NULL);
-            return 0;
-        }
-        case MODE_TEST: {
-            test();
             return 0;
         }
         case MODE_RESET_UTXO: {

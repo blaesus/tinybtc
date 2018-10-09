@@ -2,7 +2,7 @@
 #include "datatypes.h"
 #include "utils/data.h"
 
-void reverse_endian(Byte *data, uint32_t width) {
+void reverse_bytes(Byte *data, uint32_t width) {
     for (uint32_t i = 0; i < width / 2; i++) {
         Byte temp = data[i];
         data[i] = data[width - i - 1];

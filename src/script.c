@@ -539,6 +539,24 @@ bool is_pubkey_prefix_valid(Byte prefix) {
            || prefix == SECP256K1_TAG_PUBKEY_HYBRID_ODD;
 }
 
+typedef Byte OperatorFunction(Byte num1, Byte num2);
+
+Byte greater_than(Byte num1, Byte num2) {
+    return (Byte)(num2 > num1);
+}
+
+Byte minus(Byte num1, Byte num2) {
+    return (Byte)(num2 - num1);
+}
+
+void perform_binary_operator(Stack *stack, OperatorFunction f) {
+    StackFrame frame1 = pop(stack);
+    StackFrame frame2 = pop(stack);
+    Byte num1 = frame1.data[0];
+    Byte num2 = frame2.data[0]; // TODO: Use BIGNUM
+    push(stack, get_numerical_frame(f(num1, num2)));
+}
+
 // 1: valid, 0: invalid, <0: error
 int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
     if (!is_pubkey_prefix_valid(pubkeyFrame.data[0])) {
@@ -676,6 +694,27 @@ bool is_branch_op_frame(StackFrame *frame) {
     return op == OP_IF || op == OP_ELSE || op == OP_NOTIF || op == OP_ENDIF;
 }
 
+uint32_t bignum_to_bytes(BIGNUM* num, Byte *buffer) {
+    int32_t width = BN_bn2mpi(num, NULL);
+    if (width < 4) {
+        return 0;
+    }
+    BN_bn2mpi(num, buffer);
+    memcpy(buffer, buffer+3, width);
+    width -= 3;
+    reverse_bytes(buffer, (uint32_t)width);
+    // FIXME: Hack
+    // Check tx 61a078472543e9de9247446076320499c108b52307d8d0fafbe53b5c4e32acc4
+    // This function produces [0x14, 0x01] for (OP_NEGATE [0x14])
+    // But actually the function expects [0x94]
+    if (buffer[1] == 1) {
+        buffer[1] = 0;
+        buffer[0] += 0x80;
+        width--;
+    }
+    return (uint32_t)width;
+}
+
 enum BranchState {
     BRANCH_OUTSIDE,
     BRANCH_EXECUTING,
@@ -773,6 +812,14 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_HASH256: {
                     hash_top_frame(&runtimeStack, dsha256, SHA256_LENGTH);
+                    break;
+                }
+                case OP_SHA1: {
+                    hash_top_frame(&runtimeStack, sha1, SHA1_LENGTH);
+                    break;
+                }
+                case OP_RIPEMD160: {
+                    hash_top_frame(&runtimeStack, ripemd, SHA1_LENGTH);
                     break;
                 }
                 case OP_CODESEPARATOR: {
@@ -941,18 +988,37 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     goto immediate_fail;
                 }
                 case OP_SUB: {
-                    StackFrame frame1 = pop(&runtimeStack);
-                    StackFrame frame2 = pop(&runtimeStack);
-                    Byte num1 = frame1.data[0];
-                    Byte num2 = frame2.data[0]; // TODO: Use BIGNUM
-                    Byte result = num2 - num1;
-                    push(&runtimeStack, get_numerical_frame(result));
+                    perform_binary_operator(&runtimeStack, minus);
                     break;
                 }
                 case OP_1SUB: {
                     StackFrame topFrame = pop(&runtimeStack);
                     topFrame.data[0]--;
                     push(&runtimeStack, get_numerical_frame(topFrame.data[0]));
+                    break;
+                }
+                case OP_GREATERTHAN: {
+                    perform_binary_operator(&runtimeStack, greater_than);
+                    break;
+                }
+                case OP_VERIFY: {
+                    if (runtimeStack.height == 0) {
+                        goto immediate_fail;
+                    }
+                    StackFrame topFrame = pop(&runtimeStack);
+                    if (!is_frame_truthy(&topFrame)) {
+                        goto immediate_fail;
+                    }
+                    break;
+                }
+                case OP_NEGATE: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    BIGNUM *num = BN_new();
+                    BN_set_word(num, topFrame.data[0]);
+                    topFrame.dataWidth = bignum_to_bytes(num, topFrame.data);
+
+                    push(&runtimeStack, topFrame);
+                    BN_free(num);
                     break;
                 }
                 default: {

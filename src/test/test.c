@@ -389,6 +389,7 @@ void test_script() {
         "69216b8aaa35b76d6613e5f527f4858640d986e1046238583bdad79b35e938dc", // tx, SIGHASH_SINGLE, input > output
             // see https://bitcointalk.org/index.php?topic=260595.0
         "0000000000000025d42c1a8e04ece646f7116bb4cac5abfaf16a7264f1a724c3", // OP_IF, OP_SIZE
+        "61a078472543e9de9247446076320499c108b52307d8d0fafbe53b5c4e32acc4", // tx, OP_VERIFY, OP_NEGATE
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 
@@ -399,7 +400,7 @@ void test_script() {
         const char *targetBlock = targets[i];
         SHA256_HASH targetHash = {0};
         sha256_hex_to_binary(targetBlock, targetHash);
-        reverse_endian(targetHash, SHA256_LENGTH);
+        reverse_bytes(targetHash, SHA256_LENGTH);
 
         BlockIndex *index = GET_BLOCK_INDEX(targetHash);
         if (!index) {
@@ -450,6 +451,43 @@ void test_file() {
     print_block_payload(ptrBlockReloaded);
 }
 
+void brute_force() {
+    Byte correctHash[] = {
+        0x16, 0xcf, 0xb9, 0xbc, 0x76, 0x54, 0xef, 0x1d, 0x77, 0x23,
+        0xe5, 0xc2, 0x72, 0x2f, 0xc0, 0xc3, 0xd5, 0x05, 0x04, 0x5e
+    };
+    Byte hash[32] = {0};
+    Byte input[5] = {0x14, 0x01};
+    uint32_t width = 1;
+
+    for (uint16_t i = 0; i < 256; i++) {
+        printf("Check %i\n", i);
+        // for (uint16_t j = 0; j < 256; j++) {
+        //     for (uint16_t k = 0; k < 256; k++) {
+                input[0] = (Byte)i;
+                // input[1] = (Byte)j;
+                // input[2] = (Byte)k;
+                dsha256(input, width, hash);
+                sharipe(hash, SHA256_LENGTH, hash);
+                sha256(hash, RIPEMD_LENGTH, hash);
+                sha1(hash, SHA256_LENGTH, hash);
+                ripemd(hash, SHA1_LENGTH, hash);
+                if (memcmp(hash, correctHash, sizeof(correctHash)) == 0) {
+                    printf("Found match!\n");
+                    print_object(input, width);
+                    break;
+                }
+        //     }
+        // }
+    }
+}
+
+void test_hashes() {
+    Byte hash[32] = {0};
+    sha1("", 0, hash);
+    print_object(hash, 32);
+}
+
 void test() {
     // test_version_messages();
     // test_genesis();
@@ -466,7 +504,9 @@ void test() {
     // test_target_conversions();
     // test_db();
     // test_ripe();
-    test_script();
+    // test_script();
     // test_hash();
     // test_file();
+    brute_force();
+    // test_hashes();
 }

@@ -37,7 +37,7 @@ void handle_options(int32_t argc, char **argv) {
             case 'o': {
                 Byte *hash = CALLOC(1, SHA256_LENGTH, "handle_options:modeData");
                 sha256_hex_to_binary(optarg, hash);
-                reverse_endian(hash, SHA256_LENGTH);
+                reverse_bytes(hash, SHA256_LENGTH);
                 global.mode = MODE_VALIDATE_ONE;
                 global.modeData = hash;
                 break;
