@@ -390,6 +390,7 @@ void test_script() {
             // see https://bitcointalk.org/index.php?topic=260595.0
         "0000000000000025d42c1a8e04ece646f7116bb4cac5abfaf16a7264f1a724c3", // OP_IF, OP_SIZE
         "61a078472543e9de9247446076320499c108b52307d8d0fafbe53b5c4e32acc4", // tx, OP_VERIFY, OP_NEGATE
+        "00000000000000445a8c19b4ed54590e54a069d7cf8c3b9f7207ed7fb230aa47", // OP_DEPTH, OP_SWAP
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

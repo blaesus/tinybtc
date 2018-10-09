@@ -549,6 +549,10 @@ Byte minus(Byte num1, Byte num2) {
     return (Byte)(num2 - num1);
 }
 
+Byte boolean_or(Byte num1, Byte num2) {
+    return (Byte)(num1 > 0 || num2 > 0);
+}
+
 void perform_binary_operator(Stack *stack, OperatorFunction f) {
     StackFrame frame1 = pop(stack);
     StackFrame frame2 = pop(stack);
@@ -1019,6 +1023,27 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
 
                     push(&runtimeStack, topFrame);
                     BN_free(num);
+                    break;
+                }
+                case OP_DEPTH: {
+                    push(&runtimeStack, get_numerical_frame((Byte)runtimeStack.height));
+                    break;
+                }
+                case OP_SWAP: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    StackFrame top2Frame = pop(&runtimeStack);
+                    push(&runtimeStack, topFrame);
+                    push(&runtimeStack, top2Frame);
+                    break;
+                }
+                case OP_1ADD: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    topFrame.data[0]++;
+                    push(&runtimeStack, topFrame);
+                    break;
+                }
+                case OP_BOOLOR: {
+                    perform_binary_operator(&runtimeStack, boolean_or);
                     break;
                 }
                 default: {
