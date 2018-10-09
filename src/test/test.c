@@ -386,6 +386,8 @@ void test_script() {
         "00000000000004e6d451786f2ddd89c9432a24badf80f02cb8cbbc94317a765c", // hashtype 2, #53
         "0000000000000464217a15db82142b8ff50f4d783ef992534cc2162468b50d97", // hashtype 0x81
         "0000000000000449d509274d2749a62d9e003403746417b21c5d0c0df67417f8", // SIGHASH_SINGLE
+        "69216b8aaa35b76d6613e5f527f4858640d986e1046238583bdad79b35e938dc", // tx, SIGHASH_SINGLE, input > output
+            // see https://bitcointalk.org/index.php?topic=260595.0
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 

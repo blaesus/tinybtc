@@ -22,6 +22,8 @@
 #define SECP256K1_TAG_PUBKEY_HYBRID_EVEN 0x06
 #define SECP256K1_TAG_PUBKEY_HYBRID_ODD 0x07
 
+#define MASK_HASHTYPE(ht) (ht & 0x1f)
+
 enum HashType {
     SIGHASH_ALL_ALTERNATIVE = 0,
     SIGHASH_ALL = 1,
@@ -51,6 +53,8 @@ struct Stack {
     uint64_t height;
 };
 
+void polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex);
+
 bool is_anonymous_push_data_op(Byte op) {
     return (op > OP_0) && (op < OP_PUSHDATA1);
 }
@@ -59,7 +63,17 @@ bool is_push_data_op(Byte op) {
     return is_anonymous_push_data_op(op)|| op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4;
 }
 
-void hash_tx_with_hashtype(TxPayload *tx, int32_t hashType, Byte *hash) {
+void hash_tx_with_hashtype(TxPayload *tx, uint32_t hashType, uint64_t inputIndex, Byte *hash) {
+    if (MASK_HASHTYPE(hashType) == SIGHASH_SINGLE
+        && tx->txInputCount > tx->txOutputCount
+        && inputIndex >= tx->txOutputCount
+    ) {
+        // Simulate bug, see https://bitcointalk.org/index.php?topic=260595.0
+        memset(hash, 0, SHA256_LENGTH);
+        hash[0] = 1;
+        return;
+    }
+    polish_tx_copy(tx, hashType, inputIndex);
     Byte *buffer = MALLOC(MESSAGE_BUFFER_LENGTH, "hash_tx_with_hashtype:buffer");
     uint64_t width = serialize_tx_payload(tx, buffer);
     memcpy(buffer + width, &hashType, 4);
@@ -482,9 +496,8 @@ void fix_signature_frame(StackFrame *sigFrame) {
     FREE(signature, "fix_signature_frame:signature");
 }
 
-#define MASK_HASHTYPE(ht) (ht & 0x1f)
 
-int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex) {
+void polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex) {
     if (MASK_HASHTYPE(hashtype) == SIGHASH_NONE) {
         memset(txCopy->txOutputs, 0, sizeof(TxOut) * txCopy->txOutputCount);
         txCopy->txOutputCount = 0;
@@ -516,7 +529,6 @@ int8_t polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInpu
         txCopy->txInputs[0] = txCopy->txInputs[currentInputIndex];
         txCopy->txInputCount = 1;
     }
-    return 0;
 }
 
 bool is_pubkey_prefix_valid(Byte prefix) {
@@ -552,10 +564,7 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
     fix_signature_frame(&sigFrame);
     SHA256_HASH hashTx = {0};
     TxPayload *txCopy = make_tx_copy(meta, subscript, subscriptLength);
-    if (polish_tx_copy(txCopy, hashtype, meta.txInputIndex)) {
-        return -2;
-    };
-    hash_tx_with_hashtype(txCopy, hashtype, hashTx);
+    hash_tx_with_hashtype(txCopy, hashtype, meta.txInputIndex, hashTx);
     release_items_in_tx(txCopy);
     FREE(txCopy, "make_tx_copy:txCopy");
 
