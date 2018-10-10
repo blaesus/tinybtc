@@ -25,6 +25,10 @@ uint32_t bignum_to_bytes(BIGNUM* num, Byte *buffer) {
 }
 
 void bytes_to_bignum(Byte *buffer, uint32_t width, BIGNUM* num) {
+    if (width == 1) {
+        BN_set_word(num, buffer[0]);
+        return;
+    }
     Byte *data = CALLOC(1, width+3, "bytes_to_bignum:data");
     data[0] = (Byte)((width >> 24) & 0xff);
     data[1] = (Byte)((width >> 16) & 0xff);

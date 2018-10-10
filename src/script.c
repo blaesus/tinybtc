@@ -610,6 +610,10 @@ void less_than(BIGNUM *result, BIGNUM *bignum1, BIGNUM *bignum2) {
     BN_set_word(result, BN_cmp(bignum2, bignum1) < 0 ? 1 : 0);
 }
 
+void add(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_add(result, bignum2, bignum1);
+}
+
 void minus(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
     BN_sub(result, bignum2, bignum1);
 }
@@ -632,6 +636,7 @@ void perform_binary_operator(Stack *stack, BinaryOperatorFunction f) {
     bytes_to_bignum(frame2.data, frame2.dataWidth, bignum2);
     BIGNUM *result = BN_new();
     f(result, bignum1, bignum2);
+    // printf("binary operator: f(%s, %s) = %s\n", BN_bn2dec(bignum1), BN_bn2dec(bignum2), BN_bn2dec(result));
 
     StackFrame resultFrame = {
         .type = FRAME_TYPE_DATA,
@@ -644,7 +649,7 @@ void perform_binary_operator(Stack *stack, BinaryOperatorFunction f) {
     BN_free(result);
 }
 
-StackFrame get_numerical_frame(Byte value) {
+StackFrame get_numerical_frame(uint32_t value) {
     BIGNUM *result = BN_new();
     BN_set_word(result, value);
     StackFrame resultFrame = {
@@ -819,9 +824,6 @@ bool execute_checksig(Stack *runtimeStack, Stack *inputStack, uint64_t i, CheckS
     uint64_t subscriptLength = form_subscript(inputStack, i, subscript, true);
     int8_t result = check_signature(pubkeyFrame, sigFrame, meta, subscript, subscriptLength);
     FREE(subscript, "subscript");
-    if (result < 0) {
-        return false;
-    }
     push(runtimeStack, get_boolean_frame(result));
     return true;
 }
@@ -881,8 +883,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_CHECKSIG: {
-                    bool sigValid = execute_checksig(&runtimeStack, inputStack, i, meta);
-                    push(&runtimeStack, get_boolean_frame(sigValid));
+                    if (!execute_checksig(&runtimeStack, inputStack, i, meta)) {
+                        goto immediate_fail;
+                    }
                     break;
                 }
                 case OP_EQUAL: {
@@ -1046,12 +1049,8 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_SIZE: {
                     StackFrame topFrame = top(&runtimeStack);
-                    StackFrame newFrame = get_empty_frame();
-                    newFrame.type = FRAME_TYPE_DATA;
                     uint32_t width = topFrame.dataWidth;
-                    newFrame.dataWidth = 4;
-                    segment_uint32(width, newFrame.data);
-                    push(&runtimeStack, newFrame);
+                    push(&runtimeStack, get_numerical_frame(width));
                     break;
                 }
                 case OP_IF: {
@@ -1092,6 +1091,10 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_RETURN: {
                     fprintf(stderr, "Encountered OP_RETURN\n");
                     goto immediate_fail;
+                }
+                case OP_ADD: {
+                    perform_binary_operator(&runtimeStack, add);
+                    break;
                 }
                 case OP_SUB: {
                     perform_binary_operator(&runtimeStack, minus);
@@ -1196,6 +1199,39 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
                     StackFrame target = *runtimeStack.frames[index];
                     push(&runtimeStack, target);
+                    break;
+                }
+                case OP_ROLL: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    Byte count = topFrame.data[0];
+                    int64_t index = runtimeStack.height - 1 - count;
+                    if (index < 0) {
+                        fprintf(stderr, "OP_ROLL: insufficient frames\n");
+                        return -1;
+                    }
+                    StackFrame target = *runtimeStack.frames[index];
+                    for (uint64_t x = (uint64_t)index; x < runtimeStack.height - index + 1; x++) {
+                        *runtimeStack.frames[x] = *runtimeStack.frames[x+1];
+                    }
+                    runtimeStack.height--;
+                    push(&runtimeStack, target);
+                    break;
+                }
+                case OP_TUCK: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    StackFrame top2Frame = pop(&runtimeStack);
+                    push(&runtimeStack, topFrame);
+                    push(&runtimeStack, top2Frame);
+                    push(&runtimeStack, topFrame);
+                    break;
+                }
+                case OP_ROT: {
+                    StackFrame frame1 = pop(&runtimeStack);
+                    StackFrame frame2 = pop(&runtimeStack);
+                    StackFrame frame3 = pop(&runtimeStack);
+                    push(&runtimeStack, frame2);
+                    push(&runtimeStack, frame1);
+                    push(&runtimeStack, frame3);
                     break;
                 }
                 default: {
