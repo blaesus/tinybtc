@@ -24,6 +24,7 @@
 #include "utils/integers.h"
 #include "utils/strings.h"
 #include "utils/random.h"
+#include "utils/bignum.h"
 
 
 static int32_t test_version_messages() {
@@ -391,6 +392,7 @@ void test_script() {
         "0000000000000025d42c1a8e04ece646f7116bb4cac5abfaf16a7264f1a724c3", // OP_IF, OP_SIZE
         "61a078472543e9de9247446076320499c108b52307d8d0fafbe53b5c4e32acc4", // tx, OP_VERIFY, OP_NEGATE
         "00000000000000445a8c19b4ed54590e54a069d7cf8c3b9f7207ed7fb230aa47", // OP_DEPTH, OP_SWAP
+        "000000000000000c15dfb68cc1abead192f718cf8b772977d79938f3a4259afa", // OP_1NEGATIVE, OP_LESSTHAN
         // "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763", // checkpoint 168000
     };
 
@@ -452,41 +454,19 @@ void test_file() {
     print_block_payload(ptrBlockReloaded);
 }
 
-void brute_force() {
-    Byte correctHash[] = {
-        0x16, 0xcf, 0xb9, 0xbc, 0x76, 0x54, 0xef, 0x1d, 0x77, 0x23,
-        0xe5, 0xc2, 0x72, 0x2f, 0xc0, 0xc3, 0xd5, 0x05, 0x04, 0x5e
-    };
-    Byte hash[32] = {0};
-    Byte input[5] = {0x14, 0x01};
-    uint32_t width = 1;
+void test_bignum() {
+    Byte data[32] = {0};
+    BIGNUM *num = BN_new();
+    uint32_t x = 1;
+    BN_set_word(num, x);
+    BN_set_negative(num, -1);
+    uint32_t width = bignum_to_bytes(num, data);
+    BIGNUM *num_out = BN_new();
+    bytes_to_bignum(data, width, num_out);
+    printf("%s -> %s", BN_bn2dec(num), BN_bn2dec(num_out));
 
-    for (uint16_t i = 0; i < 256; i++) {
-        printf("Check %i\n", i);
-        // for (uint16_t j = 0; j < 256; j++) {
-        //     for (uint16_t k = 0; k < 256; k++) {
-                input[0] = (Byte)i;
-                // input[1] = (Byte)j;
-                // input[2] = (Byte)k;
-                dsha256(input, width, hash);
-                sharipe(hash, SHA256_LENGTH, hash);
-                sha256(hash, RIPEMD_LENGTH, hash);
-                sha1(hash, SHA256_LENGTH, hash);
-                ripemd(hash, SHA1_LENGTH, hash);
-                if (memcmp(hash, correctHash, sizeof(correctHash)) == 0) {
-                    printf("Found match!\n");
-                    print_object(input, width);
-                    break;
-                }
-        //     }
-        // }
-    }
-}
-
-void test_hashes() {
-    Byte hash[32] = {0};
-    sha1("", 0, hash);
-    print_object(hash, 32);
+    BN_free(num);
+    BN_free(num_out);
 }
 
 void test() {
@@ -508,6 +488,5 @@ void test() {
     // test_script();
     // test_hash();
     // test_file();
-    brute_force();
-    // test_hashes();
+    test_bignum();
 }

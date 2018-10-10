@@ -11,6 +11,7 @@
 #include "parameters.h"
 #include "utils/memory.h"
 #include "utils/data.h"
+#include "utils/bignum.h"
 
 #define UNKNOWN_OPCODE "UNKNOWN_OPCODE"
 
@@ -88,19 +89,6 @@ StackFrame get_empty_frame() {
     StackFrame frame;
     memset(&frame, 0, sizeof(frame));
     return frame;
-}
-
-StackFrame get_numerical_frame(Byte value) {
-    StackFrame resultFrame = {
-        .type = FRAME_TYPE_DATA,
-        .dataWidth = 1,
-        .data = { value }
-    };
-    return resultFrame;
-}
-
-StackFrame get_boolean_frame(bool value) {
-    return get_numerical_frame((Byte) value);
 }
 
 StackFrame pop(Stack *stack) {
@@ -539,27 +527,134 @@ bool is_pubkey_prefix_valid(Byte prefix) {
            || prefix == SECP256K1_TAG_PUBKEY_HYBRID_ODD;
 }
 
-typedef Byte OperatorFunction(Byte num1, Byte num2);
-
-Byte greater_than(Byte num1, Byte num2) {
-    return (Byte)(num2 > num1);
+bool BN_is_not_zero(BIGNUM *num) {
+    return !BN_is_zero(num);
 }
 
-Byte minus(Byte num1, Byte num2) {
-    return (Byte)(num2 - num1);
+typedef void NullaryOperatorFunction(BIGNUM *result);
+
+typedef void BinaryOperatorFunction(BIGNUM *result, BIGNUM *bignum1, BIGNUM *bignum2);
+
+typedef void UnaryOperatorFunction(BIGNUM *result, BIGNUM *bignum);
+
+// Nullary
+
+void negative_one(BIGNUM *result) {
+    BN_set_word(result, 1);
+    BN_set_negative(result, -1);
 }
 
-Byte boolean_or(Byte num1, Byte num2) {
-    return (Byte)(num1 > 0 || num2 > 0);
+void perform_nullary_operator(Stack *stack, NullaryOperatorFunction f) {
+    BIGNUM *result = BN_new();
+    f(result);
+    StackFrame resultFrame = {
+        .type = FRAME_TYPE_DATA,
+    };
+    resultFrame.dataWidth = bignum_to_bytes(result, resultFrame.data);
+    push(stack, resultFrame);
+    BN_free(result);
 }
 
-void perform_binary_operator(Stack *stack, OperatorFunction f) {
+// Unary
+
+void absolute_value(BIGNUM *result, BIGNUM *bignum) {
+    BN_copy(result, bignum);
+    if (BN_is_negative(result)) {
+        BN_set_negative(result, 0);
+    }
+}
+
+void increment(BIGNUM *result, BIGNUM *bignum) {
+    BN_copy(result, bignum);
+    BN_add_word(result, 1);
+}
+
+void decrement(BIGNUM *result, BIGNUM *bignum) {
+    BN_copy(result, bignum);
+    BN_sub_word(result, 1);
+}
+
+void negate(BIGNUM *result, BIGNUM *bignum) {
+    BN_copy(result, bignum);
+    if (BN_is_negative(result)) {
+        BN_set_negative(result, 0);
+    }
+    else {
+        BN_set_negative(result, -1);
+    }
+}
+
+
+void perform_unary_operator(Stack *stack, UnaryOperatorFunction f) {
+    StackFrame top = pop(stack);
+    BIGNUM *bignum = BN_new();
+    bytes_to_bignum(top.data, top.dataWidth, bignum);
+    BIGNUM *result = BN_new();
+    f(result, bignum);
+    StackFrame resultFrame = {
+        .type = FRAME_TYPE_DATA,
+    };
+    resultFrame.dataWidth = bignum_to_bytes(result, resultFrame.data);
+    push(stack, resultFrame);
+    BN_free(bignum);
+    BN_free(result);
+}
+
+// Binary
+
+void greater_than(BIGNUM *result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_set_word(result, BN_cmp(bignum2, bignum1) > 0 ? 1 : 0);
+}
+
+void less_than(BIGNUM *result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_set_word(result, BN_cmp(bignum2, bignum1) < 0 ? 1 : 0);
+}
+
+void minus(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_sub(result, bignum2, bignum1);
+}
+
+void boolean_or(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_set_word(result, (Byte)(BN_is_not_zero(bignum1) || BN_is_not_zero(bignum2)));
+}
+
+void perform_binary_operator(Stack *stack, BinaryOperatorFunction f) {
     StackFrame frame1 = pop(stack);
     StackFrame frame2 = pop(stack);
-    Byte num1 = frame1.data[0];
-    Byte num2 = frame2.data[0]; // TODO: Use BIGNUM
-    push(stack, get_numerical_frame(f(num1, num2)));
+
+    BIGNUM *bignum1 = BN_new();
+    bytes_to_bignum(frame1.data, frame1.dataWidth, bignum1);
+    BIGNUM *bignum2 = BN_new();
+    bytes_to_bignum(frame2.data, frame2.dataWidth, bignum2);
+    BIGNUM *result = BN_new();
+    f(result, bignum1, bignum2);
+
+    StackFrame resultFrame = {
+        .type = FRAME_TYPE_DATA,
+    };
+    resultFrame.dataWidth = bignum_to_bytes(result, resultFrame.data);
+    push(stack, resultFrame);
+
+    BN_free(bignum1);
+    BN_free(bignum2);
+    BN_free(result);
 }
+
+StackFrame get_numerical_frame(Byte value) {
+    BIGNUM *result = BN_new();
+    BN_set_word(result, value);
+    StackFrame resultFrame = {
+        .type = FRAME_TYPE_DATA,
+    };
+    resultFrame.dataWidth = bignum_to_bytes(result, resultFrame.data);
+    BN_free(result);
+    return resultFrame;
+}
+
+StackFrame get_boolean_frame(bool value) {
+    return get_numerical_frame((Byte) value);
+}
+
 
 // 1: valid, 0: invalid, <0: error
 int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
@@ -698,25 +793,33 @@ bool is_branch_op_frame(StackFrame *frame) {
     return op == OP_IF || op == OP_ELSE || op == OP_NOTIF || op == OP_ENDIF;
 }
 
-uint32_t bignum_to_bytes(BIGNUM* num, Byte *buffer) {
-    int32_t width = BN_bn2mpi(num, NULL);
-    if (width < 4) {
-        return 0;
+bool execute_verify(Stack *runtimeStack) {
+    if (runtimeStack->height == 0) {
+        return false;
     }
-    BN_bn2mpi(num, buffer);
-    memcpy(buffer, buffer+3, width);
-    width -= 3;
-    reverse_bytes(buffer, (uint32_t)width);
-    // FIXME: Hack
-    // Check tx 61a078472543e9de9247446076320499c108b52307d8d0fafbe53b5c4e32acc4
-    // This function produces [0x14, 0x01] for (OP_NEGATE [0x14])
-    // But actually the function expects [0x94]
-    if (buffer[1] == 1) {
-        buffer[1] = 0;
-        buffer[0] += 0x80;
-        width--;
+    StackFrame topFrame = pop(runtimeStack);
+    if (!is_frame_truthy(&topFrame)) {
+        return false;
     }
-    return (uint32_t)width;
+    return true;
+}
+
+bool execute_checksig(Stack *runtimeStack, Stack *inputStack, uint64_t i, CheckSigMeta meta) {
+    if (runtimeStack->height < 2) {
+        fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
+        return false;
+    }
+    StackFrame pubkeyFrame = pop(runtimeStack);
+    StackFrame sigFrame = pop(runtimeStack);
+    Byte *subscript = CALLOC(1, 100000, "subscript");
+    uint64_t subscriptLength = form_subscript(inputStack, i, subscript, true);
+    int8_t result = check_signature(pubkeyFrame, sigFrame, meta, subscript, subscriptLength);
+    FREE(subscript, "subscript");
+    if (result < 0) {
+        return false;
+    }
+    push(runtimeStack, get_boolean_frame(result));
+    return true;
 }
 
 enum BranchState {
@@ -727,6 +830,7 @@ enum BranchState {
 
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
+    Stack altRuntimeStack = get_empty_stack();
 
     enum BranchState branchState = BRANCH_OUTSIDE;
 
@@ -773,20 +877,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_CHECKSIG: {
-                    if (runtimeStack.height < 2) {
-                        fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
+                    if (!execute_checksig(&runtimeStack, inputStack, i, meta)) {
                         goto immediate_fail;
                     }
-                    StackFrame pubkeyFrame = pop(&runtimeStack);
-                    StackFrame sigFrame = pop(&runtimeStack);
-                    Byte *subscript = CALLOC(1, 100000, "subscript");
-                    uint64_t subscriptLength = form_subscript(inputStack, i, subscript, true);
-                    int8_t result = check_signature(pubkeyFrame, sigFrame, meta, subscript, subscriptLength);
-                    FREE(subscript, "subscript");
-                    if (result < 0) {
-                        goto immediate_fail;
-                    }
-                    push(&runtimeStack, get_boolean_frame(result));
                     break;
                 }
                 case OP_EQUAL: {
@@ -996,33 +1089,25 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_1SUB: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    topFrame.data[0]--;
-                    push(&runtimeStack, get_numerical_frame(topFrame.data[0]));
+                    perform_unary_operator(&runtimeStack, decrement);
                     break;
                 }
                 case OP_GREATERTHAN: {
                     perform_binary_operator(&runtimeStack, greater_than);
                     break;
                 }
+                case OP_LESSTHAN: {
+                    perform_binary_operator(&runtimeStack, less_than);
+                    break;
+                }
                 case OP_VERIFY: {
-                    if (runtimeStack.height == 0) {
-                        goto immediate_fail;
-                    }
-                    StackFrame topFrame = pop(&runtimeStack);
-                    if (!is_frame_truthy(&topFrame)) {
+                    if (!execute_verify(&runtimeStack)) {
                         goto immediate_fail;
                     }
                     break;
                 }
                 case OP_NEGATE: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    BIGNUM *num = BN_new();
-                    BN_set_word(num, topFrame.data[0]);
-                    topFrame.dataWidth = bignum_to_bytes(num, topFrame.data);
-
-                    push(&runtimeStack, topFrame);
-                    BN_free(num);
+                    perform_unary_operator(&runtimeStack, negate);
                     break;
                 }
                 case OP_DEPTH: {
@@ -1037,13 +1122,55 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_1ADD: {
-                    StackFrame topFrame = pop(&runtimeStack);
-                    topFrame.data[0]++;
-                    push(&runtimeStack, topFrame);
+                    perform_unary_operator(&runtimeStack, increment);
                     break;
                 }
                 case OP_BOOLOR: {
                     perform_binary_operator(&runtimeStack, boolean_or);
+                    break;
+                }
+                case OP_1NEGATE: {
+                    perform_nullary_operator(&runtimeStack, negative_one);
+                    break;
+                }
+                case OP_ABS: {
+                    perform_unary_operator(&runtimeStack, absolute_value);
+                    break;
+                }
+                case OP_WITHIN: {
+                    StackFrame maxFrame = pop(&runtimeStack);
+                    StackFrame minFrame = pop(&runtimeStack);
+                    StackFrame targetFrame = pop(&runtimeStack);
+                    BIGNUM *max = BN_new();
+                    BIGNUM *min = BN_new();
+                    BIGNUM *target = BN_new();
+                    bytes_to_bignum(maxFrame.data, maxFrame.dataWidth, max);
+                    bytes_to_bignum(minFrame.data, minFrame.dataWidth, min);
+                    bytes_to_bignum(targetFrame.data, targetFrame.dataWidth, target);
+                    bool result = (BN_cmp(min, target) <= 0) && (BN_cmp(target, max) <= 0);
+                    push(&runtimeStack, get_boolean_frame(result));
+                    BN_free(max);
+                    BN_free(min);
+                    BN_free(target);
+                    break;
+                }
+                case OP_TOALTSTACK: {
+                    StackFrame top = pop(&runtimeStack);
+                    push(&altRuntimeStack, top);
+                    break;
+                }
+                case OP_FROMALTSTACK: {
+                    StackFrame top = pop(&altRuntimeStack);
+                    push(&runtimeStack, top);
+                    break;
+                }
+                case OP_CHECKSIGVERIFY: {
+                    if (!execute_checksig(&runtimeStack, inputStack, i, meta)) {
+                        goto immediate_fail;
+                    }
+                    if (!execute_verify(&runtimeStack)) {
+                        goto immediate_fail;
+                    }
                     break;
                 }
                 default: {
