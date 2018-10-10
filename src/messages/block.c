@@ -225,7 +225,7 @@ void print_block_payload(BlockPayload *ptrBlock) {
     hash_block_header(&ptrBlock->header, blockHash);
     print_hash_with_description("", blockHash);
     for (uint32_t i = 0; i < ptrBlock->txCount; i++) {
-        printf("\n## TX %u\n", i);
+        printf("\nTX #%u\n", i);
         print_tx_payload(&ptrBlock->txs[i]);
     }
     printf("----------------\n");

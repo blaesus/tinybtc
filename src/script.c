@@ -618,6 +618,10 @@ void boolean_or(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
     BN_set_word(result, (Byte)(BN_is_not_zero(bignum1) || BN_is_not_zero(bignum2)));
 }
 
+void boolean_and(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_set_word(result, (Byte)(BN_is_not_zero(bignum1) && BN_is_not_zero(bignum2)));
+}
+
 void perform_binary_operator(Stack *stack, BinaryOperatorFunction f) {
     StackFrame frame1 = pop(stack);
     StackFrame frame2 = pop(stack);
@@ -877,9 +881,8 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_CHECKSIG: {
-                    if (!execute_checksig(&runtimeStack, inputStack, i, meta)) {
-                        goto immediate_fail;
-                    }
+                    bool sigValid = execute_checksig(&runtimeStack, inputStack, i, meta);
+                    push(&runtimeStack, get_boolean_frame(sigValid));
                     break;
                 }
                 case OP_EQUAL: {
@@ -897,6 +900,12 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_DROP: {
                     pop(&runtimeStack);
+                    break;
+                }
+                case OP_NIP: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    pop(&runtimeStack);
+                    push(&runtimeStack, topFrame);
                     break;
                 }
                 case OP_HASH160: {
@@ -1129,6 +1138,10 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     perform_binary_operator(&runtimeStack, boolean_or);
                     break;
                 }
+                case OP_BOOLAND: {
+                    perform_binary_operator(&runtimeStack, boolean_and);
+                    break;
+                }
                 case OP_1NEGATE: {
                     perform_nullary_operator(&runtimeStack, negative_one);
                     break;
@@ -1171,6 +1184,18 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     if (!execute_verify(&runtimeStack)) {
                         goto immediate_fail;
                     }
+                    break;
+                }
+                case OP_PICK: {
+                    StackFrame topFrame = pop(&runtimeStack);
+                    Byte count = topFrame.data[0];
+                    int64_t index = runtimeStack.height - 1 - count;
+                    if (index < 0) {
+                        fprintf(stderr, "OP_PICK: insufficient frames\n");
+                        goto immediate_fail;
+                    }
+                    StackFrame target = *runtimeStack.frames[index];
+                    push(&runtimeStack, target);
                     break;
                 }
                 default: {
