@@ -669,9 +669,11 @@ int8_t validate_block(Byte *target, bool saveValidation, Byte *nextHash) {
 
     if (saveValidation) {
         index->meta.fullBlockValidated = true;
-        global.mainValidatedTip = *index;
-        register_validated_block(block);
         index->meta.outputsRegistered = true;
+        register_validated_block(block);
+        if (index->context.chainPOW > global.mainValidatedTip.context.chainPOW) {
+            global.mainValidatedTip = *index;
+        }
     }
 
     if (nextHash && hasChild) {
