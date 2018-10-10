@@ -935,7 +935,9 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_0: {
-                    push(&runtimeStack, get_numerical_frame(0));
+                    StackFrame newFrame = get_empty_frame();
+                    newFrame.dataWidth = 0;
+                    push(&runtimeStack, newFrame);
                     break;
                 }
                 case OP_1:
