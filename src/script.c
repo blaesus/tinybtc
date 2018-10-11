@@ -1257,6 +1257,21 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, frame3);
                     break;
                 }
+                case OP_NOT: {
+                    StackFrame topFrame = top(&runtimeStack);
+                    if (topFrame.type == FRAME_TYPE_DATA) {
+                        BIGNUM *num = BN_new();
+                        bytes_to_bignum(topFrame.data, topFrame.dataWidth, num);
+                        bool isZero = BN_get_word(num) == 0;
+                        BN_free(num);
+                        if (isZero) {
+                            push(&runtimeStack, get_boolean_frame(true));
+                            break;
+                        }
+                    }
+                    push(&runtimeStack, get_boolean_frame(false));
+                    break;
+                }
                 default: {
                     fprintf(stderr, "\nUnimplemented op %#02x [%s]\n", op, get_op_name(op));
                     goto immediate_fail;
