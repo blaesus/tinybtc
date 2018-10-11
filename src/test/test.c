@@ -396,6 +396,7 @@ void test_script() {
         "9fb65b7304aaa77ac9580823c2c06b259cc42591e5cce66d76a81b6f51cc5c28", // Very fancy opes
         "aef4cf7abcd4344ae612d5f27735010a26e5102af20a97a5f43802583d72eb78", // OP_TUCK, OP_ROT
         "00000000000000001e038cda661d0d513723fe0e31634a0019718f343a9880c4", // OP_NUMEQUAL
+        "00000000000000008205dfa0bef686a2cefe24a1fe138a350215123bc5b20136", // OP_2DUP
     };
 
     uint64_t totalTargets = sizeof(targets) / sizeof(targets[0]);

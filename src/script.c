@@ -873,6 +873,19 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, top(&runtimeStack));
                     break;
                 }
+                case OP_2DUP: {
+                    if (runtimeStack.height < 2) {
+                        fprintf(stderr, "OP_2DUP: insufficient frames\n");
+                        goto immediate_fail;
+                    }
+                    StackFrame topFrame = pop(&runtimeStack);
+                    StackFrame subtopFrame = pop(&runtimeStack);
+                    push(&runtimeStack, subtopFrame);
+                    push(&runtimeStack, topFrame);
+                    push(&runtimeStack, subtopFrame);
+                    push(&runtimeStack, topFrame);
+                    break;
+                }
                 case OP_EQUALVERIFY: {
                     if (runtimeStack.height < 2) {
                         fprintf(stderr, "OP_EQUALVERIFY: insufficient frames\n");
