@@ -610,6 +610,10 @@ void less_than(BIGNUM *result, BIGNUM *bignum1, BIGNUM *bignum2) {
     BN_set_word(result, BN_cmp(bignum2, bignum1) < 0 ? 1 : 0);
 }
 
+void equal(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
+    BN_set_word(result, BN_cmp(bignum2, bignum1) == 0 ? 1 : 0);
+}
+
 void add(BIGNUM* result, BIGNUM *bignum1, BIGNUM *bignum2) {
     BN_add(result, bignum2, bignum1);
 }
@@ -1112,6 +1116,10 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_LESSTHAN: {
                     perform_binary_operator(&runtimeStack, less_than);
+                    break;
+                }
+                case OP_NUMEQUAL: {
+                    perform_binary_operator(&runtimeStack, equal);
                     break;
                 }
                 case OP_VERIFY: {
