@@ -669,7 +669,7 @@ StackFrame get_boolean_frame(bool value) {
 int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta meta, Byte *subscript, uint64_t subscriptLength) {
     if (!is_pubkey_prefix_valid(pubkeyFrame.data[0])) {
         printf(
-            "\nInvalid pubkey prefix 0x%#02x. Possibly arbitrary data. Skipping...\n",
+            "\nInvalid pubkey prefix %#02x. Possibly arbitrary data. Skipping...\n",
             pubkeyFrame.data[0]
         );
         return -1;
