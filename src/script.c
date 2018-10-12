@@ -1308,6 +1308,16 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     push(&runtimeStack, get_boolean_frame(false));
                     break;
                 }
+                case OP_RESERVED:
+                case OP_VER:
+                case OP_VERIF:
+                case OP_VERNOTIF:
+                case OP_RESERVED1:
+                case OP_RESERVED2: {
+                    fprintf(stderr, "\nEncountered reserved OP %#02x [%s]\n", op, get_op_name(op));
+                    goto immediate_fail;
+                    break;
+                }
                 default: {
                     fprintf(stderr, "\nUnimplemented op %#02x [%s]\n", op, get_op_name(op));
                     goto immediate_fail;
