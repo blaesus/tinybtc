@@ -953,8 +953,15 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 }
                 case OP_0: {
                     StackFrame newFrame = get_empty_frame();
-                    newFrame.dataWidth = 0;
+                    newFrame.type = FRAME_TYPE_DATA;
+                    newFrame.dataWidth = 1;
+                    newFrame.data[0] = 0;
                     push(&runtimeStack, newFrame);
+                    // TODO:
+                    // 8ea98508efd1f0aada5d734f743d1a2f4d23a7e8428a8be1e820391870eb9a69
+                    // 2c1462024303955581e74ff750a019ed817f682191eb1ef7e3162d91a17cb633
+                    // seems to have different understanding of OP_0
+                    // it is [] or [00] ?
                     break;
                 }
                 case OP_1:
@@ -1079,6 +1086,20 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     }
                     StackFrame topFrame = pop(&runtimeStack);
                     if (is_frame_truthy(&topFrame)) {
+                        branchState = BRANCH_EXECUTING;
+                    }
+                    else {
+                        branchState = BRANCH_NOT_EXECUTING;
+                    }
+                    break;
+                }
+                case OP_NOTIF: {
+                    int64_t endifIndex = next_op(inputStack, i, OP_ENDIF);
+                    if (endifIndex < 0) {
+                        goto immediate_fail;
+                    }
+                    StackFrame topFrame = pop(&runtimeStack);
+                    if (!is_frame_truthy(&topFrame)) {
                         branchState = BRANCH_EXECUTING;
                     }
                     else {

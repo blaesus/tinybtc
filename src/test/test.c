@@ -398,6 +398,8 @@ void test_script() {
         "00000000000000001e038cda661d0d513723fe0e31634a0019718f343a9880c4", // OP_NUMEQUAL
         "00000000000000008205dfa0bef686a2cefe24a1fe138a350215123bc5b20136", // OP_2DUP
         "00000000000000006a2b155c209f0572c0e2470d5349aa60806e9ee5ea696066", // OP_NOT
+        "8ea98508efd1f0aada5d734f743d1a2f4d23a7e8428a8be1e820391870eb9a69", // OP_0 hashing
+        "2c1462024303955581e74ff750a019ed817f682191eb1ef7e3162d91a17cb633", // OP_NOTIF
     };
 
     uint64_t totalTargets = sizeof(targets) / sizeof(targets[0]);
