@@ -4,6 +4,9 @@
 #include "utils/memory.h"
 
 uint32_t bignum_to_bytes(BIGNUM* num, Byte *buffer) {
+    if (BN_get_word(num) == 0) {
+        return 0;
+    }
     int32_t width = BN_bn2mpi(num, NULL);
     if (width < 4) {
         return 0;
@@ -25,6 +28,10 @@ uint32_t bignum_to_bytes(BIGNUM* num, Byte *buffer) {
 }
 
 void bytes_to_bignum(Byte *buffer, uint32_t width, BIGNUM* num) {
+    if (width == 0) {
+        BN_set_word(num, 0);
+        return;
+    }
     if (width == 1) {
         BN_set_word(num, buffer[0]);
         return;
