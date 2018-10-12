@@ -705,7 +705,7 @@ uint32_t validate_blocks(double maxTime) {
         int8_t validation = validate_block(blockHash, true, blockHash);
         checkedBlocks++;
         now = get_now();
-        averageTime = (now - start) / maxTime;
+        averageTime = (now - start) / checkedBlocks;
         if (validation != 2) {
             break;
         }
