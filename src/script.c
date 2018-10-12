@@ -841,20 +841,31 @@ bool execute_checksig(Stack *runtimeStack, Stack *inputStack, uint64_t i, CheckS
 }
 
 enum BranchState {
-    BRANCH_OUTSIDE,
     BRANCH_EXECUTING,
-    BRANCH_NOT_EXECUTING,
+    BRANCCH_SKIPPING,
 };
+
+struct BranchStack {
+    enum BranchState states[64];
+    int16_t stackIndex;
+};
+
+inline bool should_skip_branch(struct BranchStack *branchStack) {
+    return branchStack->stackIndex >= 0 && branchStack->states[branchStack->stackIndex] == BRANCCH_SKIPPING;
+}
 
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
     Stack runtimeStack = get_empty_stack();
     Stack altRuntimeStack = get_empty_stack();
 
-    enum BranchState branchState = BRANCH_OUTSIDE;
+    struct BranchStack branchStack = {
+        .stackIndex = -1,
+        .states = {0},
+    };
 
     for (uint64_t i = 0; i < inputStack->height; i++) {
         StackFrame *inputFrame = inputStack->frames[i];
-        if (branchState == BRANCH_NOT_EXECUTING && !is_branch_op_frame(inputFrame)) {
+        if (should_skip_branch(&branchStack) && !is_branch_op_frame(inputFrame)) {
             #if LOG_SCRIPT_STACKS
             printf("Skipping frame for branching:\n");
             print_frame(inputFrame);
@@ -1099,12 +1110,13 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     if (endifIndex < 0) {
                         goto immediate_fail;
                     }
+                    branchStack.stackIndex++;
                     StackFrame topFrame = pop(&runtimeStack);
                     if (is_frame_truthy(&topFrame)) {
-                        branchState = BRANCH_EXECUTING;
+                        branchStack.states[branchStack.stackIndex] = BRANCH_EXECUTING;
                     }
                     else {
-                        branchState = BRANCH_NOT_EXECUTING;
+                        branchStack.states[branchStack.stackIndex] = BRANCCH_SKIPPING;
                     }
                     break;
                 }
@@ -1113,34 +1125,34 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     if (endifIndex < 0) {
                         goto immediate_fail;
                     }
+                    branchStack.stackIndex++;
                     StackFrame topFrame = pop(&runtimeStack);
                     if (!is_frame_truthy(&topFrame)) {
-                        branchState = BRANCH_EXECUTING;
+                        branchStack.states[branchStack.stackIndex] = BRANCH_EXECUTING;
                     }
                     else {
-                        branchState = BRANCH_NOT_EXECUTING;
+                        branchStack.states[branchStack.stackIndex] = BRANCCH_SKIPPING;
                     }
                     break;
                 }
                 case OP_ELSE: {
-                    if (branchState == BRANCH_OUTSIDE) {
-                        fprintf(stderr, "Unexpected OP_ELSE\n");
+                    if (branchStack.stackIndex < 0) {
                         goto immediate_fail;
                     }
-                    else if (branchState == BRANCH_EXECUTING) {
-                        branchState = BRANCH_NOT_EXECUTING;
+                    else if (branchStack.states[branchStack.stackIndex] == BRANCH_EXECUTING) {
+                        branchStack.states[branchStack.stackIndex] = BRANCCH_SKIPPING;
                     }
                     else {
-                        branchState = BRANCH_EXECUTING;
+                        branchStack.states[branchStack.stackIndex] = BRANCH_EXECUTING;
                     }
                     break;
                 }
                 case OP_ENDIF: {
-                    if (branchState == BRANCH_OUTSIDE) {
+                    if (branchStack.stackIndex < 0) {
                         fprintf(stderr, "Unexpected OP_ENDIF\n");
                         goto immediate_fail;
                     }
-                    branchState = BRANCH_OUTSIDE;
+                    branchStack.stackIndex--;
                     break;
                 }
                 case OP_RETURN: {

@@ -400,6 +400,7 @@ void test_script() {
         "00000000000000006a2b155c209f0572c0e2470d5349aa60806e9ee5ea696066", // OP_NOT
         "8ea98508efd1f0aada5d734f743d1a2f4d23a7e8428a8be1e820391870eb9a69", // OP_0 hashing
         "2c1462024303955581e74ff750a019ed817f682191eb1ef7e3162d91a17cb633", // OP_NOTIF
+        "4fea28ca023cae8498cf10541826f5da8e06eabf0d9cc03c8cdc4b91cb0c49e2", // Complex script, embedded endif
     };
 
     uint64_t totalTargets = sizeof(targets) / sizeof(targets[0]);
