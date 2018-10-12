@@ -71,7 +71,7 @@ int32_t main(int32_t argc, char **argv) {
     switch (global.mode) {
         case MODE_VALIDATE: {
             uint32_t *time = global.modeData;
-            revalidate(*time);
+            validate_blocks(*time);
             return 0;
         }
         case MODE_VALIDATE_ONE: {

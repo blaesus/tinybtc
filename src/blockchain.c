@@ -710,7 +710,8 @@ uint32_t validate_blocks(double maxTime) {
             break;
         }
     }
-    printf("\nStopping validation after %.1fms\n", now - start);
+    double deltaT = now - start;
+    printf("\nValidated %u in %.1fms (avg. %.1fms per block)\n", checkedBlocks, deltaT, deltaT / checkedBlocks);
     return checkedBlocks;
 }
 
@@ -733,9 +734,4 @@ void reset_utxo() {
     reset_validation();
     destory_db(config.utxoDBName);
     printf("Done.\n");
-}
-
-void revalidate(uint32_t maxTime) {
-    uint32_t checkedBlocks = validate_blocks(maxTime);
-    printf("\nChecked %u blocks\n", checkedBlocks);
 }
