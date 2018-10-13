@@ -1023,6 +1023,13 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     // Simulate Bitcoin bug
                     pop(&runtimeStack);
 
+                    if (signatureCount == 0) {
+                        // HACK for fcc78d0f68a3e9b3c7dc81f050714f24c2a71af1f141131d4b4992f863d0f2bc
+                        // It doesn't have signature but does have a public key
+                        push(&runtimeStack, get_boolean_frame(true));
+                        break;
+                    }
+
                     Byte *subscript = CALLOC(1, 100000, "subscript");
                     uint64_t subscriptLength = form_subscript(inputStack, i, subscript, false);
 
