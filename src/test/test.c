@@ -402,6 +402,7 @@ void test_script() {
         "2c1462024303955581e74ff750a019ed817f682191eb1ef7e3162d91a17cb633", // OP_NOTIF
         "4fea28ca023cae8498cf10541826f5da8e06eabf0d9cc03c8cdc4b91cb0c49e2", // Complex script, embedded endif
         "fcc78d0f68a3e9b3c7dc81f050714f24c2a71af1f141131d4b4992f863d0f2bc", // OP_CHECKMULTISIG without sig
+        "0000000000000000128e40ab4f910b3e40395c4f1de6d2d20dbd2f906b42bcde", // 500+ stack frames
     };
 
     uint64_t totalTargets = sizeof(targets) / sizeof(targets[0]);

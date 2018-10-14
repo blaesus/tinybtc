@@ -17,8 +17,6 @@
 
 #define CLEAR_OLD_ADDR_THRESHOLD 1000
 
-#define MAX_STACK_HEIGHT 100
-
 #define MAX_CHECKPOINTS 32
 
 struct ChainCheckPoint {

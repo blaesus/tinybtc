@@ -16,6 +16,7 @@
 #define UNKNOWN_OPCODE "UNKNOWN_OPCODE"
 
 #define MAX_STACK_FRAME_WIDTH 1024 // TODO: dynamic allocate
+#define DEFAULT_STACK_SIZE 16
 
 #define SECP256K1_TAG_PUBKEY_EVEN 0x02
 #define SECP256K1_TAG_PUBKEY_ODD 0x03
@@ -50,8 +51,9 @@ struct StackFrame {
 typedef struct StackFrame StackFrame;
 
 struct Stack {
-    struct StackFrame *frames[MAX_STACK_HEIGHT];
-    uint64_t height;
+    struct StackFrame *frames;
+    uint32_t capacity;
+    uint32_t size;
 };
 
 void polish_tx_copy(TxPayload *txCopy, uint32_t hashtype, uint64_t currentInputIndex);
@@ -85,6 +87,22 @@ void hash_tx_with_hashtype(TxPayload *tx, uint32_t hashType, uint64_t inputIndex
 
 typedef struct Stack Stack;
 
+Stack create_stack(uint16_t capacity) {
+    Stack stack;
+    memset(&stack, 0, sizeof(stack));
+    stack.capacity = capacity;
+    stack.frames = CALLOC(capacity, sizeof(StackFrame), "stack:frames");
+    return stack;
+}
+
+uint32_t resize_stack(Stack *stack) {
+    uint32_t ratio = 2U;
+    uint32_t newCapacity = stack->capacity * ratio;
+    stack->frames = realloc(stack->frames, newCapacity * sizeof(StackFrame));
+    stack->capacity = newCapacity;
+    return newCapacity;
+}
+
 StackFrame get_empty_frame() {
     StackFrame frame;
     memset(&frame, 0, sizeof(frame));
@@ -92,29 +110,29 @@ StackFrame get_empty_frame() {
 }
 
 StackFrame pop(Stack *stack) {
-    if (stack->height == 0) {
+    if (stack->size == 0) {
         fprintf(stderr, "\nattempting to pop an empty stack; returning empty frame...\n");
         return get_empty_frame();
     }
-    StackFrame *ptrTop = stack->frames[stack->height - 1];
-    stack->height--;
-    StackFrame result = *ptrTop;
-    FREE(ptrTop, "push:frame");
-    return result;
+    StackFrame topFrame = stack->frames[stack->size - 1];
+    stack->size--;
+    return topFrame;
 }
 
-void push(Stack *stack, StackFrame data) {
-    stack->frames[stack->height] = CALLOC(1, sizeof(StackFrame), "push:frame");
-    memcpy(stack->frames[stack->height], &data, sizeof(StackFrame));
-    stack->height++;
+void push(Stack *stack, StackFrame newFrame) {
+    if (stack->size >= stack->capacity) {
+        resize_stack(stack);
+    }
+    memcpy(&stack->frames[stack->size], &newFrame, sizeof(StackFrame));
+    stack->size++;
 }
 
 StackFrame top(Stack *stack) {
-    if (stack->height == 0) {
+    if (stack->size == 0) {
         fprintf(stderr, "\nattempting to top an empty stack; returning empty frame...\n");
         return get_empty_frame();
     }
-    return *stack->frames[stack->height - 1];
+    return stack->frames[stack->size - 1];
 }
 
 // From Bitcoin 0.0.1
@@ -272,14 +290,14 @@ void print_stack_with_label(struct Stack *stack, char *label) {
         return;
     }
     if (label) {
-        printf("\n=== %s Stack (height=%llu) ===\n", label, stack->height);
+        printf("\n=== %s Stack (height=%u) ===\n", label, stack->size);
     }
     else {
-        printf("\n=== Stack (height=%llu) ===\n", stack->height);
+        printf("\n=== Stack (height=%u) ===\n", stack->size);
     }
-    for (uint16_t i = 0; i < stack->height; i++) {
+    for (uint16_t i = 0; i < stack->size; i++) {
         printf("Frame %02i: ", i);
-        print_frame(stack->frames[i]);
+        print_frame(&stack->frames[i]);
     }
     printf("---------------------\n");
 }
@@ -350,16 +368,8 @@ void print_ops(Byte *array, uint64_t length) {
     }
 }
 
-Stack get_empty_stack() {
-    Stack stack;
-    memset(&stack, 0, sizeof(stack));
-    return stack;
-}
-
 void free_stack_frames(Stack *stack) {
-    for (uint64_t i = 0; i < stack->height; i++) {
-        FREE(stack->frames[i]->data, "push:frame");
-    }
+    FREE(stack->frames, "stack:frames");
 }
 
 bool are_frames_equal(StackFrame *frameA, StackFrame *frameB) {
@@ -735,7 +745,7 @@ int8_t check_signature(StackFrame pubkeyFrame, StackFrame sigFrame, CheckSigMeta
 
 int64_t find_op_frame(Stack *stack, uint64_t end, Byte op) {
     for (int64_t i = end; i > 0; i--) {
-        StackFrame *frame = stack->frames[i];
+        StackFrame *frame = &stack->frames[i];
         if (frame->type == FRAME_TYPE_OP && frame->data[0] == op) {
             return i;
         }
@@ -749,9 +759,9 @@ uint64_t form_subscript(Stack *inputStack, uint64_t checksigIndex, Byte *subscri
         return 0;
     }
     uint64_t subscriptLength = 0;
-    uint64_t end = useAllScript ? inputStack->height : checksigIndex + 1;
-    for (uint64_t i = (uint64_t)separatorIndex+1; i < end && i < inputStack->height; i++) {
-        StackFrame *frame = inputStack->frames[i];
+    uint64_t end = useAllScript ? inputStack->size : checksigIndex + 1;
+    for (uint64_t i = (uint64_t)separatorIndex+1; i < end && i < inputStack->size; i++) {
+        StackFrame *frame = &inputStack->frames[i];
         if (frame->type == FRAME_TYPE_OP && frame->data[0] == OP_CODESEPARATOR) {
             continue;
         }
@@ -774,7 +784,7 @@ StackFrame hash_frame(StackFrame topFrame, HashFunc hashFunc, uint32_t outputWid
 }
 
 void hash_top_frame(Stack *stack, HashFunc hashFunc, uint32_t outputWidth) {
-    if (stack->height < 1) {
+    if (stack->size < 1) {
         fprintf(stderr, "hash_top_frame: insufficient frames\n");
         return;
     }
@@ -797,8 +807,8 @@ bool is_frame_truthy(StackFrame *frame) {
 
 
 int64_t next_op(Stack *stack, uint64_t start, Byte op) {
-    for (uint64_t i = start+1; i < stack->height; i++) {
-        StackFrame *frame = stack->frames[i];
+    for (uint64_t i = start+1; i < stack->size; i++) {
+        StackFrame *frame = &stack->frames[i];
         if (frame->type == FRAME_TYPE_OP && frame->data[0] == op) {
             return i;
         }
@@ -815,7 +825,7 @@ bool is_branch_op_frame(StackFrame *frame) {
 }
 
 bool execute_verify(Stack *runtimeStack) {
-    if (runtimeStack->height == 0) {
+    if (runtimeStack->size == 0) {
         return false;
     }
     StackFrame topFrame = pop(runtimeStack);
@@ -826,7 +836,7 @@ bool execute_verify(Stack *runtimeStack) {
 }
 
 bool execute_checksig(Stack *runtimeStack, Stack *inputStack, uint64_t i, CheckSigMeta meta) {
-    if (runtimeStack->height < 2) {
+    if (runtimeStack->size < 2) {
         fprintf(stderr, "OP_CHECKSIG: insufficient frames\n");
         return false;
     }
@@ -855,16 +865,16 @@ inline bool should_skip_branch(struct BranchStack *branchStack) {
 }
 
 bool evaluate(Stack *inputStack, CheckSigMeta meta) {
-    Stack runtimeStack = get_empty_stack();
-    Stack altRuntimeStack = get_empty_stack();
+    Stack runtimeStack = create_stack(DEFAULT_STACK_SIZE);
+    Stack altRuntimeStack = create_stack(DEFAULT_STACK_SIZE);
 
     struct BranchStack branchStack = {
         .stackIndex = -1,
         .states = {0},
     };
 
-    for (uint64_t i = 0; i < inputStack->height; i++) {
-        StackFrame *inputFrame = inputStack->frames[i];
+    for (uint64_t i = 0; i < inputStack->size; i++) {
+        StackFrame *inputFrame = &inputStack->frames[i];
         if (should_skip_branch(&branchStack) && !is_branch_op_frame(inputFrame)) {
             #if LOG_SCRIPT_STACKS
             printf("Skipping frame for branching:\n");
@@ -885,7 +895,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
             #endif
             switch (op) {
                 case OP_DUP: {
-                    if (runtimeStack.height == 0) {
+                    if (runtimeStack.size == 0) {
                         fprintf(stderr, "OP_DUP: empty stack\n");
                         goto immediate_fail;
                     }
@@ -893,7 +903,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_2DUP: {
-                    if (runtimeStack.height < 2) {
+                    if (runtimeStack.size < 2) {
                         fprintf(stderr, "OP_2DUP: insufficient frames\n");
                         goto immediate_fail;
                     }
@@ -906,7 +916,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_EQUALVERIFY: {
-                    if (runtimeStack.height < 2) {
+                    if (runtimeStack.size < 2) {
                         fprintf(stderr, "OP_EQUALVERIFY: insufficient frames\n");
                         goto immediate_fail;
                     }
@@ -925,7 +935,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_EQUAL: {
-                    if (runtimeStack.height < 2) {
+                    if (runtimeStack.size < 2) {
                         fprintf(stderr, "OP_EQUAL: insufficient frames\n");
                         goto immediate_fail;
                     }
@@ -1201,7 +1211,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                     break;
                 }
                 case OP_DEPTH: {
-                    push(&runtimeStack, get_numerical_frame((Byte)runtimeStack.height));
+                    push(&runtimeStack, get_numerical_frame((Byte)runtimeStack.size));
                     break;
                 }
                 case OP_SWAP: {
@@ -1270,28 +1280,28 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
                 case OP_PICK: {
                     StackFrame topFrame = pop(&runtimeStack);
                     Byte count = topFrame.data[0];
-                    int64_t index = runtimeStack.height - 1 - count;
+                    int64_t index = runtimeStack.size - 1 - count;
                     if (index < 0) {
                         fprintf(stderr, "OP_PICK: insufficient frames\n");
                         goto immediate_fail;
                     }
-                    StackFrame target = *runtimeStack.frames[index];
+                    StackFrame target = runtimeStack.frames[index];
                     push(&runtimeStack, target);
                     break;
                 }
                 case OP_ROLL: {
                     StackFrame topFrame = pop(&runtimeStack);
                     Byte count = topFrame.data[0];
-                    int64_t index = runtimeStack.height - 1 - count;
+                    int64_t index = runtimeStack.size - 1 - count;
                     if (index < 0) {
                         fprintf(stderr, "OP_ROLL: insufficient frames\n");
                         return -1;
                     }
-                    StackFrame target = *runtimeStack.frames[index];
-                    for (uint64_t x = (uint64_t)index; x < runtimeStack.height - index + 1; x++) {
-                        *runtimeStack.frames[x] = *runtimeStack.frames[x+1];
+                    StackFrame target = runtimeStack.frames[index];
+                    for (int64_t x = index; x < runtimeStack.size - index + 1; x++) {
+                        runtimeStack.frames[x] = runtimeStack.frames[x+1];
                     }
-                    runtimeStack.height--;
+                    runtimeStack.size--;
                     push(&runtimeStack, target);
                     break;
                 }
@@ -1352,7 +1362,7 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
 
     // Calculate final output
     bool result;
-    if (runtimeStack.height == 0) {
+    if (runtimeStack.size == 0) {
         printf("No frames remain when input are exhausted\n");
         result = false;
     }
@@ -1361,15 +1371,17 @@ bool evaluate(Stack *inputStack, CheckSigMeta meta) {
         result = !is_byte_array_empty(lastFrame.data, lastFrame.dataWidth);
     }
     free_stack_frames(&runtimeStack);
+    free_stack_frames(&altRuntimeStack);
     return result;
 
     immediate_fail:
     free_stack_frames(&runtimeStack);
+    free_stack_frames(&altRuntimeStack);
     return false;
 }
 
 bool run_program(Byte *program, uint64_t programLength, CheckSigMeta meta) {
-    Stack inputStack = get_empty_stack();
+    Stack inputStack = create_stack(DEFAULT_STACK_SIZE);
     load_program(&inputStack, program, programLength);
     print_stack_with_label(&inputStack, "Input");
     bool result = evaluate(&inputStack, meta);
